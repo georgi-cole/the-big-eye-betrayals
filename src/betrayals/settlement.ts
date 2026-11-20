@@ -1,9 +1,18 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
-import { isCurrentCommand } from './run.ts'
+import { hashId, isCurrentCommand } from './run.ts'
 import type { CommandToken, Role, Run } from './run.ts'
 
 type Reason = NonNullable<Run['result']>['reason']
 type EndVote = { voterId: string; choice: 'end' | 'banish' }
+
+export function intendsToEnd(run: Run, voterId: string): boolean {
+  const roll = mulberry32(run.publicSeed ^ hashId(voterId) ^ (run.day * 97))()
+  if (run.private.betrayers.includes(voterId)) return roll >= 0.18
+  const revealedBetrayers = run.seats.filter(({ exit }) => exit?.revealedRole === 'betrayer').length
+  const pressure = Math.max(0, ...Object.values(run.lastTable?.tally ?? {}))
+  const confidence = Math.min(0.9, 0.13 + revealedBetrayers * 0.16 - pressure * 0.035)
+  return roll < confidence
+}
 
 export function settleRun(run: Run, reason: Reason): Run {
   if (run.result) return run

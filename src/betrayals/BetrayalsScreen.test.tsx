@@ -4,8 +4,9 @@ import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
 import { saveRun } from './persistence'
-import { startRun } from './run'
+import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
+import { resolveTable } from './table'
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
@@ -230,10 +231,52 @@ describe('Betrayals season review', () => {
     expect(tv.queryByRole('log')).not.toBeInTheDocument()
     fireEvent.click(within(chamber).getByRole('button', { name: 'Back to castle' }))
     expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const privateTalk = within(screen.getByRole('dialog', { name: 'Social' }))
+    expect(privateTalk.getByRole('button', { name: /Speak one-on-one/ })).toBeVisible()
+    expect(privateTalk.getByRole('button', { name: /Plan a vote/ })).toBeVisible()
+    fireEvent.click(privateTalk.getByRole('button', { name: 'Close social panel' }))
     fireEvent.click(screen.getByRole('button', { name: 'Enter Round Table' }))
     await clickAndSave(screen.getByRole('button', { name: 'Go to vote' }))
     expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lock vote' })).toBeDisabled()
+  })
+
+  it('keeps a completed vote count visible after a private check-in', async () => {
+    const start = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'table-check-in', roleSeed: 32, publicSeed: 12 }
+    )
+    const table = { ...start, phase: 'round-table' as const }
+    const [, target, alternate] = table.seats
+    const counted = resolveTable(
+      table,
+      commandToken(table),
+      table.seats.map(({ id }) => ({
+        voterId: id,
+        targetId: id === target.id ? alternate.id : target.id,
+      }))
+    )
+    saveRun(localStorage, 'edition-local', counted)
+    render(<BetrayalsScreen />)
+    const feed = within(screen.getByRole('region', { name: 'Round Table vote count' }))
+    fireEvent.click(feed.getByRole('button', { name: 'Show full count' }))
+    expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    const guests = within(social.getByRole('region', { name: 'Player roster' }))
+    fireEvent.click(guests.getAllByRole('button')[0])
+    expect(social.queryByRole('button', { name: /Plan a vote/ })).not.toBeInTheDocument()
+    fireEvent.click(social.getByRole('button', { name: /Check in after the vote/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    expect(social.getByLabelText('Energy: 4')).toBeVisible()
+    fireEvent.click(social.getByRole('button', { name: 'Close social panel' }))
+
+    expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+    expect(screen.getByRole('button', { name: 'Reveal result' })).toBeEnabled()
   })
 
   it('keeps the revealed contestant in their original seat after a banishment', async () => {

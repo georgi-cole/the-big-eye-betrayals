@@ -1,0 +1,190 @@
+import type { SocialActionDefinition } from '../social/socialActions'
+import {
+  addEarnedEnergy,
+  podiumEnergyForPlacement,
+  SOCIAL_RESOURCE_CALIBRATION as calibration,
+} from '../social/socialResourceCalibration.ts'
+import { getSocialResourceEffect } from '../social/socialResourceEconomy.ts'
+import type { RealityPreset, Run, SocialEntry } from './run.ts'
+
+export type SocialResources = { energy: number; influence: number; info: number }
+export type SocialWallet = SocialResources & { day: number; energySpent: number }
+
+const actionEconomy: Record<
+  SocialEntry['kind'],
+  { resourceAction: Pick<SocialActionDefinition, 'id' | 'kind'>; cost: SocialResources }
+> = {
+  rapport: {
+    resourceAction: { id: 'rapport', kind: 'rapport' },
+    cost: { energy: 1, influence: 0, info: 0 },
+  },
+  question: {
+    resourceAction: { id: 'whisper', kind: 'intel_gain' },
+    cost: { energy: 1, influence: 0, info: 0 },
+  },
+  alliance: {
+    resourceAction: { id: 'proposeAlliance', kind: 'intel_spend' },
+    cost: { energy: 2, influence: 0, info: 0 },
+  },
+  'vote-plan': {
+    resourceAction: { id: 'rally_votes_against', kind: 'political_spend' },
+    cost: { energy: 2, influence: 20, info: 50 },
+  },
+  'ask-about': {
+    resourceAction: { id: 'ask_player_opinion', kind: 'intel_gain' },
+    cost: { energy: 1, influence: 2, info: 0 },
+  },
+  'share-suspicion': {
+    resourceAction: { id: 'share_suspicion', kind: 'intel_spend' },
+    cost: { energy: 1, influence: 0, info: 25 },
+  },
+  'defend-guest': {
+    resourceAction: { id: 'defend_guest', kind: 'political_spend' },
+    cost: { energy: 1, influence: 5, info: 0 },
+  },
+  'mend-fences': {
+    resourceAction: { id: 'mend_fences', kind: 'rapport' },
+    cost: { energy: 1, influence: 0, info: 0 },
+  },
+  debrief: {
+    resourceAction: { id: 'ask_player_opinion', kind: 'intel_gain' },
+    cost: { energy: 1, influence: 0, info: 0 },
+  },
+  'ask-end': {
+    resourceAction: { id: 'ask_loh_target', kind: 'intel_gain' },
+    cost: { energy: 1, influence: 3, info: 0 },
+  },
+}
+
+const calibrationMode = (reality: RealityPreset) => (reality === 'off' ? 'normal' : 'drama')
+
+function startingSocialWallet(day: number, reality: RealityPreset): SocialWallet {
+  return {
+    day,
+    energy: calibration[calibrationMode(reality)].dailyEnergy,
+    energySpent: 0,
+    influence: 0,
+    info: 0,
+  }
+}
+
+export function initializeSocialWallets(
+  seats: readonly { id: string }[],
+  day: number,
+  reality: RealityPreset
+): NonNullable<Run['socialWallets']> {
+  return Object.fromEntries(seats.map(({ id }) => [id, startingSocialWallet(day, reality)]))
+}
+
+export function socialMoveCost(kind: SocialEntry['kind'], reality: RealityPreset): SocialResources {
+  const { cost } = actionEconomy[kind]
+  return reality !== 'off' && (kind === 'question' || kind === 'vote-plan')
+    ? { ...cost, energy: cost.energy + 1 }
+    : cost
+}
+
+export function missingSocialResource(
+  resources: SocialResources,
+  cost: SocialResources
+): keyof SocialResources | undefined {
+  const currencies = ['energy', 'influence', 'info'] as const
+  return currencies.find((currency) => resources[currency] < cost[currency])
+}
+
+export function socialWalletFor(run: Run, id: string): SocialWallet {
+  const mode = calibrationMode(run.options.realityMode)
+  const allowance = calibration[mode].dailyEnergy
+  const stored =
+    run.socialWallets && Object.hasOwn(run.socialWallets, id) ? run.socialWallets[id] : undefined
+  if (!stored) return startingSocialWallet(run.day, run.options.realityMode)
+  if (stored.day === run.day) return stored
+  return {
+    ...stored,
+    energy: addEarnedEnergy(stored.energy, (run.day - stored.day) * allowance, mode),
+    day: run.day,
+    energySpent: 0,
+  }
+}
+
+export function recordSocialWallet(
+  run: Run,
+  id: string,
+  changes: Partial<SocialResources>,
+  energySpent = 0
+): NonNullable<Run['socialWallets']> {
+  const wallet = socialWalletFor(run, id)
+  const energy = changes.energy ?? 0
+  const mode = calibrationMode(run.options.realityMode)
+  return {
+    ...run.socialWallets,
+    [id]: {
+      ...wallet,
+      energy: energy < 0 ? wallet.energy + energy : addEarnedEnergy(wallet.energy, energy, mode),
+      influence: Math.max(0, wallet.influence + (changes.influence ?? 0)),
+      info: Math.max(0, wallet.info + (changes.info ?? 0)),
+      energySpent: wallet.energySpent + energySpent,
+    },
+  }
+}
+
+export function walletAfterSocialMove(run: Run, entry: SocialEntry, cost: SocialResources) {
+  const { resourceAction } = actionEconomy[entry.kind]
+  const outcome =
+    entry.reaction === 'backfired'
+      ? 'backfire'
+      : entry.accepted === false || entry.reaction === 'held-back' || entry.reaction === 'unmoved'
+        ? 'failure'
+        : 'success'
+  const effect = getSocialResourceEffect(
+    { ...resourceAction, title: resourceAction.id, category: 'strategic', baseCost: cost.energy },
+    outcome
+  )
+  const alliance = entry.kind === 'alliance' && entry.accepted
+  return recordSocialWallet(
+    run,
+    entry.actorId,
+    {
+      energy: -cost.energy,
+      influence:
+        effect.influence -
+        cost.influence +
+        (alliance ? calibration.relationships.allianceInfluence : 0),
+      info: effect.info - cost.info,
+    },
+    cost.energy
+  )
+}
+
+export function walletsAfterChallenge(
+  run: Run,
+  standings: readonly { contestantId: string; forfeited?: boolean }[]
+): Run['socialWallets'] {
+  const mode = calibrationMode(run.options.realityMode)
+  let updated = run
+  for (const [index, { contestantId, forfeited }] of standings.entries()) {
+    const wallet = socialWalletFor(updated, contestantId)
+    const secondWind =
+      run.phase === 'immunity' && wallet.energySpent >= calibration[mode].secondWindSpendThreshold
+        ? calibration[mode].activeSecondWind
+        : 0
+    const podium = forfeited ? 0 : podiumEnergyForPlacement(index + 1)
+    const influence =
+      !forfeited && index === 0
+        ? run.phase === 'immunity'
+          ? calibration.competition.lohInfluence
+          : run.phase === 'safety'
+            ? calibration.competition.posInfluence
+            : calibration.competition.voxFinalImmunityInfluence
+        : 0
+    if (secondWind || podium || influence) {
+      updated = {
+        ...updated,
+        socialWallets: recordSocialWallet(updated, contestantId, {
+          energy: secondWind + podium,
+          influence,
+        }),
+      }
+    }
+  }
+  return updated.socialWallets
+}

@@ -1,4 +1,6 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
+import { initializeSocialWallets } from './socialResources.ts'
+import type { SocialWallet } from './socialResources.ts'
 
 export const CAST_SIZE = 25
 export const MAX_TABLE_ROUNDS = 3
@@ -36,13 +38,36 @@ export type RunOptions = { publicMode: boolean; realityMode: RealityPreset }
 export const INCOMING_ANSWERS = ['engage', 'listen', 'dismiss'] as const
 export type IncomingAnswer = (typeof INCOMING_ANSWERS)[number]
 
+export type SocialReaction =
+  | 'wary'
+  | 'trusts'
+  | 'uncertain'
+  | 'held-back'
+  | 'landed'
+  | 'unmoved'
+  | 'backfired'
+  | 'repaired'
+  | 'end'
+  | 'banish'
+
 export type SocialEntry = {
   day: number
   actorId: string
   recipientId: string
-  kind: 'rapport' | 'question' | 'alliance' | 'vote-plan'
+  kind:
+    | 'rapport'
+    | 'question'
+    | 'alliance'
+    | 'vote-plan'
+    | 'ask-about'
+    | 'share-suspicion'
+    | 'defend-guest'
+    | 'mend-fences'
+    | 'debrief'
+    | 'ask-end'
   suspectId?: string
   accepted?: boolean
+  reaction?: SocialReaction
 }
 
 export type TableReceipt = {
@@ -96,6 +121,7 @@ export type Run = {
   publicSeed: number
   pot: number
   social: SocialEntry[]
+  socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>
   presentation?: PresentationCue[]
   immunityId?: string
@@ -116,6 +142,26 @@ export type Run = {
 }
 
 export type CommandToken = { runId: string; revision: number; phase: Phase }
+
+export function hashId(id: string): number {
+  return Array.from(id).reduce(
+    (hash, character) => (Math.imul(hash, 31) + character.charCodeAt(0)) | 0,
+    0
+  )
+}
+
+export function eligibleBanishmentTargets(run: Run, voterId: string): string[] {
+  const shieldId = run.publicShield?.day === run.day ? run.publicShield.id : undefined
+  return run.seats
+    .filter(
+      ({ id, exit }) =>
+        !exit &&
+        id !== voterId &&
+        (run.phase === 'final-banishment' || (id !== run.immunityId && id !== shieldId)) &&
+        (!run.runoffIds || run.runoffIds.includes(id))
+    )
+    .map(({ id }) => id)
+}
 
 export function commandToken(run: Run): CommandToken {
   return { runId: run.id, revision: run.revision, phase: run.phase }
@@ -168,6 +214,7 @@ export function startRun(
     publicSeed: entropy.publicSeed,
     pot: 0,
     social: [],
+    socialWallets: initializeSocialWallets(seats, 1, options.realityMode),
   }
 }
 

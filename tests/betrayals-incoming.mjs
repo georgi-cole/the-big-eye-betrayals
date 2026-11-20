@@ -3,7 +3,8 @@ import test from 'node:test'
 import { getIncomingInteractions, respondToIncomingInteraction } from '../src/betrayals/incoming.ts'
 import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
 import { commandToken, startRun } from '../src/betrayals/run.ts'
-import { getSocialView, remainingActions } from '../src/betrayals/social.ts'
+import { getSocialView } from '../src/betrayals/social.ts'
+import { socialWalletFor } from '../src/betrayals/socialResources.ts'
 import { recordTableSway } from '../src/betrayals/table.ts'
 
 const human = { id: 'you', name: 'You' }
@@ -41,7 +42,7 @@ test('an accepted confidence updates private rapport without using a move or all
       kind: 'rapport',
     },
   ])
-  assert.equal(remainingActions(next, run.humanId), remainingActions(run, run.humanId))
+  assert.deepEqual(socialWalletFor(next, run.humanId), socialWalletFor(run, run.humanId))
   assert.deepEqual(getIncomingInteractions(next), [{ ...encounter, response: 'engage' }])
   assert.equal(respondToIncomingInteraction(next, commandToken(next), encounter.id, 'engage'), next)
   assert.equal(respondToIncomingInteraction(next, commandToken(run), encounter.id, 'dismiss'), next)

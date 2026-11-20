@@ -1,6 +1,7 @@
 import { mulberry32 } from '../store/rng.ts'
 import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
+import { walletsAfterChallenge } from './socialResources.ts'
 
 export type RankedScore = {
   contestantId: string
@@ -66,15 +67,19 @@ export function resolveChallenge(
   )
   const pot = run.pot + Math.round((cap * contribution) / standings.length)
   const revision = run.revision + 1
+  const afterChallenge = {
+    ...run,
+    pot,
+    revision,
+    socialWallets: walletsAfterChallenge(run, standings),
+  }
   if (run.phase === 'immunity') {
-    return { ...run, pot, revision, phase: 'safety', immunityId: standings[0].contestantId }
+    return { ...afterChallenge, phase: 'safety', immunityId: standings[0].contestantId }
   }
   if (run.phase === 'safety') {
     const nightShieldIds = standings.slice(0, 2).map(({ contestantId }) => contestantId)
     return {
-      ...run,
-      pot,
-      revision,
+      ...afterChallenge,
       phase: 'round-table',
       private: {
         ...run.private,
@@ -90,7 +95,7 @@ export function resolveChallenge(
       },
     }
   }
-  return { ...run, pot, revision, phase: 'final-banishment' }
+  return { ...afterChallenge, phase: 'final-banishment' }
 }
 
 export function safetyResultsFor(run: Run, actorId: string | null) {

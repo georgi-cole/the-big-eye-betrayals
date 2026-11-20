@@ -8,7 +8,8 @@ import {
 } from '../src/betrayals/run.ts'
 import { resolveEndVote } from '../src/betrayals/settlement.ts'
 import { awardPublicShield } from '../src/betrayals/publicShield.ts'
-import { applySocialMove, getSocialView, remainingActions } from '../src/betrayals/social.ts'
+import { applySocialMove, getSocialView } from '../src/betrayals/social.ts'
+import { recordSocialWallet, socialWalletFor } from '../src/betrayals/socialResources.ts'
 import { tableTargets } from '../src/betrayals/table.ts'
 
 function createRun() {
@@ -25,6 +26,7 @@ function createRun() {
 test('private social activity has a budget and accepted deals require rapport', () => {
   let run = createRun()
   const [actor, peer, suspect, bystander] = run.seats
+  run = { ...run, socialWallets: recordSocialWallet(run, actor.id, { influence: 50, info: 100 }) }
   const rapport = { actorId: actor.id, recipientId: peer.id, kind: 'rapport' }
   const deal = { ...rapport, kind: 'vote-plan', suspectId: suspect.id }
   run = applySocialMove(run, commandToken(run), deal)
@@ -33,7 +35,7 @@ test('private social activity has a budget and accepted deals require rapport', 
   run = applySocialMove(run, commandToken(run), deal)
   assert.equal(getSocialView(run, peer.id)[2].accepted, true)
   assert.deepEqual(getSocialView(run, bystander.id), [])
-  assert.equal(remainingActions(run, actor.id), 0)
+  assert.equal(socialWalletFor(run, actor.id).energy, 0)
   assert.strictEqual(applySocialMove(run, commandToken(run), deal), run)
 })
 

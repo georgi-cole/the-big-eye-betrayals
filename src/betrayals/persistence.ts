@@ -7,6 +7,7 @@ import {
   RULES_VERSION,
 } from './run.ts'
 import type { Run, Seat } from './run.ts'
+import { initializeSocialWallets } from './socialResources.ts'
 
 const SAVE_PREFIX = 'big-eye:betrayals:season:'
 
@@ -128,6 +129,27 @@ function validIncomingResponses(value: unknown, day: number): boolean {
   )
 }
 
+function validSocialWallets(value: unknown, ids: Set<string>, day: number): boolean {
+  if (value === undefined) return true
+  const wallets = asObject(value)
+  if (!wallets) return false
+  return Object.entries(wallets).every(([id, value]) => {
+    const wallet = asObject(value)
+    return (
+      ids.has(id) &&
+      wallet &&
+      typeof wallet.day === 'number' &&
+      Number.isSafeInteger(wallet.day) &&
+      wallet.day >= 1 &&
+      wallet.day <= day &&
+      ['energy', 'influence', 'info', 'energySpent'].every((key) => {
+        const balance = wallet[key]
+        return typeof balance === 'number' && Number.isSafeInteger(balance) && balance >= 0
+      })
+    )
+  })
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
@@ -182,6 +204,7 @@ function isRun(value: unknown): value is Run {
         (sway.tone === 'careful' || sway.tone === 'forceful'))) &&
     validSafetyStandings(hidden.safetyStandings, ids, item.day) &&
     validIncomingResponses(item.incomingResponses, item.day) &&
+    validSocialWallets(item.socialWallets, ids, item.day) &&
     (item.presentation === undefined ||
       (Array.isArray(item.presentation) &&
         item.presentation.length > 0 &&
@@ -229,7 +252,19 @@ export function restoreRun(storage: StorageAdapter, profileId: string): Restore 
   if (value === null) return { status: 'empty' }
   try {
     const candidate: unknown = JSON.parse(value)
-    return isRun(candidate) ? { status: 'ready', run: candidate } : { status: 'incompatible' }
+    if (!isRun(candidate)) return { status: 'incompatible' }
+    if (candidate.socialWallets) return { status: 'ready', run: candidate }
+    return {
+      status: 'ready',
+      run: {
+        ...candidate,
+        socialWallets: initializeSocialWallets(
+          candidate.seats,
+          candidate.day,
+          candidate.options.realityMode
+        ),
+      },
+    }
   } catch {
     return { status: 'incompatible' }
   }

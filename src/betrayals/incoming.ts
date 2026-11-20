@@ -1,9 +1,11 @@
 import { getVoiceProfile, pickVariantText } from '../social/interactionVariantBank.ts'
 import type { VariantFamily, VoiceTag } from '../social/interactionVariantBank.ts'
+import { SOCIAL_RESOURCE_CALIBRATION as calibration } from '../social/socialResourceCalibration.ts'
 import { mulberry32 } from '../store/rng.ts'
 import { INCOMING_ANSWERS, isCurrentCommand } from './run.ts'
 import type { CommandToken, Contestant, IncomingAnswer, Run, SocialEntry } from './run.ts'
 import { getSocialView, hasAlliance, rapport } from './social.ts'
+import { recordSocialWallet } from './socialResources.ts'
 import { chooseTarget } from './strategy.ts'
 import { tableDiscussionOpen, tableTargets } from './table.ts'
 
@@ -200,10 +202,19 @@ export function respondToIncomingInteraction(
   const encounter = getIncomingInteractions(run).find(({ id }) => id === interactionId)
   if (!encounter || encounter.response) return run
   const entry = responseEntry(run, encounter, answer)
+  const socialWallets =
+    entry?.kind === 'alliance'
+      ? recordSocialWallet(run, run.humanId, {
+          influence: calibration.relationships.allianceInfluence,
+        })
+      : entry?.kind === 'question'
+        ? recordSocialWallet(run, run.humanId, { info: calibration.incoming.credibleInfo })
+        : run.socialWallets
   return {
     ...run,
     revision: run.revision + 1,
     social: entry ? [...run.social, entry] : run.social,
+    socialWallets,
     incomingResponses: { ...run.incomingResponses, [interactionId]: answer },
   }
 }

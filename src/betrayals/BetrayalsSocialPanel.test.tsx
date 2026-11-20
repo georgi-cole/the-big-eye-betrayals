@@ -9,6 +9,7 @@ const prospects = [
   { id: 'sable', name: 'Sable' },
   { id: 'opal', name: 'Opal' },
 ]
+const resources = { energy: 5, influence: 20, info: 100 }
 
 describe('Betrayals private conversations', () => {
   beforeEach(() => {
@@ -32,7 +33,7 @@ describe('Betrayals private conversations', () => {
       <BetrayalsSocialPanel
         actorId="human"
         prospects={prospects}
-        actionsLeft={3}
+        resources={resources}
         day={2}
         onClose={vi.fn()}
         onMove={onMove}
@@ -67,7 +68,7 @@ describe('Betrayals private conversations', () => {
     expect(screen.queryByRole('group', { name: 'Vote target' })).toBeNull()
   })
 
-  it('lets the player browse guests and their own private notes outside the social window', () => {
+  it('lets the player browse guests and their own private notes after the season', () => {
     const onMove = vi.fn()
     const conversation: SocialEntry[] = [
       { actorId: 'human', recipientId: 'ren', day: 2, kind: 'question', suspectId: 'ivy' },
@@ -78,9 +79,9 @@ describe('Betrayals private conversations', () => {
         actorId="human"
         prospects={prospects}
         cast={[...prospects, { id: 'ivy', name: 'Ivy' }]}
-        actionsLeft={3}
+        resources={resources}
         day={2}
-        canAct={false}
+        phase="settled"
         conversation={conversation}
         recent={conversation[1]}
         onClose={vi.fn()}
@@ -93,7 +94,9 @@ describe('Betrayals private conversations', () => {
     expect(within(roster).queryByRole('button', { name: /Ivy/ })).toBeNull()
     fireEvent.click(within(roster).getByRole('button', { name: /Ren/ }))
     expect(screen.getByRole('heading', { name: 'Ren' })).toBeInTheDocument()
-    expect(screen.getByText('Social moves are available during the Social phase.')).toBeVisible()
+    expect(
+      screen.getByText('The season has ended. You can still browse your relationships.')
+    ).toBeVisible()
     expect(screen.queryByRole('region', { name: 'Social actions' })).toBeNull()
     fireEvent.keyDown(
       screen.getByRole('group', { name: 'Browse guests with left and right arrows' }),
@@ -122,7 +125,7 @@ describe('Betrayals private conversations', () => {
       <BetrayalsSocialPanel
         actorId="human"
         prospects={prospects}
-        actionsLeft={3}
+        resources={resources}
         incomingCount={2}
         onClose={onClose}
         onOpenIncoming={onOpenIncoming}

@@ -7,7 +7,6 @@ const icons = {
   social: 'clean_glassy_dock/fab_icon_social_clean.svg',
   incoming: 'clean_glassy_dock/fab_icon_inbox_clean.svg',
   roster: 'updated_nav_fab_bar/profile_approved_final.svg',
-  store: 'side_utilities_button/shop_v2.svg',
   settings: 'updated_nav_fab_bar/settings_approved_final.svg',
 } as const
 
@@ -29,7 +28,6 @@ export interface BetrayalsDockProps {
   social?: DockAction
   incoming?: DockAction
   roster?: DockAction
-  store?: DockAction
   settings?: DockAction
   utility?: ReactNode
 }
@@ -74,7 +72,6 @@ export function BetrayalsDock({
   social,
   incoming,
   roster,
-  store,
   settings,
   utility,
 }: BetrayalsDockProps) {
@@ -108,7 +105,6 @@ export function BetrayalsDock({
           </button>
         )}
         {roster && <DockButton target="roster" label="Roster" action={roster} />}
-        {store && <DockButton target="store" label="Store" action={store} />}
         {settings && <DockButton target="settings" label="Settings" action={settings} />}
       </div>
     </nav>

@@ -17,7 +17,14 @@ import { BetrayalsSocialPanel } from './BetrayalsSocialPanel'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
 import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferences'
 import type { Run, Phase, RealityPreset } from './run'
-import { acknowledgeRole, advancePreparation, commandToken, startRun, viewFor } from './run'
+import {
+  acknowledgeRole,
+  advancePreparation,
+  commandToken,
+  eligibleBanishmentTargets,
+  startRun,
+  viewFor,
+} from './run'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
 import { challengeBriefing, challengeGame, challengeSeed, scoreField } from './challengeRotation'
@@ -25,7 +32,7 @@ import { CinematicScene } from './CinematicScene'
 import { getIncomingInteractions, respondToIncomingInteraction } from './incoming'
 import { getConclaveView, resolveConclave, revealDawn } from './night'
 import { cinematicFor, presentationAfter } from './presentation'
-import { chooseTarget, wantsToEnd } from './strategy'
+import { chooseTarget } from './strategy'
 import {
   advanceTableRound,
   buildTableBallots,
@@ -40,8 +47,9 @@ import { awardPublicShield } from './publicShield'
 import { RoundTableDiscussion } from './RoundTableDiscussion'
 import { RoundTableFeed } from './RoundTableFeed'
 import { SafetyResults } from './SafetyResults'
-import { resolveEndVote } from './settlement'
-import { applySocialMove, getSocialView, remainingActions } from './social'
+import { intendsToEnd, resolveEndVote } from './settlement'
+import { applySocialMove, getSocialView, socialMoveKinds } from './social'
+import { socialWalletFor } from './socialResources'
 import { restoreRun, saveRun } from './persistence'
 import { Roster } from './Roster'
 import './season.css'
@@ -298,7 +306,6 @@ export default function BetrayalsScreen() {
     stage === 'round-table' && run.options.publicMode && run.publicShieldDecisionDay !== run.day
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
-  const countKey = run.id + ':' + run.revision
   const conclave = getConclaveView(run, viewerId, selected)
   const targets =
     votePhase && !audiencePending && !discussion && !counting
@@ -310,14 +317,16 @@ export default function BetrayalsScreen() {
   const briefing = challengeBriefing[gameId]
   const challengeName = briefing.title
   const activeCast = view.seats.filter(({ exit }) => !exit)
+  const countKey = [run.id, run.day, stage, activeCast.length, run.tableCount?.round].join(':')
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
   const conversation = participating ? getSocialView(run, run.humanId) : []
   const recent = conversation
     .filter((entry) => entry.day === run.day && entry.actorId === run.humanId)
     .at(-1)
-  const canSocialize = participating && stage === 'social'
-  const actionsLeft = participating ? remainingActions(run, run.humanId) : 0
+  const moveKinds = socialMoveKinds(run)
+  const canSocialize = participating && moveKinds.length > 0
+  const socialResources = socialWalletFor(run, run.humanId)
   const incoming = getIncomingInteractions(run)
   const pendingIncoming = incoming.filter(({ response }) => !response)
   const cue = run.presentation?.[0]
@@ -349,16 +358,11 @@ export default function BetrayalsScreen() {
 
   function end(continueVoting: boolean) {
     apply((active) => {
-      const knownBetrayers = active.seats.filter(
-        ({ exit }) => exit?.revealedRole === 'betrayer'
-      ).length
       const ballots = active.seats
         .filter(({ exit }) => !exit)
         .map(({ id: voterId }) => {
           const wantsEnd =
-            voterId === active.humanId
-              ? !continueVoting
-              : wantsToEnd(resolutionPerspective(active, voterId, []), knownBetrayers)
+            voterId === active.humanId ? !continueVoting : intendsToEnd(active, voterId)
           return { voterId, choice: wantsEnd ? ('end' as const) : ('banish' as const) }
         })
       return resolveEndVote(active, token, ballots)
@@ -715,7 +719,9 @@ export default function BetrayalsScreen() {
           message={message}
           detail={detail}
           action={broadcastAction}
-          interactive={Boolean(tableFeed || conclave || (canSocialize && pendingIncoming.length))}
+          interactive={Boolean(
+            tableFeed || conclave || (stage === 'social' && pendingIncoming.length)
+          )}
           cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
           mode={broadcastMode}
           art={artBase + scene + '.jpg'}
@@ -761,13 +767,6 @@ export default function BetrayalsScreen() {
               setHomeOpen(true)
             },
           }}
-          store={{
-            onClick: () => {
-              utilities.playEffect('ui:navigate', 0.45)
-              utilities.openPanel('store')
-            },
-            active: utilities.panel === 'store',
-          }}
           social={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
@@ -775,17 +774,13 @@ export default function BetrayalsScreen() {
             },
             active: socialOpen,
             disabled: !participating,
-            count: canSocialize ? actionsLeft : undefined,
+            count: canSocialize ? socialResources.energy : undefined,
           }}
-          incoming={
-            pendingIncoming.length
-              ? {
-                  onClick: openIncoming,
-                  active: incomingOpen,
-                  count: pendingIncoming.length,
-                }
-              : undefined
-          }
+          incoming={{
+            onClick: openIncoming,
+            active: incomingOpen,
+            count: pendingIncoming.length,
+          }}
           settings={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
@@ -801,8 +796,12 @@ export default function BetrayalsScreen() {
             actorId={run.humanId}
             prospects={activeCast}
             cast={view.seats}
-            actionsLeft={actionsLeft}
+            resources={socialResources}
+            realityMode={run.options.realityMode}
             canAct={canSocialize}
+            phase={stage}
+            moveKinds={moveKinds}
+            voteTargetIds={eligibleBanishmentTargets(run, run.humanId)}
             day={run.day}
             conversation={conversation}
             recent={recent}

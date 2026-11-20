@@ -1,4 +1,5 @@
 import { mulberry32 } from '../store/rng.ts'
+import { hashId } from './run.ts'
 import type { Phase, Role, SocialEntry } from './run.ts'
 import { hasAlliance, rapport } from './social.ts'
 
@@ -16,16 +17,10 @@ type Perspective = {
   tablePressure?: ReadonlyMap<string, number>
 }
 
-function hashId(id: string): number {
-  return Array.from(id).reduce(
-    (hash, character) => (Math.imul(hash, 31) + character.charCodeAt(0)) | 0,
-    0
-  )
-}
-
 function socialPressure({ actorId, day, ownConversations }: Perspective) {
   const pledges = new Map<string, string>()
   const suspicions = new Map<string, string>()
+  const argumentsHeard = new Map<string, SocialEntry>()
 
   for (const entry of ownConversations) {
     if (entry.day !== day || !entry.suspectId) continue
@@ -35,6 +30,9 @@ function socialPressure({ actorId, day, ownConversations }: Perspective) {
     if (entry.kind === 'vote-plan' && entry.accepted)
       pledges.set(incoming ? entry.actorId : entry.recipientId, entry.suspectId)
     if (entry.kind === 'question' && incoming) suspicions.set(entry.actorId, entry.suspectId)
+    if (incoming && (entry.kind === 'share-suspicion' || entry.kind === 'defend-guest')) {
+      argumentsHeard.set(JSON.stringify([entry.actorId, entry.suspectId]), entry)
+    }
   }
 
   const pressure = new Map<string, number>()
@@ -44,6 +42,15 @@ function socialPressure({ actorId, day, ownConversations }: Perspective) {
   for (const [peerId, suspectId] of pledges) {
     const weight = hasAlliance(ownConversations, actorId, peerId) ? 0.72 : 0.55
     pressure.set(suspectId, Math.min(0.85, (pressure.get(suspectId) ?? 0) + weight))
+  }
+  for (const { actorId: speaker, suspectId, kind, reaction } of argumentsHeard.values()) {
+    if (reaction === 'backfired') {
+      pressure.set(speaker, Math.min(0.85, (pressure.get(speaker) ?? 0) + 0.24))
+    } else if (reaction === 'landed' && suspectId) {
+      const weight = kind === 'defend-guest' ? -0.27 : 0.28
+      const prior = pressure.get(suspectId) ?? 0
+      pressure.set(suspectId, Math.min(0.85, Math.max(-0.5, prior + weight)))
+    }
   }
   return pressure
 }
@@ -83,12 +90,4 @@ export function chooseTarget(
   }))
   ranked.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
   return ranked[0]?.id
-}
-
-export function wantsToEnd(perspective: Perspective, publiclyRevealedBetrayers: number): boolean {
-  const random = mulberry32(perspective.seed ^ hashId(perspective.actorId) ^ (perspective.day * 97))
-  if (perspective.role === 'betrayer') return random() >= 0.18
-  const pressure = Math.max(0, ...Object.values(perspective.publicTally))
-  const confidence = Math.min(0.9, 0.13 + publiclyRevealedBetrayers * 0.16 - pressure * 0.035)
-  return random() < confidence
 }

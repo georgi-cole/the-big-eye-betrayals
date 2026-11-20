@@ -1,15 +1,51 @@
-import { isCurrentCommand } from './run.ts'
-import type { CommandToken, Run, SocialEntry } from './run.ts'
+import { eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
+import type { CommandToken, Phase, Run, SocialEntry, SocialReaction } from './run.ts'
+import { intendsToEnd } from './settlement.ts'
+import {
+  missingSocialResource,
+  socialMoveCost,
+  socialWalletFor,
+  walletAfterSocialMove,
+} from './socialResources.ts'
 
-export const DAILY_ACTIONS = 3
+export type SocialMove = Omit<SocialEntry, 'day' | 'accepted' | 'reaction'>
 
-export type SocialMove = Omit<SocialEntry, 'day' | 'accepted'>
+const checkIn = ['rapport'] as const
+const makePeace = ['rapport', 'mend-fences'] as const
+const compareNotes = [...makePeace, 'question', 'ask-about'] as const
+const discussSuspicions = [...compareNotes, 'share-suspicion', 'defend-guest'] as const
+const prepareForTable = [...discussSuspicions, 'vote-plan'] as const
+const phaseMoves: Record<Phase, readonly SocialEntry['kind'][]> = {
+  'role-reveal': checkIn,
+  dawn: [...discussSuspicions, 'alliance', 'debrief'],
+  social: [...prepareForTable, 'alliance'],
+  immunity: prepareForTable,
+  safety: prepareForTable,
+  'round-table': prepareForTable,
+  'table-reveal': makePeace,
+  night: [...makePeace, 'alliance', 'debrief'],
+  'night-resolved': checkIn,
+  'final-challenge': compareNotes,
+  'final-banishment': compareNotes,
+  'end-vote': [...compareNotes, 'ask-end'],
+  settled: [],
+}
 
-export function remainingActions(run: Run, actorId: string): number {
-  return Math.max(
-    0,
-    DAILY_ACTIONS -
-      run.social.filter((entry) => entry.day === run.day && entry.actorId === actorId).length
+export function socialMoveKinds(
+  run: Pick<Run, 'phase' | 'result' | 'tableCount' | 'runoffIds' | 'lastTable'>
+): readonly SocialEntry['kind'][] {
+  if (run.result || run.phase === 'settled') return []
+  if (run.tableCount || run.runoffIds) return makePeace
+  const moves = phaseMoves[run.phase]
+  return run.lastTable?.blind === false ? moves : moves.filter((kind) => kind !== 'debrief')
+}
+
+export function choosesSocialSubject(kind: SocialEntry['kind']): boolean {
+  return (
+    kind === 'vote-plan' ||
+    kind === 'ask-about' ||
+    kind === 'share-suspicion' ||
+    kind === 'defend-guest'
   )
 }
 
@@ -33,18 +69,19 @@ export function hasAlliance(entries: readonly SocialEntry[], actorId: string, pe
   )
 }
 
-export function askedToday(
+export function discussedToday(
   entries: readonly SocialEntry[],
-  actorId: string,
-  peerId: string,
+  move: SocialMove,
   day: number
-) {
+): boolean {
+  if (move.kind === 'rapport' || move.kind === 'alliance' || move.kind === 'vote-plan') return false
   return entries.some(
     (entry) =>
-      entry.kind === 'question' &&
+      entry.kind === move.kind &&
       entry.day === day &&
-      entry.actorId === actorId &&
-      entry.recipientId === peerId
+      entry.actorId === move.actorId &&
+      entry.recipientId === move.recipientId &&
+      (!choosesSocialSubject(move.kind) || entry.suspectId === move.suspectId)
   )
 }
 
@@ -67,19 +104,67 @@ export function latestPact(
 }
 
 export function rapport(entries: readonly SocialEntry[], actorId: string, peerId: string): number {
-  const exchanges = entries.filter(
-    (entry) => entry.kind === 'rapport' && between(entry, actorId, peerId)
-  ).length
-  return Math.min(0.6, exchanges * 0.12) + (hasAlliance(entries, actorId, peerId) ? 0.24 : 0)
+  let balance = 0
+  for (const entry of entries) {
+    if (!between(entry, actorId, peerId)) continue
+    if (entry.kind === 'rapport') balance += 0.12
+    if (entry.reaction === 'backfired') balance -= 0.12
+    if (entry.reaction === 'repaired') balance += 0.16
+  }
+  return Math.max(0, Math.min(0.6, balance)) + (hasAlliance(entries, actorId, peerId) ? 0.24 : 0)
+}
+
+export function hasSocialStrain(entries: readonly SocialEntry[], actorId: string, peerId: string) {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index]
+    if (!between(entry, actorId, peerId)) continue
+    if (entry.reaction === 'backfired' || entry.reaction === 'repaired') {
+      return entry.reaction === 'backfired'
+    }
+  }
+  return false
+}
+
+function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined {
+  const { actorId, kind, recipientId, suspectId } = move
+  if (
+    !['ask-about', 'share-suspicion', 'defend-guest', 'mend-fences', 'debrief', 'ask-end'].includes(
+      kind
+    )
+  )
+    return
+  const trust = rapport(run.social, actorId, recipientId)
+  const subjectTrust = suspectId ? rapport(run.social, recipientId, suspectId) : 0
+  const previousVote = run.lastTable?.blind === false ? run.lastTable : undefined
+  const votes = suspectId ? (previousVote?.tally[suspectId] ?? 0) : 0
+  switch (kind) {
+    case 'ask-about':
+      if (trust < 0.12) return 'held-back'
+      if (subjectTrust >= 0.24) return 'trusts'
+      return votes >= 2 ? 'wary' : 'uncertain'
+    case 'share-suspicion':
+      if (subjectTrust - trust >= 0.2) return 'backfired'
+      return trust >= 0.12 || votes >= 2 ? 'landed' : 'unmoved'
+    case 'defend-guest':
+      if (votes >= 3 && subjectTrust + trust < 0.24) return 'backfired'
+      return subjectTrust + trust >= 0.12 ? 'landed' : 'unmoved'
+    case 'mend-fences':
+      return run.social.some(
+        (entry) => entry.kind === 'rapport' && between(entry, actorId, recipientId)
+      ) || trust > 0
+        ? 'repaired'
+        : 'held-back'
+    case 'debrief':
+      if (trust < 0.12) return 'held-back'
+      return previousVote?.tiedByDraw ? 'wary' : 'landed'
+    case 'ask-end':
+      if (trust < 0.24) return 'held-back'
+      return intendsToEnd(run, recipientId) ? 'end' : 'banish'
+  }
 }
 
 export function applySocialMove(run: Run, token: CommandToken, move: SocialMove): Run {
-  if (
-    run.phase !== 'social' ||
-    !isCurrentCommand(run, token) ||
-    remainingActions(run, move.actorId) === 0
-  )
-    return run
+  if (!socialMoveKinds(run).includes(move.kind) || !isCurrentCommand(run, token)) return run
 
   const active = new Set(run.seats.filter(({ exit }) => !exit).map(({ id }) => id))
   if (
@@ -89,18 +174,26 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
   )
     return run
   if (
-    (move.kind === 'vote-plan' || move.kind === 'question') &&
+    (choosesSocialSubject(move.kind) || move.kind === 'question') &&
     (!move.suspectId ||
       !active.has(move.suspectId) ||
       move.suspectId === move.actorId ||
       move.suspectId === move.recipientId)
   )
     return run
+  if (
+    move.kind === 'vote-plan' &&
+    !eligibleBanishmentTargets(run, move.recipientId).includes(move.suspectId ?? '')
+  )
+    return run
 
   const { actorId, recipientId, kind, suspectId } = move
   const { social, day } = run
+  const cost = socialMoveCost(kind, run.options.realityMode)
+  if (missingSocialResource(socialWalletFor(run, actorId), cost)) return run
   if (
-    (kind === 'question' && askedToday(social, actorId, recipientId, day)) ||
+    discussedToday(social, move, day) ||
+    (kind === 'mend-fences' && !hasSocialStrain(social, actorId, recipientId)) ||
     (kind === 'alliance' && hasAlliance(social, actorId, recipientId)) ||
     (kind === 'vote-plan' && latestPact(social, actorId, recipientId, day)?.suspectId === suspectId)
   )
@@ -112,12 +205,19 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
     kind,
     day,
   }
-  if (kind === 'vote-plan' || kind === 'question') {
+  if (choosesSocialSubject(kind) || kind === 'question') {
     entry.suspectId = suspectId
   }
   if (kind === 'vote-plan' || kind === 'alliance') {
     entry.accepted = rapport(social, actorId, recipientId) >= 0.12
   }
+  const reaction = responseToMove(run, move)
+  if (reaction) entry.reaction = reaction
 
-  return { ...run, revision: run.revision + 1, social: [...social, entry] }
+  return {
+    ...run,
+    revision: run.revision + 1,
+    social: [...social, entry],
+    socialWallets: walletAfterSocialMove(run, entry, cost),
+  }
 }

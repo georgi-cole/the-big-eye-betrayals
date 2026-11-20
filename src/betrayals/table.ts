@@ -1,5 +1,5 @@
 import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
-import { MAX_TABLE_ROUNDS, isCurrentCommand, viewFor } from './run.ts'
+import { MAX_TABLE_ROUNDS, eligibleBanishmentTargets, isCurrentCommand, viewFor } from './run.ts'
 import type { Ballot, CommandToken, Run, TableReceipt, TableSway } from './run.ts'
 import { settleRun } from './settlement.ts'
 import { getSocialView, rapport } from './social.ts'
@@ -36,17 +36,7 @@ export function canVoteAtTable(run: Run, id: string): boolean {
 }
 
 export function tableTargets(run: Run, voterId: string): string[] {
-  if (!canVoteAtTable(run, voterId)) return []
-  const shieldId = run.publicShield?.day === run.day ? run.publicShield.id : undefined
-  return run.seats
-    .filter(
-      ({ id, exit }) =>
-        !exit &&
-        id !== voterId &&
-        (run.phase === 'final-banishment' || (id !== run.immunityId && id !== shieldId)) &&
-        (!run.runoffIds || run.runoffIds.includes(id))
-    )
-    .map(({ id }) => id)
+  return canVoteAtTable(run, voterId) ? eligibleBanishmentTargets(run, voterId) : []
 }
 
 export function tableRoundNumber(run: Run): number {
@@ -127,8 +117,13 @@ export function tableDiscussion(run: Run): TableSpeech[] {
     const targetId = strategyTarget(run, speakerId, targets)
     if (!targetId) return []
     const heard = getSocialView(run, speakerId).some(
-      ({ day, suspectId, recipientId }) =>
-        day === run.day && suspectId === targetId && recipientId === speakerId
+      ({ day, suspectId, recipientId, kind, reaction, accepted }) =>
+        day === run.day &&
+        suspectId === targetId &&
+        recipientId === speakerId &&
+        (kind === 'question' ||
+          (kind === 'share-suspicion' && reaction === 'landed') ||
+          (kind === 'vote-plan' && accepted))
     )
     return [
       {
