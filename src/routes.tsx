@@ -50,6 +50,11 @@ const SeasonRecapPreview = import.meta.env.DEV
 const ViewportReview = import.meta.env.DEV
   ? lazy(() => import('./screens/ViewportReview/ViewportReview'))
   : null
+const isBetrayalsEdition = import.meta.env.VITE_BETRAYALS_EDITION === 'true'
+const BetrayalsReview =
+  import.meta.env.DEV || isBetrayalsEdition
+    ? lazy(() => import('./betrayals/BetrayalsScreen'))
+    : null
 const ReleaseFixesPreview = import.meta.env.DEV
   ? lazy(() => import('./screens/ReleaseFixesPreview/ReleaseFixesPreview'))
   : null
@@ -146,313 +151,320 @@ const MinigameTurnDemos = import.meta.env.DEV
   ? lazy(() => import('./screens/MinigameTurnDemos/MinigameTurnDemos'))
   : null
 
-export const router = createHashRouter([
-  {
-    path: '/cinematic',
-    element: (
-      <Suspense fallback={null}>
-        <CinematicPreview />
-      </Suspense>
-    ),
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: '/phone-preview',
-    element: (
-      <Suspense fallback={null}>
-        <PhonePreviewPage />
-      </Suspense>
-    ),
-    errorElement: <RouteErrorBoundary />,
-  },
-  ...(SeasonRecapPreview != null
-    ? [
+export const router = createHashRouter(
+  isBetrayalsEdition && BetrayalsReview
+    ? [{ path: '*', element: load(<BetrayalsReview />), errorElement: <RouteErrorBoundary /> }]
+    : [
         {
-          path: '/season-recap-test',
+          path: '/cinematic',
           element: (
             <Suspense fallback={null}>
-              <SeasonRecapPreview />
+              <CinematicPreview />
             </Suspense>
           ),
           errorElement: <RouteErrorBoundary />,
         },
-      ]
-    : []),
-  ...(ViewportReview != null
-    ? [{ path: '/viewport-review', element: load(<ViewportReview />) }]
-    : []),
-  ...(ReleaseFixesPreview != null
-    ? [
         {
-          path: '/release-fixes',
+          path: '/phone-preview',
           element: (
             <Suspense fallback={null}>
-              <ReleaseFixesPreview />
+              <PhonePreviewPage />
             </Suspense>
           ),
+          errorElement: <RouteErrorBoundary />,
+        },
+        ...(SeasonRecapPreview != null
+          ? [
+              {
+                path: '/season-recap-test',
+                element: (
+                  <Suspense fallback={null}>
+                    <SeasonRecapPreview />
+                  </Suspense>
+                ),
+                errorElement: <RouteErrorBoundary />,
+              },
+            ]
+          : []),
+        ...(ViewportReview != null
+          ? [{ path: '/viewport-review', element: load(<ViewportReview />) }]
+          : []),
+        ...(BetrayalsReview != null
+          ? [{ path: '/betrayals', element: load(<BetrayalsReview />) }]
+          : []),
+        ...(ReleaseFixesPreview != null
+          ? [
+              {
+                path: '/release-fixes',
+                element: (
+                  <Suspense fallback={null}>
+                    <ReleaseFixesPreview />
+                  </Suspense>
+                ),
+              },
+            ]
+          : []),
+        {
+          path: '/',
+          element: <AppShell />,
+          errorElement: <RouteErrorBoundary />,
+          children: [
+            { index: true, element: <HomeHub /> },
+            { path: 'game', element: load(<GameRoute />) },
+            { path: 'new-season', element: <Navigate to="/?menu=play" replace /> },
+            { path: 'diary-room', element: load(<ConfessionalRoute />) },
+            { path: 'houseguests', element: load(<Houseguests />) },
+            { path: 'profile', element: load(<Profile />) },
+            { path: 'profile/account', element: load(<PlayerAccount />) },
+            { path: 'profile-edit', element: load(<EditProfile />) },
+            { path: 'profile/dressing-room', element: load(<DressingRoom />) },
+            { path: 'profile-picker', element: load(<ProfilePicker />) },
+            { path: 'unsubscribe', element: load(<EmailUnsubscribe />) },
+            { path: 'leaderboard', element: load(<Leaderboard />) },
+            { path: 'credits', element: load(<Credits />) },
+            { path: 'week', element: load(<Week />) },
+            { path: 'create-player', element: load(<CreatePlayer />) },
+            { path: 'game-over', element: load(<GameOver />) },
+            { path: 'self-evicted', element: load(<SelfEvicted />) },
+            { path: 'rules', element: load(<Rules />) },
+            { path: 'vox-populi-rules', element: load(<VoxPopuliRules />) },
+            { path: 'public-meter', element: load(<PublicMeter />) },
+            { path: 'player-privacy', element: load(<AdvertisingPrivacy />) },
+            {
+              path: 'settings',
+              element: load(<Settings />),
+            },
+            { path: 'store', element: load(<Store />) },
+            { path: 'legal', element: load(<Legal />) },
+            { path: 'settingsatiste', element: <SettingsAdminRoute /> },
+            ...(twistsQaEnabled && TwistsTestPage != null
+              ? [
+                  {
+                    path: 'twists-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <TwistsTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && CwgoTestPage != null
+              ? [
+                  {
+                    path: 'cwgo-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <CwgoTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && HoldTheWallTestPage != null
+              ? [
+                  {
+                    path: 'htw-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <HoldTheWallTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && FamousFiguresTestPage != null
+              ? [
+                  {
+                    path: 'ff-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <FamousFiguresTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && SilentSaboteurTestPage != null
+              ? [
+                  {
+                    path: 'ss-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <SilentSaboteurTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && RiskWheelTestPage != null
+              ? [
+                  {
+                    path: 'rw-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <RiskWheelTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && WildcardWesternTestPage != null
+              ? [
+                  {
+                    path: 'ww-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <WildcardWesternTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && TimingBarTestPage != null
+              ? [
+                  {
+                    path: 'tb-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <TimingBarTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && GridOfLuckTestPage != null
+              ? [
+                  {
+                    path: 'gol-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <GridOfLuckTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && MinigameLab != null
+              ? [
+                  {
+                    path: 'minigame-lab',
+                    element: (
+                      <Suspense fallback={null}>
+                        <MinigameLab />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && KeyboardGamesTestPage != null
+              ? [
+                  {
+                    path: 'keyboard-games-test',
+                    element: (
+                      <Suspense fallback={null}>
+                        <KeyboardGamesTestPage />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && FindYourTwinExperiment != null
+              ? [
+                  {
+                    path: 'find-your-twin-experiment',
+                    element: (
+                      <Suspense fallback={null}>
+                        <FindYourTwinExperiment />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && FindYourTwin2 != null
+              ? [
+                  {
+                    path: 'find-your-twin-2',
+                    element: (
+                      <Suspense fallback={null}>
+                        <FindYourTwin2 />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && QuickTapExperiment != null
+              ? [
+                  {
+                    path: 'quick-tap-experiment',
+                    element: (
+                      <Suspense fallback={null}>
+                        <QuickTapExperiment />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && PresentationTestPage != null
+              ? [{ path: 'presentation-test', element: load(<PresentationTestPage />) }]
+              : []),
+            ...(import.meta.env.DEV && QuickTapSeasons != null
+              ? [
+                  {
+                    path: 'quick-tap-seasons',
+                    element: (
+                      <Suspense fallback={null}>
+                        <QuickTapSeasons />
+                      </Suspense>
+                    ),
+                  },
+                ]
+              : []),
+            ...(import.meta.env.DEV && MinigameTurnDemos != null
+              ? [{ path: 'minigame-turn-demos', element: load(<MinigameTurnDemos />) }]
+              : []),
+            {
+              path: 'gamedebug',
+              element: (
+                <Suspense fallback={null}>
+                  <GameDebug />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'confessional-lab',
+              element: (
+                <Suspense fallback={null}>
+                  <ConfessionalLab />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'broadcast-manager',
+              element: (
+                <Suspense fallback={null}>
+                  <BroadcastManager />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'game-manager',
+              element: (
+                <Suspense fallback={null}>
+                  <GameManager />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'remote-manager',
+              element: (
+                <Suspense fallback={null}>
+                  <RemoteManager />
+                </Suspense>
+              ),
+            },
+            { path: '*', element: <NotFound /> },
+          ],
         },
       ]
-    : []),
-  {
-    path: '/',
-    element: <AppShell />,
-    errorElement: <RouteErrorBoundary />,
-    children: [
-      { index: true, element: <HomeHub /> },
-      { path: 'game', element: load(<GameRoute />) },
-      { path: 'new-season', element: <Navigate to="/?menu=play" replace /> },
-      { path: 'diary-room', element: load(<ConfessionalRoute />) },
-      { path: 'houseguests', element: load(<Houseguests />) },
-      { path: 'profile', element: load(<Profile />) },
-      { path: 'profile/account', element: load(<PlayerAccount />) },
-      { path: 'profile-edit', element: load(<EditProfile />) },
-      { path: 'profile/dressing-room', element: load(<DressingRoom />) },
-      { path: 'profile-picker', element: load(<ProfilePicker />) },
-      { path: 'unsubscribe', element: load(<EmailUnsubscribe />) },
-      { path: 'leaderboard', element: load(<Leaderboard />) },
-      { path: 'credits', element: load(<Credits />) },
-      { path: 'week', element: load(<Week />) },
-      { path: 'create-player', element: load(<CreatePlayer />) },
-      { path: 'game-over', element: load(<GameOver />) },
-      { path: 'self-evicted', element: load(<SelfEvicted />) },
-      { path: 'rules', element: load(<Rules />) },
-      { path: 'vox-populi-rules', element: load(<VoxPopuliRules />) },
-      { path: 'public-meter', element: load(<PublicMeter />) },
-      { path: 'player-privacy', element: load(<AdvertisingPrivacy />) },
-      {
-        path: 'settings',
-        element: load(<Settings />),
-      },
-      { path: 'store', element: load(<Store />) },
-      { path: 'legal', element: load(<Legal />) },
-      { path: 'settingsatiste', element: <SettingsAdminRoute /> },
-      ...(twistsQaEnabled && TwistsTestPage != null
-        ? [
-            {
-              path: 'twists-test',
-              element: (
-                <Suspense fallback={null}>
-                  <TwistsTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && CwgoTestPage != null
-        ? [
-            {
-              path: 'cwgo-test',
-              element: (
-                <Suspense fallback={null}>
-                  <CwgoTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && HoldTheWallTestPage != null
-        ? [
-            {
-              path: 'htw-test',
-              element: (
-                <Suspense fallback={null}>
-                  <HoldTheWallTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && FamousFiguresTestPage != null
-        ? [
-            {
-              path: 'ff-test',
-              element: (
-                <Suspense fallback={null}>
-                  <FamousFiguresTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && SilentSaboteurTestPage != null
-        ? [
-            {
-              path: 'ss-test',
-              element: (
-                <Suspense fallback={null}>
-                  <SilentSaboteurTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && RiskWheelTestPage != null
-        ? [
-            {
-              path: 'rw-test',
-              element: (
-                <Suspense fallback={null}>
-                  <RiskWheelTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && WildcardWesternTestPage != null
-        ? [
-            {
-              path: 'ww-test',
-              element: (
-                <Suspense fallback={null}>
-                  <WildcardWesternTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && TimingBarTestPage != null
-        ? [
-            {
-              path: 'tb-test',
-              element: (
-                <Suspense fallback={null}>
-                  <TimingBarTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && GridOfLuckTestPage != null
-        ? [
-            {
-              path: 'gol-test',
-              element: (
-                <Suspense fallback={null}>
-                  <GridOfLuckTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && MinigameLab != null
-        ? [
-            {
-              path: 'minigame-lab',
-              element: (
-                <Suspense fallback={null}>
-                  <MinigameLab />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && KeyboardGamesTestPage != null
-        ? [
-            {
-              path: 'keyboard-games-test',
-              element: (
-                <Suspense fallback={null}>
-                  <KeyboardGamesTestPage />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && FindYourTwinExperiment != null
-        ? [
-            {
-              path: 'find-your-twin-experiment',
-              element: (
-                <Suspense fallback={null}>
-                  <FindYourTwinExperiment />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && FindYourTwin2 != null
-        ? [
-            {
-              path: 'find-your-twin-2',
-              element: (
-                <Suspense fallback={null}>
-                  <FindYourTwin2 />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && QuickTapExperiment != null
-        ? [
-            {
-              path: 'quick-tap-experiment',
-              element: (
-                <Suspense fallback={null}>
-                  <QuickTapExperiment />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && PresentationTestPage != null
-        ? [{ path: 'presentation-test', element: load(<PresentationTestPage />) }]
-        : []),
-      ...(import.meta.env.DEV && QuickTapSeasons != null
-        ? [
-            {
-              path: 'quick-tap-seasons',
-              element: (
-                <Suspense fallback={null}>
-                  <QuickTapSeasons />
-                </Suspense>
-              ),
-            },
-          ]
-        : []),
-      ...(import.meta.env.DEV && MinigameTurnDemos != null
-        ? [{ path: 'minigame-turn-demos', element: load(<MinigameTurnDemos />) }]
-        : []),
-      {
-        path: 'gamedebug',
-        element: (
-          <Suspense fallback={null}>
-            <GameDebug />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'confessional-lab',
-        element: (
-          <Suspense fallback={null}>
-            <ConfessionalLab />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'broadcast-manager',
-        element: (
-          <Suspense fallback={null}>
-            <BroadcastManager />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'game-manager',
-        element: (
-          <Suspense fallback={null}>
-            <GameManager />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'remote-manager',
-        element: (
-          <Suspense fallback={null}>
-            <RemoteManager />
-          </Suspense>
-        ),
-      },
-      { path: '*', element: <NotFound /> },
-    ],
-  },
-])
+)
