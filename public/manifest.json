@@ -1,12 +1,12 @@
 {
-  "name": "The Big Eye",
-  "short_name": "The Big Eye",
-  "description": "The Big Eye mobile companion app",
+  "name": "The Big Eye: Betrayals",
+  "short_name": "Betrayals",
+  "description": "The Big Eye social deduction game",
   "start_url": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#0a1118",
+  "theme_color": "#0a1118",
   "icons": [
     {
       "src": "./favicon.svg?v=embroidered-clean-20261102",

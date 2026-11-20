@@ -42,6 +42,7 @@ import './styles/performanceOverrides.css'
 import './styles/majorityRulesFinalDuel.css'
 
 const IS_PUBLIC_QA_BUILD = import.meta.env.VITE_VIP_DEV_ENTITLEMENT === 'true'
+const IS_BETRAYALS = import.meta.env.VITE_BETRAYALS_EDITION === 'true'
 
 if (import.meta.env.DEV) {
   console.log(
@@ -74,6 +75,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (IS_BETRAYALS) return undefined
     const stopRouteAnalytics = setupRouteAnalytics({
       getPathname: () => router.state.location.pathname,
       getProfileId: () => {
@@ -135,6 +137,16 @@ export default function App() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
+
+  if (IS_BETRAYALS) {
+    return (
+      <Provider store={store}>
+        <I18nProvider>
+          <RouterProvider router={router} />
+        </I18nProvider>
+      </Provider>
+    )
+  }
 
   return (
     <Provider store={store}>

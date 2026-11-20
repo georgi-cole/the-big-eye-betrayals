@@ -1,0 +1,156 @@
+.betrayals-layout {
+  --betrayals-tile: #15252d;
+  --betrayals-ink: #edf4f3;
+  --betrayals-edge: #456971;
+  --betrayals-focus: #ebb180;
+  color: var(--betrayals-ink);
+  background: radial-gradient(ellipse at top, #1c343f 0%, #0a1118 60%);
+  width: min(100%, 440px);
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: 16px max(12px, env(safe-area-inset-left)) calc(20px + env(safe-area-inset-bottom));
+}
+
+.betrayals-layout h1 {
+  margin: 0 0 5px;
+  font-family: Georgia, serif;
+  font-size: 1.65rem;
+}
+
+.betrayals-layout p {
+  margin: 0 0 10px;
+}
+
+.betrayals-header {
+  border-bottom: 1px solid #456971;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.betrayals-franchise {
+  color: #ebb180;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.betrayals-header div,
+.betrayals-controls {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.betrayals-phase {
+  min-height: 66px;
+  margin-bottom: 12px;
+}
+
+.betrayals-selection,
+.betrayals-note {
+  margin-top: 12px !important;
+  color: #b4c7ca;
+}
+
+.betrayals-controls {
+  margin-top: 14px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.betrayals-layout button {
+  min-height: 44px;
+}
+
+.betrayals-controls button,
+.betrayals-primary {
+  padding: 0.55rem 0.8rem;
+  color: var(--betrayals-ink);
+  background: #193943;
+  border: 1px solid #567a80;
+  border-radius: 8px;
+}
+
+.betrayals-controls button:first-child,
+.betrayals-primary {
+  background: #e8ac76;
+  color: #131f26;
+  font-weight: 700;
+}
+
+.betrayals-controls button:disabled {
+  opacity: 0.45;
+}
+
+.betrayals-entry {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+}
+
+.betrayals-entry h1 {
+  font-size: clamp(3rem, 11vw, 4rem);
+}
+.betrayals-entry form {
+  display: grid;
+  gap: 14px;
+}
+.betrayals-entry label {
+  display: grid;
+  gap: 6px;
+}
+.betrayals-entry input:not([type='checkbox']) {
+  border-radius: 8px;
+  padding: 12px;
+  background: #15252d;
+  color: inherit;
+  border: 1px solid #567a80;
+}
+.betrayals-entry .betrayals-option {
+  display: flex;
+  gap: 10px;
+}
+
+.betrayals-entry {
+  isolation: isolate;
+  position: relative;
+  align-content: end;
+  padding-block-end: max(36px, env(safe-area-inset-bottom));
+}
+.betrayals-entry__art {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  z-index: -2;
+}
+.betrayals-entry::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 28%, #070f16ba 54%, #070f16 88%);
+  z-index: -1;
+}
+.betrayals-layout[data-phase='night'],
+.betrayals-layout[data-phase='night-resolved'] {
+  --betrayals-tile: #271f29;
+  --betrayals-edge: #806456;
+  background: radial-gradient(ellipse at top, #392b36 0%, #0a1118 60%);
+}
+.betrayals-social__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-block: 10px;
+}
+.betrayals-social select,
+.betrayals-entry select {
+  min-height: 44px;
+  color: inherit;
+  background: #15252d;
+  border: 1px solid #567a80;
+  border-radius: 8px;
+  padding-inline: 8px;
+}

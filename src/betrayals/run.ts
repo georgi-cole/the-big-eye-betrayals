@@ -36,7 +36,7 @@ export type SocialEntry = {
   day: number
   actorId: string
   recipientId: string
-  kind: 'rapport' | 'question' | 'vote-plan'
+  kind: 'rapport' | 'question' | 'alliance' | 'vote-plan'
   suspectId?: string
   accepted?: boolean
 }
@@ -70,6 +70,7 @@ export type Run = {
   immunityId?: string
   publicShield?: { id: string; day: number }
   publicShieldDecisionDay?: number
+  audienceApproval?: Record<string, number>
   runoffIds?: string[]
   lastTable?: TableReceipt
   lastDawn?: { day: number; eliminatedId: string | null }
