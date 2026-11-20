@@ -90,6 +90,7 @@ export const PRESENTATION_CUES = [
   'elimination',
   'sunset',
   'interlude',
+  'finale',
 ] as const
 
 export type PresentationCue = (typeof PRESENTATION_CUES)[number]

@@ -194,12 +194,14 @@ export default function BetrayalsScreen() {
     const phaseChanged = before?.phase !== next.phase || next.id !== before?.id
     if (phaseChanged || before?.runoffIds !== next.runoffIds) setSelected(undefined)
     if (phaseChanged) {
-      if (next.phase === 'settled') utilities.playEffect('tv:finale_winner_stinger', 0.72)
-      else if (before?.phase === 'table-reveal' || before?.phase === 'night-resolved') {
+      if (
+        next.phase !== 'settled' &&
+        (before?.phase === 'table-reveal' || before?.phase === 'night-resolved')
+      ) {
         utilities.playEffect('tv:ceremony_reveal', 0.72)
       } else if (next.phase === 'table-reveal' || next.phase === 'night-resolved') {
         utilities.playEffect('tv:ceremony_impact', 0.57)
-      } else {
+      } else if (next.phase !== 'settled') {
         utilities.playEffect('tv:ceremony_transition', 0.4)
       }
       setSocialOpen(false)
@@ -868,14 +870,7 @@ export default function BetrayalsScreen() {
       {cinematic && (
         <CinematicScene
           key={cinematic.id}
-          scene={
-            cue === 'interlude' && pendingIncoming.length
-              ? {
-                  ...cinematic,
-                  subtitle: pendingIncoming[0].speaker.name + ' asks to speak privately.',
-                }
-              : cinematic
-          }
+          scene={cinematic}
           reducedMotion={utilities.preferences.reducedMotion}
           autoAdvance={cue !== 'death-letter' && (run.presentation?.length ?? 0) > 1}
           playEffect={utilities.playEffect}
