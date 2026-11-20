@@ -265,10 +265,12 @@ function RollCall({
 }
 
 function ExitingFigure({ subject }: { subject?: CinematicCastMember }) {
-  const walk = subject && walkAssets[subject.id]
+  const characterWalk = subject && walkAssets[subject.id]
+  const walk = characterWalk ?? walkManifest.characters.finn
   return (
-    <div className="betrayals-cine__departing" aria-hidden="true">
-      {walk ? (
+    <div className="betrayals-cine__corridor-plane" aria-hidden="true">
+      <div className="betrayals-cine__departing" data-silhouette={!characterWalk || undefined}>
+        <span className="betrayals-cine__walk-shadow" />
         <div
           className="betrayals-cine__walker"
           style={
@@ -279,9 +281,7 @@ function ExitingFigure({ subject }: { subject?: CinematicCastMember }) {
             } as CSSProperties
           }
         />
-      ) : (
-        <span className="betrayals-cine__departure-silhouette" />
-      )}
+      </div>
     </div>
   )
 }
@@ -374,11 +374,9 @@ function Stage({ scene, beat }: { scene: CinematicSceneData; beat: number }) {
     case 'departure':
       return beat < 2 && subject ? (
         <PortraitVerdict subject={subject} role={role} stamp={beat === 1 ? 'evicted' : undefined} />
-      ) : beat === 2 ? (
-        <ExitingFigure subject={subject} />
-      ) : (
+      ) : beat === 3 ? (
         <div className="betrayals-cine__closed-gate" aria-hidden="true" />
-      )
+      ) : null
     case 'elimination':
       return (
         subject && <PortraitVerdict subject={subject} stamp={beat > 0 ? 'murdered' : undefined} />
@@ -481,6 +479,11 @@ export function CinematicScene({
         <div className="betrayals-cine__stage">
           <Stage scene={scene} beat={stageBeat} />
         </div>
+        {scene.kind === 'departure' && stageBeat === 2 && (
+          <ExitingFigure
+            subject={scene.concealed || scene.subject?.concealed ? undefined : scene.subject}
+          />
+        )}
         <div className="betrayals-cine__edge" aria-hidden="true" />
         <div className="betrayals-cine__caption" aria-live="polite" aria-atomic="true">
           <div key={title} className="betrayals-cine__caption-beat">
