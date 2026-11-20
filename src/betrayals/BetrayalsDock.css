@@ -35,6 +35,7 @@
   display: flex;
   grid-column: 1;
   justify-content: center;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -74,10 +75,27 @@
 }
 
 .betrayals-dock .betrayals-dock__side[aria-expanded='true'],
+.betrayals-dock .betrayals-dock__side[aria-pressed='true'],
 .betrayals-dock .betrayals-dock__side:enabled:hover {
   border-color: #7e565745;
   background: #5138426b;
   color: #fff3df;
+}
+
+.betrayals-dock__side[data-target='music'][aria-pressed='false'] img {
+  opacity: 0.6;
+}
+
+.betrayals-dock__side[data-target='music'][aria-pressed='true'] .betrayals-dock__icon-frame::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 0;
+  width: 4px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #f6d5a0;
+  box-shadow: 0 0 7px #f6d5a0;
 }
 
 .betrayals-dock__icon-frame {
@@ -118,8 +136,9 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  padding: 7px 16px;
-  min-width: 96px;
+  padding: 7px clamp(8px, 4vw, 16px);
+  min-width: clamp(70px, 24vw, 96px);
+  max-width: min(140px, 36vw);
   border: 1px solid #bb896b;
   border-radius: 18px;
   background:

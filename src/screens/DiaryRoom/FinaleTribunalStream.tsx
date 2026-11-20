@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Player, WeekendTribunalSpeech } from '../../types'
+import { usePacedReveal } from '../../hooks/usePacedReveal'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { preloadImages } from '../../utils/preloadImages'
 import PlayerAvatar from '../../components/PlayerAvatar/PlayerAvatar'
@@ -17,21 +18,15 @@ export default function FinaleTribunalStream({
   players,
   onClose,
 }: FinaleTribunalStreamProps) {
-  const [visibleSpeechCount, setVisibleSpeechCount] = useState(0)
+  const { visible: visibleSpeechCount } = usePacedReveal(speeches.length, {
+    firstDelay: 700,
+    stepDelay: 1150,
+  })
   const chatRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     preloadImages([TRIBUNAL_BACKDROP_SRC])
   }, [])
-
-  useEffect(() => {
-    if (visibleSpeechCount >= speeches.length) return
-    const timeout = window.setTimeout(
-      () => setVisibleSpeechCount((count) => Math.min(count + 1, speeches.length)),
-      visibleSpeechCount === 0 ? 700 : 1150
-    )
-    return () => window.clearTimeout(timeout)
-  }, [speeches.length, visibleSpeechCount])
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight

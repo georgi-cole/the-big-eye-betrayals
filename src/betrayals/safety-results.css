@@ -1,0 +1,81 @@
+.betrayals-safety-results {
+  width: min(32rem, calc(100vw - 1.5rem));
+  max-height: min(85dvh, 48rem);
+  margin: auto;
+  padding: 0;
+  color: #f5ebd8;
+  background: radial-gradient(ellipse at top, #41321e, #16110f 50%);
+  border: 1px solid #886943;
+  border-radius: 1.1rem;
+  box-shadow: 0 16px 80px #000b;
+}
+
+.betrayals-safety-results::backdrop {
+  background: #0c0808dd;
+  backdrop-filter: blur(9px);
+}
+
+.betrayals-safety-results[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.betrayals-safety-results header,
+.betrayals-safety-results footer {
+  padding: 1rem;
+}
+
+.betrayals-safety-results h2 {
+  margin: 0 0 0.35rem;
+  color: #f7dba3;
+  font:
+    600 clamp(1.4rem, 5vw, 2rem) / 1.1 Georgia,
+    serif;
+}
+
+.betrayals-safety-results p {
+  margin: 0;
+  color: #e1d4bd;
+  font-size: 0.88rem;
+}
+
+.betrayals-safety-results__scores {
+  margin-inline: 0.75rem;
+  overflow: auto;
+}
+
+.betrayals-safety-results table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.84rem;
+}
+
+.betrayals-safety-results thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #eed3a5;
+  background: #252019;
+}
+
+.betrayals-safety-results td,
+.betrayals-safety-results th {
+  padding: 0.55rem 0.45rem;
+  border-bottom: 1px solid #a984502e;
+}
+
+.betrayals-safety-results tr[data-own] {
+  color: #ffe7ac;
+  background: #be8b272b;
+}
+
+.betrayals-safety-results [aria-label='Hidden'] {
+  color: #c7ac7e;
+  letter-spacing: 0.12em;
+  font-size: 0.65rem;
+}
+
+.betrayals-safety-results footer button {
+  width: 100%;
+}

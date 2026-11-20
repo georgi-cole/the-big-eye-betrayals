@@ -1,45 +1,89 @@
 .betrayals-broadcast {
-  --signal-ink: #b8ddd8;
-  --signal-shade: #102a2b;
+  --signal-ink: #bce5d7;
+  --signal-shade: #183d37;
+  --signal-light: #7fe0c2;
+  --tv-height: clamp(130px, 17dvh, 158px);
   position: relative;
   isolation: isolate;
-  padding: 6px 6px 4px;
+  padding: 8px 8px 5px;
   margin-block: 0 10px;
   min-width: 0;
-  border: 1px solid #74604c;
-  border-radius: 12px 12px 9px 9px;
-  background: linear-gradient(166deg, #493b32, #1a161a 33%, #282024 78%, #382b26);
+  border: 1px solid #927550;
+  border-radius: 13px 13px 9px 9px;
+  background: linear-gradient(167deg, #362b21, #141112 44%, #211a1b 85%, #423026);
   box-shadow:
-    inset 0 1px #f2d7ac3d,
+    inset 0 1px #f9dfb252,
     inset 0 -1px #050607,
-    0 8px 16px #06040aa6;
+    0 6px 15px #06040abe,
+    0 0 18px color-mix(in srgb, var(--signal-light) 33%, transparent);
+  transition: box-shadow 750ms ease;
+}
+
+.betrayals-broadcast::before,
+.betrayals-broadcast::after {
+  position: absolute;
+  inset: 3px 14% auto;
+  height: 2px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, var(--signal-light), transparent);
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--signal-light) 37%, transparent);
+  content: '';
+  pointer-events: none;
+  transition:
+    background-color 750ms ease,
+    box-shadow 750ms ease;
+}
+
+.betrayals-broadcast::after {
+  inset: auto 30% 3px;
+  opacity: 0.67;
 }
 
 .betrayals-broadcast[data-mode='ceremony'] {
-  --signal-ink: #f6c9a5;
-  --signal-shade: #402623;
+  --signal-ink: #ffd8b2;
+  --signal-shade: #572d1c;
+  --signal-light: #ffae6b;
 }
 
 .betrayals-broadcast[data-mode='night'] {
-  --signal-ink: #dbc2ee;
-  --signal-shade: #30233f;
+  --signal-ink: #f0c6e7;
+  --signal-shade: #48233e;
+  --signal-light: #dc73a5;
 }
 
 .betrayals-broadcast[data-mode='daybreak'] {
-  --signal-ink: #f2d7a8;
-  --signal-shade: #36372d;
+  --signal-ink: #ffe0b1;
+  --signal-shade: #4b3c29;
+  --signal-light: #f3d38e;
+}
+
+.betrayals-broadcast[data-mode='immunity'] {
+  --signal-ink: #f6e6b7;
+  --signal-shade: #51451e;
+  --signal-light: #e6cb72;
+}
+
+.betrayals-broadcast[data-mode='safety'] {
+  --signal-ink: #d4ecff;
+  --signal-shade: #233a56;
+  --signal-light: #8abbec;
+}
+
+.betrayals-broadcast[data-mode='finale'] {
+  --signal-ink: #f7e0ae;
+  --signal-shade: #5d3e25;
+  --signal-light: #f0c479;
 }
 
 .betrayals-broadcast__glass {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  min-block-size: 112px;
-  border: 1px solid #141b21;
+  border: 1px solid #0a0c0e;
   border-radius: 7px;
   background: radial-gradient(ellipse at 73% 4%, var(--signal-shade), #0b1018 72%);
   box-shadow:
-    inset 0 0 0 1px #a0c7c61f,
+    inset 0 0 0 1px #e4c48d33,
     inset 0 0 22px #020406;
   color: #f4eeee;
 }
@@ -57,32 +101,43 @@
 .betrayals-broadcast__art {
   z-index: -3;
   object-fit: cover;
-  object-position: center 47%;
+  object-position: center 44%;
+  animation: betrayals-monitor-push 1300ms ease-out both;
 }
 
-.betrayals-broadcast__glass:has(.betrayals-broadcast__art) {
-  background: #0b1018a3;
+.betrayals-broadcast[data-mode='night'] .betrayals-broadcast__art {
+  object-position: center 56%;
 }
 
 .betrayals-broadcast__glass::after {
   z-index: -2;
   content: '';
   background:
-    radial-gradient(ellipse at 74% 20%, transparent 12%, #090d1590 94%),
-    linear-gradient(94deg, #090d15f7 6%, #090d15cc 58%, #090d1580);
+    radial-gradient(
+      ellipse at 90% 0%,
+      color-mix(in srgb, var(--signal-light) 18%, transparent),
+      transparent 66%
+    ),
+    linear-gradient(98deg, #080a0ef2 3%, #080a0ec2 47%, #080a0e3d 100%),
+    linear-gradient(0deg, #08090ae5 2%, transparent 74%);
 }
 
 .betrayals-broadcast__grain {
   z-index: -1;
-  opacity: 0.24;
+  opacity: 0.19;
   background: repeating-linear-gradient(to bottom, transparent 0 3px, #03060c 3px 4px);
 }
 
 .betrayals-broadcast__readout {
   display: grid;
   align-items: center;
-  min-block-size: 112px;
-  padding: 11px 14px 12px;
+  box-sizing: border-box;
+  min-block-size: var(--tv-height);
+  padding: 15px clamp(11px, 4vw, 19px);
+}
+
+.betrayals-broadcast[data-interactive='true'] .betrayals-broadcast__readout {
+  align-items: start;
 }
 
 .betrayals-broadcast__transmission {
@@ -94,7 +149,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-block-end: 5px;
+  margin-block-end: 6px;
   color: var(--signal-ink);
   font-size: 0.66rem;
   line-height: 1.2;
@@ -116,7 +171,7 @@
 
 .betrayals-broadcast .betrayals-broadcast__title {
   margin: 0;
-  font-size: clamp(1.24rem, 5.8vw, 1.68rem);
+  font-size: clamp(1.38rem, 6.3vw, 1.88rem);
   line-height: 1.08;
   text-wrap: balance;
   overflow-wrap: anywhere;
@@ -126,17 +181,18 @@
 
 .betrayals-broadcast__message,
 .betrayals-broadcast__detail {
-  margin-block-start: 5px;
+  margin-block-start: 7px;
   max-width: 45ch;
   color: #d2d2db;
-  font-size: 0.81rem;
+  font-size: 0.88rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .betrayals-broadcast__detail {
+  max-width: none;
   color: var(--signal-ink);
-  font-size: 0.75rem;
+  font-size: 0.81rem;
 }
 
 .betrayals-broadcast__message > p,
@@ -151,6 +207,18 @@
   border-radius: 4px;
   background: repeating-linear-gradient(90deg, #806951 0 3px, transparent 3px 6px);
   opacity: 0.68;
+}
+
+@keyframes betrayals-monitor-push {
+  from {
+    opacity: 0.52;
+    transform: scale(1.05);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes betrayals-signal-enter {
@@ -168,7 +236,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .betrayals-broadcast__transmission {
+  .betrayals-broadcast__transmission,
+  .betrayals-broadcast__art {
     animation: none;
+  }
+
+  .betrayals-broadcast {
+    transition: none;
   }
 }

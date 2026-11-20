@@ -17,6 +17,8 @@ for (const viewport of [
     const television = page.getByRole('region', { name: 'Faux TV' })
     const dock = page.getByRole('navigation', { name: 'Season actions' })
     await expect(television.getByRole('heading', { name: 'Your role' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Music' })).toBeVisible()
+    await expect(dock.getByRole('button', { name: 'Store' })).toBeVisible()
 
     const roster = page.getByRole('list', { name: 'Contestant roster' })
     const tiles = roster.getByRole('button')
@@ -52,8 +54,19 @@ for (const viewport of [
       .toBe(24)
 
     await dock.getByRole('button', { name: 'Play: open Day 1' }).click()
+    await expect(page.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+    await page.reload()
+    await expect(page.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /Skip cinematic|Continue/ })
+      .click()
     await expect(television.getByRole('heading', { name: 'Dawn' })).toBeVisible()
     await dock.getByRole('button', { name: 'Play: enter Social' }).click()
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /Skip cinematic|Continue/ })
+      .click()
     await dock.getByRole('button', { name: /^Social/ }).click()
     await expect(page.getByRole('dialog', { name: 'Social' })).toBeVisible()
     await page.keyboard.press('Escape')

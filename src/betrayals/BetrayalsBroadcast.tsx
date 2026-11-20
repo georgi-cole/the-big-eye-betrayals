@@ -7,8 +7,9 @@ export interface BetrayalsBroadcastProps {
   message?: ReactNode
   detail?: ReactNode
   cueKey?: string | number
-  mode?: 'default' | 'ceremony' | 'night' | 'daybreak'
+  mode?: 'default' | 'ceremony' | 'night' | 'daybreak' | 'immunity' | 'safety' | 'finale'
   art?: string
+  interactive?: boolean
 }
 
 export function BetrayalsBroadcast({
@@ -19,13 +20,23 @@ export function BetrayalsBroadcast({
   cueKey,
   mode = 'default',
   art,
+  interactive = false,
 }: BetrayalsBroadcastProps) {
   return (
-    <section className="betrayals-broadcast" data-mode={mode} aria-label="Faux TV">
+    <section
+      className="betrayals-broadcast"
+      data-mode={mode}
+      data-interactive={interactive || undefined}
+      aria-label="Faux TV"
+    >
       <div className="betrayals-broadcast__glass">
-        {art && <img className="betrayals-broadcast__art" src={art} alt="" aria-hidden="true" />}
+        {art && <img key={art} className="betrayals-broadcast__art" src={art} alt="" />}
         <div className="betrayals-broadcast__grain" aria-hidden="true" />
-        <div className="betrayals-broadcast__readout" aria-live="polite" aria-atomic="true">
+        <div
+          className="betrayals-broadcast__readout"
+          aria-live={interactive ? undefined : 'polite'}
+          aria-atomic={interactive ? undefined : true}
+        >
           <div className="betrayals-broadcast__transmission" key={cueKey ?? title}>
             <header className="betrayals-broadcast__signal">
               <span className="betrayals-broadcast__lamp" aria-hidden="true" />

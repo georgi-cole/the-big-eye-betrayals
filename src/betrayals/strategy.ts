@@ -12,6 +12,8 @@ type Perspective = {
   ownConversations: readonly SocialEntry[]
   publicTally: Readonly<Record<string, number>>
   eligibleIds: readonly string[]
+  tableRound?: number
+  tablePressure?: ReadonlyMap<string, number>
 }
 
 function hashId(id: string): number {
@@ -53,7 +55,8 @@ function scoreChoice(
   pressure: number
 ): number {
   const { actorId, day, role, seed, teammates, publicTally, ownConversations } = perspective
-  const random = mulberry32(seed ^ Math.imul(day, 1021) ^ hashId(actorId + ':' + id))
+  const roundSalt = !night && perspective.tableRound ? Math.imul(perspective.tableRound, 229) : 0
+  const random = mulberry32(seed ^ Math.imul(day, 1021) ^ hashId(actorId + ':' + id) ^ roundSalt)
   const uncertainty = random() * 0.8
   const trust = rapport(ownConversations, actorId, id)
   const targetPressure = (publicTally[id] ?? 0) / 12
@@ -71,7 +74,12 @@ export function chooseTarget(
     !night && perspective.phase !== 'final-banishment' ? socialPressure(perspective) : undefined
   const ranked = perspective.eligibleIds.map((id) => ({
     id,
-    score: scoreChoice(perspective, id, night, pressure?.get(id) ?? 0),
+    score: scoreChoice(
+      perspective,
+      id,
+      night,
+      (pressure?.get(id) ?? 0) + (night ? 0 : (perspective.tablePressure?.get(id) ?? 0))
+    ),
   }))
   ranked.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
   return ranked[0]?.id

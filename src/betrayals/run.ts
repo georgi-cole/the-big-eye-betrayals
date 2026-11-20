@@ -1,6 +1,7 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
 
 export const CAST_SIZE = 25
+export const MAX_TABLE_ROUNDS = 3
 export const RULES_VERSION = 1
 export const PHASES = [
   'role-reveal',
@@ -32,6 +33,9 @@ export type Seat = Contestant & {
 }
 
 export type RunOptions = { publicMode: boolean; realityMode: RealityPreset }
+export const INCOMING_ANSWERS = ['engage', 'listen', 'dismiss'] as const
+export type IncomingAnswer = (typeof INCOMING_ANSWERS)[number]
+
 export type SocialEntry = {
   day: number
   actorId: string
@@ -48,6 +52,29 @@ export type TableReceipt = {
   tiedByDraw: boolean
 }
 
+export const PRESENTATION_CUES = [
+  'conclave-arrival',
+  'conclave-seal',
+  'sunrise',
+  'awakening',
+  'shield',
+  'safety-results',
+  'death-letter',
+  'round-table',
+  'departure',
+  'elimination',
+  'sunset',
+  'interlude',
+] as const
+
+export type PresentationCue = (typeof PRESENTATION_CUES)[number]
+
+export type SafetyStanding = { contestantId: string; score: number; forfeited?: boolean }
+
+export type Ballot = { voterId: string; targetId: string }
+export type TableCount = { round: number; ballots: Ballot[]; tiedIds: string[] }
+export type TableSway = { targetId: string; tone: 'careful' | 'forceful' }
+
 export type Run = {
   edition: 'betrayals'
   version: typeof RULES_VERSION
@@ -60,18 +87,25 @@ export type Run = {
   seats: Seat[]
   private: {
     betrayers: string[]
+    hiddenBetrayerIds?: string[]
     nightShieldIds: string[]
+    safetyStandings?: { day: number; rows: SafetyStanding[] }
     pendingTable?: TableReceipt
-    pendingNight?: { targetId: string | null; blocked: boolean }
+    pendingNight?: { targetId: string | null; blocked: boolean; byDraw?: boolean }
   }
   publicSeed: number
   pot: number
   social: SocialEntry[]
+  incomingResponses?: Record<string, IncomingAnswer>
+  presentation?: PresentationCue[]
   immunityId?: string
   publicShield?: { id: string; day: number }
   publicShieldDecisionDay?: number
   audienceApproval?: Record<string, number>
   runoffIds?: string[]
+  tableRound?: number
+  tableCount?: TableCount
+  tableSway?: TableSway | null
   lastTable?: TableReceipt
   lastDawn?: { day: number; eliminatedId: string | null }
   result?: {
@@ -149,6 +183,24 @@ export function advancePreparation(run: Run, token: CommandToken): Run {
   return run
 }
 
+export function knownTeammateIds(run: Run, actorId: string | null): string[] {
+  if (
+    !actorId ||
+    !run.private.betrayers.includes(actorId) ||
+    !run.seats.some(({ id, exit }) => id === actorId && !exit)
+  )
+    return []
+  return run.seats
+    .filter(
+      ({ id, exit }) =>
+        !exit &&
+        id !== actorId &&
+        run.private.betrayers.includes(id) &&
+        !run.private.hiddenBetrayerIds?.includes(id)
+    )
+    .map(({ id }) => id)
+}
+
 export function viewFor(run: Run, actorId: string | null) {
   const actor = actorId ? run.seats.find(({ id }) => id === actorId) : undefined
   const role: Role | null = actor
@@ -157,20 +209,18 @@ export function viewFor(run: Run, actorId: string | null) {
       : 'loyal'
     : null
   const activeActor = actor && !actor.exit
+  const teammateIds = knownTeammateIds(run, actorId)
+  const knownNightShieldIds = activeActor
+    ? run.private.nightShieldIds.filter((id) => id === actor.id || teammateIds.includes(id))
+    : []
 
   return {
     phase: run.phase,
     day: run.day,
     role,
-    teammateIds:
-      activeActor && role === 'betrayer'
-        ? run.seats
-            .filter(
-              ({ id, exit }) => !exit && id !== actor.id && run.private.betrayers.includes(id)
-            )
-            .map(({ id }) => id)
-        : [],
-    hasNightShield: Boolean(activeActor && run.private.nightShieldIds.includes(actor.id)),
+    teammateIds,
+    knownNightShieldIds,
+    hasNightShield: Boolean(activeActor && knownNightShieldIds.includes(actor.id)),
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,

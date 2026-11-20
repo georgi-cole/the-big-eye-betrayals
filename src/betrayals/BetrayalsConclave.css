@@ -1,0 +1,88 @@
+.betrayals-conclave {
+  margin-block-start: 0.6rem;
+  color: #ede5ef;
+}
+
+.betrayals-conclave__voices {
+  display: grid;
+  gap: 0.34rem;
+  max-block-size: 8.7rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #a17a8e #251a2e;
+  margin: 0;
+  padding: 0.1rem 0.3rem 0.1rem 0;
+  list-style: none;
+}
+
+.betrayals-conclave__voice {
+  display: grid;
+  grid-template-columns: 1.65rem 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  border: 1px solid #b989a332;
+  border-radius: 0.4rem;
+  padding: 0.34rem 0.44rem;
+  background: linear-gradient(105deg, #352437d6, #171020d6);
+  animation: betrayals-conclave-voice 360ms ease-out var(--conclave-delay) both;
+}
+
+.betrayals-conclave__voice img,
+.betrayals-conclave__hood {
+  display: block;
+  width: 1.65rem;
+  height: 1.87rem;
+  border: 1px solid #b989a38c;
+  border-radius: 0.28rem;
+  object-fit: cover;
+  object-position: 50% 24%;
+}
+
+.betrayals-conclave__hood {
+  background:
+    radial-gradient(ellipse at 50% 52%, #0b0710 0 28%, transparent 33%),
+    radial-gradient(ellipse at 50% 58%, #604662 0 43%, #251a2e 50%);
+}
+
+.betrayals-conclave__voice p {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.betrayals-conclave__voice .betrayals-conclave__nomination {
+  margin-block-end: 0.12rem;
+  color: #eacae6;
+}
+
+.betrayals-conclave .betrayals-conclave__choice {
+  margin: 0.34rem 0 0;
+  color: #f2dcba;
+  font-size: 0.78rem;
+}
+
+.betrayals-conclave__choice p {
+  margin: 0;
+}
+
+@keyframes betrayals-conclave-voice {
+  from {
+    opacity: 0;
+    transform: translateY(0.24rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-betrayals-motion='reduced'] .betrayals-conclave__voice {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .betrayals-conclave__voice {
+    animation: none;
+  }
+}

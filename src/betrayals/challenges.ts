@@ -1,5 +1,5 @@
 import { mulberry32 } from '../store/rng.ts'
-import { isCurrentCommand } from './run.ts'
+import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 
 export type RankedScore = {
@@ -76,8 +76,48 @@ export function resolveChallenge(
       pot,
       revision,
       phase: 'round-table',
-      private: { ...run.private, nightShieldIds },
+      private: {
+        ...run.private,
+        nightShieldIds,
+        safetyStandings: {
+          day: run.day,
+          rows: standings.map(({ contestantId, score, forfeited }) => ({
+            contestantId,
+            score,
+            forfeited,
+          })),
+        },
+      },
     }
   }
   return { ...run, pot, revision, phase: 'final-banishment' }
+}
+
+export function safetyResultsFor(run: Run, actorId: string | null) {
+  const standings = run.private.safetyStandings
+  if (!standings || standings.day !== run.day) return []
+  const view = viewFor(run, actorId)
+  const activeViewer = view.seats.some(({ id, exit }) => id === actorId && !exit)
+  const byId = new Map(
+    standings.rows.map((row, index) => [row.contestantId, { ...row, place: index + 1 }])
+  )
+  // Keep cast order even when every score is masked. Row position must never encode rank.
+  return view.seats.flatMap(({ id, name, portrait }) => {
+    const standing = byId.get(id)
+    if (!standing) return []
+    const own = activeViewer && id === actorId
+    const hasShield = view.knownNightShieldIds.includes(id)
+    return [
+      {
+        id,
+        name,
+        portrait,
+        own,
+        score: own ? standing.score : null,
+        place: own ? standing.place : null,
+        forfeited: own && Boolean(standing.forfeited),
+        shield: own || hasShield ? hasShield : null,
+      },
+    ]
+  })
 }

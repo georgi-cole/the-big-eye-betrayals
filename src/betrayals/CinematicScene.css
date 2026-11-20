@@ -1,0 +1,1078 @@
+.betrayals-cine {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  color: #f4e9d8;
+  background: #080a10;
+  color-scheme: dark;
+  --cine-gold: #eec397;
+  --cine-controls: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  animation: betrayals-cine-in 500ms ease both;
+}
+
+.betrayals-cine::backdrop {
+  background: #080a10;
+}
+
+.betrayals-cine__frame {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 78dvh);
+  height: 100%;
+  margin: auto;
+  overflow: hidden;
+  container-type: size;
+  background: #0b1015;
+}
+
+.betrayals-cine__camera,
+.betrayals-cine__backdrop,
+.betrayals-cine__weather,
+.betrayals-cine__grade,
+.betrayals-cine__edge {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.betrayals-cine__camera {
+  animation: betrayals-cine-push 5s cubic-bezier(0.22, 0.56, 0.24, 1) both;
+}
+
+.betrayals-cine__backdrop {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 46%;
+}
+
+.betrayals-cine[data-scene='round-table'] .betrayals-cine__camera {
+  animation-name: betrayals-cine-table;
+  animation-duration: 3s;
+}
+
+.betrayals-cine:is([data-scene='sunrise'], [data-scene='sunset']) .betrayals-cine__backdrop {
+  object-position: 62% 45%;
+  animation: betrayals-cine-daybreak 2.7s ease-in-out both;
+}
+
+.betrayals-cine[data-scene='sunset'] .betrayals-cine__backdrop {
+  animation-direction: reverse;
+}
+
+.betrayals-cine__grade {
+  background:
+    radial-gradient(ellipse at 50% 43%, transparent 24%, #060710a6 88%),
+    linear-gradient(180deg, #0608103b 0%, transparent 45%, #08090e 100%);
+}
+
+.betrayals-cine__edge {
+  z-index: 3;
+  box-shadow:
+    inset 0 1.5rem 0 #080a10,
+    inset 0 -0.5rem 0 #080a10,
+    inset 0 0 4rem #080910a3;
+}
+
+.betrayals-cine__stage {
+  position: absolute;
+  z-index: 1;
+  inset: 8% 0 max(22%, 112px);
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.betrayals-cine__caption {
+  position: absolute;
+  z-index: 4;
+  inset: auto 0 0;
+  box-sizing: border-box;
+  min-height: 29%;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding: 3rem 1.25rem calc(4rem + var(--cine-controls));
+  background: linear-gradient(0deg, #080a10 6%, #080a10e8 42%, #080a1000 100%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.betrayals-cine__caption-beat {
+  animation: betrayals-cine-caption 440ms ease both;
+}
+
+.betrayals-cine__caption h2 {
+  margin: 0;
+  color: #f6e6d1;
+  font:
+    normal clamp(1.6rem, 6.9cqw, 3.35rem) / 1.05 Georgia,
+    'Times New Roman',
+    serif;
+  text-wrap: balance;
+  text-shadow: 0 2px 15px #000;
+}
+
+.betrayals-cine__caption p {
+  max-width: 34ch;
+  margin: 0.65rem auto 0;
+  color: #ddc9b4;
+  font:
+    0.9rem/1.4 system-ui,
+    sans-serif;
+  text-wrap: pretty;
+}
+
+.betrayals-cine__controls {
+  position: absolute;
+  z-index: 5;
+  inset: auto 1.25rem var(--cine-controls);
+  display: flex;
+  justify-content: center;
+}
+
+.betrayals-cine__controls button {
+  min-width: 9rem;
+  min-height: 2.7rem;
+  border: 1px solid #ab815b;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  color: #ffead4;
+  background: #211a1b;
+  cursor: pointer;
+  font:
+    600 0.85rem/1.2 system-ui,
+    sans-serif;
+}
+
+.betrayals-cine__controls button:hover {
+  background: #382826;
+}
+
+.betrayals-cine__controls button:focus-visible {
+  outline: 2px solid var(--cine-gold);
+  outline-offset: 3px;
+}
+
+.betrayals-cine[data-scene^='conclave'] .betrayals-cine__grade {
+  background:
+    radial-gradient(ellipse at 50% 62%, #930e271f, transparent 64%),
+    linear-gradient(180deg, #0c07166b, transparent 51%, #100911db),
+    radial-gradient(ellipse at center, transparent 25%, #08060de0 93%);
+}
+
+.betrayals-cine__circle {
+  position: relative;
+  align-self: end;
+  width: min(94%, 32rem);
+  height: 83%;
+  display: grid;
+  align-items: end;
+  padding-bottom: 14%;
+  perspective: 540px;
+}
+
+.betrayals-cine__figures {
+  display: grid;
+  grid-template-columns: repeat(var(--seats), minmax(0, 1fr));
+  align-items: end;
+  justify-items: center;
+  height: min(63cqh, 69cqw);
+  padding-inline: 3%;
+}
+
+.betrayals-cine__figure {
+  position: relative;
+  width: min(100%, 7rem);
+  height: 87%;
+  filter: drop-shadow(0 0.75rem 0.6rem #020106ee);
+  animation: betrayals-cine-gather 1.35s ease-out both;
+  animation-delay: calc(var(--figure-index) * 135ms);
+}
+
+.betrayals-cine__figure:nth-child(even) {
+  align-self: center;
+}
+
+.betrayals-cine__mantle,
+.betrayals-cine__hood,
+.betrayals-cine__mantle-art,
+.betrayals-cine__face {
+  position: absolute;
+}
+
+.betrayals-cine__mantle {
+  inset: 21% -1% 0;
+  clip-path: polygon(44% 0, 56% 0, 77% 13%, 90% 31%, 100% 100%, 0 100%, 10% 31%, 23% 13%);
+  background:
+    linear-gradient(95deg, #030207 0%, transparent 16% 85%, #050308 100%),
+    repeating-linear-gradient(83deg, #0f0910 0 5%, #572c35 7% 8%, #130a14 12% 22%), #22121a;
+}
+
+.betrayals-cine__hood {
+  inset: 0 14% auto;
+  z-index: 2;
+  height: 47%;
+  clip-path: polygon(50% 0, 75% 10%, 92% 35%, 100% 73%, 61% 100%, 39% 100%, 0 73%, 8% 35%, 25% 10%);
+  background:
+    radial-gradient(ellipse at 50% 58%, #010105 0% 35%, #170c16 47%, transparent 56%),
+    linear-gradient(112deg, #140913, #683741 52%, #150a15 85%);
+}
+
+.betrayals-cine__hood::after {
+  content: '';
+  position: absolute;
+  inset: 11% 15% 19%;
+  transform: rotate(45deg);
+  border: 1px solid #b4815766;
+  border-radius: 46% 2% 40% 24%;
+}
+
+.betrayals-cine__mantle-art {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  filter: brightness(0.91) saturate(0.92);
+  opacity: 0;
+}
+
+.betrayals-cine__circle[data-mantle='true'] .betrayals-cine__figure {
+  height: auto;
+  aspect-ratio: 0.53;
+}
+
+.betrayals-cine__circle[data-mantle='true'] .betrayals-cine__mantle-art {
+  opacity: 1;
+}
+
+.betrayals-cine__circle[data-mantle='true'] .betrayals-cine__hood,
+.betrayals-cine__circle[data-mantle='true'] .betrayals-cine__mantle {
+  visibility: hidden;
+}
+
+.betrayals-cine__figure[data-revealed='true'] .betrayals-cine__mantle-art {
+  clip-path: inset(18% 0 0);
+  animation: betrayals-cine-mantle-lower 550ms ease both;
+}
+
+.betrayals-cine__circle[data-leaving='true'] .betrayals-cine__mantle-art {
+  animation: betrayals-cine-mantle-lower 520ms ease reverse both;
+}
+
+.betrayals-cine__face {
+  inset: 1% 24% auto;
+  height: 44%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 49% 49% 35% 35%;
+  color: var(--cine-gold);
+  background: #3d2427;
+  font:
+    600 1.4rem/1 Georgia,
+    serif;
+  animation: betrayals-cine-in 540ms 110ms both;
+}
+
+.betrayals-cine__circle[data-mantle='true'] .betrayals-cine__face {
+  inset: -2% 28% auto;
+  height: 23%;
+  box-shadow: 0 0.16rem 0.45rem #080509a1;
+}
+
+.betrayals-cine__face img,
+.betrayals-cine__verdict-photo img,
+.betrayals-cine__tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.betrayals-cine__face img {
+  filter: brightness(0.75) sepia(0.19) contrast(1.1);
+}
+
+.betrayals-cine__figure[data-revealed='true'] .betrayals-cine__hood {
+  animation: betrayals-cine-unhood 600ms ease both;
+}
+
+.betrayals-cine__nameplate {
+  position: absolute;
+  z-index: 3;
+  inset: auto 2% 57%;
+  overflow: hidden;
+  padding: 0.28rem 0.12rem;
+  border-block: 1px solid #775043;
+  color: #ffe0b7;
+  background: #10080eec;
+  font:
+    600 clamp(0.59rem, 3.3cqw, 0.88rem)/1 system-ui,
+    sans-serif;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: betrayals-cine-in 500ms 340ms both;
+}
+
+.betrayals-cine__circle[data-leaving='true'] .betrayals-cine__figure {
+  animation: betrayals-cine-dispersal 1.4s ease-in both;
+  animation-delay: calc(var(--figure-index) * 100ms + 200ms);
+}
+
+.betrayals-cine[data-scene='conclave-seal'][data-beat='3'] .betrayals-cine__figure {
+  visibility: hidden;
+}
+
+.betrayals-cine__altar {
+  position: absolute;
+  z-index: 2;
+  inset: auto 16% 7%;
+  height: 22%;
+  display: grid;
+  place-items: center;
+  border: 1px solid #795343;
+  border-radius: 50%;
+  transform: rotateX(50deg);
+  background:
+    repeating-conic-gradient(from 4deg, #7d4b43a8 0deg 1deg, transparent 2deg 18deg),
+    radial-gradient(ellipse, #902142 0%, #4a223a 22%, #191119 46%, #0c0a11 76%);
+  box-shadow:
+    inset 0 0 1.4rem #07060f,
+    0 1.15rem 0 #110d17,
+    0 1.65rem 1.6rem #000b;
+}
+
+.betrayals-cine__altar i,
+.betrayals-cine__wax i,
+.betrayals-cine__notice i {
+  display: block;
+  width: 33%;
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 69% 5% 65% 5%;
+  transform: rotate(45deg);
+  color: #dfab76;
+  background: radial-gradient(circle, #f5cd9e 5%, #6b301e 8% 18%, transparent 22%);
+}
+
+.betrayals-cine__altar i {
+  width: 20%;
+  box-shadow: 0 0 2rem #c451706e;
+}
+
+.betrayals-cine__letter {
+  position: relative;
+  width: min(70cqw, 28rem, 72cqh);
+  aspect-ratio: 1.6;
+  margin-top: 10%;
+  transform: rotate(-11deg);
+  animation: betrayals-cine-letter 980ms ease both;
+}
+
+.betrayals-cine__envelope {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid #cf9c66;
+  border-radius: 3%;
+  background:
+    linear-gradient(35deg, #c8a074 33%, #a4744e 34%, transparent 35%),
+    linear-gradient(-35deg, #c09a70 33%, #a57852 34%, #d3b088 35%);
+  box-shadow:
+    inset 0 0 1.7rem #5435208f,
+    0 1.6rem 3rem #020408d9;
+}
+
+.betrayals-cine__envelope::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 39%;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: linear-gradient(135deg, #e3c39a, #bc895f);
+  filter: drop-shadow(0 3px 2px #4a281b);
+}
+
+.betrayals-cine__wax {
+  position: absolute;
+  inset: 46% 39% auto;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 46% 53% 51% 44%;
+  color: #cd8b72;
+  background: radial-gradient(
+    circle at 46% 38%,
+    #681627 37%,
+    #ad4a5b 53%,
+    #541121 60%,
+    #891d37 76%
+  );
+  box-shadow: 0 2px 8px #4e1829;
+  opacity: 0;
+}
+
+.betrayals-cine__stamp {
+  position: absolute;
+  z-index: 1;
+  inset: -7% 42% 23%;
+  border-radius: 42% 42% 18% 18%;
+  opacity: 0;
+  background: linear-gradient(96deg, #190f16, #865c48 31%, #3f2934 58%, #160c16);
+  box-shadow: 0 7px 0 #9c6c51;
+}
+
+.betrayals-cine__letter[data-sealed='true'] .betrayals-cine__wax {
+  animation: betrayals-cine-in 350ms 450ms both;
+}
+
+.betrayals-cine[data-scene='conclave-seal']
+  .betrayals-cine__letter[data-sealed='true']
+  .betrayals-cine__stamp {
+  animation: betrayals-cine-stamp 840ms ease-in-out both;
+}
+
+.betrayals-cine__notice {
+  position: relative;
+  width: min(77cqw, 25rem);
+  min-height: 48%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 1.2rem;
+  transform: rotate(-3deg);
+  box-sizing: border-box;
+  border: 1px solid #ac784e;
+  background: radial-gradient(ellipse at 42% 25%, #e9caa0, #b9946f 87%);
+  box-shadow:
+    0 1.5rem 4rem #000d,
+    inset 0 0 1.7rem #59301b97;
+  color: #40142d;
+  text-align: center;
+  animation: betrayals-cine-letter 700ms ease both;
+}
+
+.betrayals-cine__notice small {
+  font:
+    600 0.75rem/1.2 system-ui,
+    sans-serif;
+}
+
+.betrayals-cine__notice strong {
+  font:
+    700 clamp(1.4rem, 7cqw, 2.6rem)/1.1 Georgia,
+    serif;
+}
+
+.betrayals-cine__notice i {
+  width: 11%;
+  color: #732845;
+}
+
+.betrayals-cine__horizon {
+  position: absolute;
+  inset: -12% 0 -12%;
+  overflow: hidden;
+  opacity: 0.52;
+  mix-blend-mode: screen;
+}
+
+.betrayals-cine__horizon i {
+  position: absolute;
+  inset: 14% 4% 7%;
+  background: radial-gradient(
+    ellipse at 50% 47%,
+    #f8c47b8f 2%,
+    #f699696e 15%,
+    #9c547c45 35%,
+    transparent 66%
+  );
+  animation: betrayals-cine-sunrise 2.55s ease-in-out both;
+}
+
+.betrayals-cine[data-scene='sunset'] .betrayals-cine__horizon i {
+  animation-direction: reverse;
+}
+
+.betrayals-cine__horizon i::after {
+  position: absolute;
+  inset: 43% auto auto 34%;
+  width: 6cqw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ffddae9c;
+  box-shadow: 0 0 1.2rem 0.3rem #ffc4808f;
+  content: '';
+  filter: blur(1px);
+}
+
+.betrayals-cine[data-scene='sunset'][data-beat='1'] .betrayals-cine__grade {
+  background: linear-gradient(#07142692, #06071393 62%, #090a12);
+}
+
+.betrayals-cine[data-scene='sunrise'][data-beat='1'] .betrayals-cine__grade {
+  background: linear-gradient(#f394662b, transparent 50%, #090a12);
+}
+
+.betrayals-cine[data-weather='mist'] .betrayals-cine__weather {
+  inset: 18% -22% -22%;
+  background:
+    radial-gradient(ellipse at 30% 60%, #c4d6e05a, transparent 41%),
+    radial-gradient(ellipse at 68% 49%, #e5d8b84d, transparent 43%);
+  animation: betrayals-cine-mist 6s ease-in-out infinite alternate;
+}
+
+.betrayals-cine[data-weather='rain'] .betrayals-cine__weather {
+  inset: -33%;
+  opacity: 0.64;
+  background:
+    repeating-linear-gradient(104deg, transparent 0 18px, #a5d4f36b 19px, transparent 21px 33px),
+    linear-gradient(160deg, #21364b3d, #091522a6);
+  mask-image: repeating-linear-gradient(169deg, #000 0 34px, transparent 38px 51px);
+  animation: betrayals-cine-rain 690ms linear infinite;
+}
+
+.betrayals-cine[data-weather='rain'] .betrayals-cine__horizon {
+  opacity: 0.19;
+}
+
+.betrayals-cine:is([data-weather='mist'], [data-weather='rain']) .betrayals-cine__horizon i::after {
+  opacity: 0.17;
+}
+
+.betrayals-cine__rollcall {
+  width: min(89cqw, 88cqh, 31rem);
+  max-height: 96%;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(3px, 1.25cqw, 0.55rem);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.betrayals-cine__tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  aspect-ratio: 0.92;
+  overflow: hidden;
+  border: 1px solid #3b3438;
+  border-radius: 4px;
+  color: #d7ac87;
+  background: #211b25;
+  filter: brightness(0.37) saturate(0.18);
+}
+
+.betrayals-cine__tile[data-awake='true'] {
+  filter: none;
+  border-color: #a37b57;
+  animation: betrayals-cine-wake 540ms cubic-bezier(0.1, 0.6, 0.2, 1) both;
+  animation-delay: calc(var(--wake-order) * 63ms);
+}
+
+.betrayals-cine__rollcall[data-sleeping='true'] .betrayals-cine__tile {
+  animation: betrayals-cine-sleep 660ms ease-in both;
+  animation-delay: calc(var(--wake-order) * 60ms);
+}
+
+.betrayals-cine__tile-name {
+  position: absolute;
+  inset: auto 0 0;
+  overflow: hidden;
+  padding: 0.36rem 0.18rem 0.15rem;
+  color: #ffe6cd;
+  background: linear-gradient(transparent, #0d080ef7 46%);
+  font:
+    600 clamp(0.46rem, 2.3cqw, 0.82rem)/1 system-ui,
+    sans-serif;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.betrayals-cine__dark-mark {
+  position: absolute;
+  width: 80%;
+  height: 1px;
+  background: #f46073;
+  box-shadow: 0 0 0.5rem #f46073;
+  transform: rotate(-45deg);
+}
+
+.betrayals-cine__shield {
+  position: relative;
+  display: grid;
+  place-items: center;
+  row-gap: 0.6rem;
+  width: min(56cqw, 59cqh);
+  color: var(--cine-gold);
+  text-align: center;
+}
+
+.betrayals-cine__shield img {
+  position: relative;
+  width: 86%;
+  max-height: 58cqh;
+  object-fit: contain;
+  filter: brightness(0.18) drop-shadow(0 0 1rem #000);
+  transform: scale(0.88) rotateY(28deg);
+  transition:
+    filter 880ms ease,
+    transform 880ms ease;
+}
+
+.betrayals-cine__shield[data-shown='true'] img {
+  filter: brightness(1.13) drop-shadow(0 0 1.2rem #f0bf7b88);
+  transform: scale(1) rotateY(0);
+}
+
+.betrayals-cine__shield-light {
+  position: absolute;
+  inset: -36%;
+  background: radial-gradient(ellipse, #eebe76a8, #aa693e2e 46%, transparent 68%);
+  opacity: 0;
+  transition: opacity 870ms ease;
+}
+
+.betrayals-cine__shield[data-shown='true'] .betrayals-cine__shield-light {
+  opacity: 1;
+}
+
+.betrayals-cine__shield strong {
+  position: relative;
+  font:
+    normal clamp(1.1rem, 5cqw, 1.9rem)/1.2 Georgia,
+    serif;
+  text-shadow: 0 2px 15px #000;
+}
+
+.betrayals-cine__ballot-box {
+  align-self: end;
+  width: min(50cqw, 42cqh, 16rem);
+  max-height: 43%;
+  margin-bottom: 9%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.75rem 1rem #000d);
+  animation: betrayals-cine-caption 1.35s 450ms both;
+}
+
+.betrayals-cine__verdict {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  width: min(63cqw, 66cqh, 25rem);
+  max-height: 83%;
+  aspect-ratio: 0.76;
+  overflow: hidden;
+  border: 1px solid #a17654;
+  border-radius: 8px;
+  color: #ffdfba;
+  background: linear-gradient(140deg, #634451, #13101c 70%);
+  box-shadow:
+    0 0 2rem #d898683b,
+    0 1.4rem 4rem #000a;
+  text-align: center;
+  animation: betrayals-cine-caption 620ms both;
+}
+
+.betrayals-cine__verdict-photo {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  font:
+    4rem/1 Georgia,
+    serif;
+  transition: filter 850ms ease;
+}
+
+.betrayals-cine__verdict[data-eliminated='true'] .betrayals-cine__verdict-photo {
+  filter: saturate(0.04) brightness(0.49);
+}
+
+.betrayals-cine__verdict-copy {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: grid;
+  gap: 0.17rem;
+  padding: 0.65rem 0.4rem;
+  background: linear-gradient(#211722e0, #161019);
+  font-family: Georgia, serif;
+}
+
+.betrayals-cine__verdict-copy strong {
+  overflow: hidden;
+  font-size: clamp(1.05rem, 5.5cqw, 2.25rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.betrayals-cine__verdict-copy span {
+  color: #e2d6ca;
+  font-size: 0.95rem;
+}
+
+.betrayals-cine__verdict-copy span[data-role='betrayer'] {
+  color: #ffa3ae;
+}
+
+.betrayals-cine__verdict-treatment {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.betrayals-cine__verdict-treatment img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  animation: betrayals-cine-in 480ms both;
+}
+
+.betrayals-cine__verdict-treatment span {
+  position: absolute;
+  inset: 45% 5% auto;
+  padding: 0.45rem 0.15rem;
+  transform: rotate(-14deg);
+  border: 2px solid currentColor;
+  color: #f994a0;
+  background: #4c1d2ec7;
+  font:
+    700 clamp(0.74rem, 4.2cqw, 1.65rem)/1.05 system-ui,
+    sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: betrayals-cine-verdict-stamp 470ms ease-out both;
+}
+
+.betrayals-cine__departing {
+  position: absolute;
+  bottom: 15%;
+  left: 47%;
+  width: min(32cqh, 31cqw);
+  transform: translateX(-50%);
+  transform-origin: 52% 25%;
+  animation: betrayals-cine-depart 2.45s ease-in both;
+}
+
+.betrayals-cine__walker {
+  aspect-ratio: 2 / 3;
+  background-image: var(--walk-src);
+  background-size: calc(var(--walk-frames) * 100%) 100%;
+  animation: betrayals-cine-walk var(--walk-loop) steps(var(--walk-frames)) infinite;
+}
+
+.betrayals-cine__departure-silhouette {
+  display: block;
+  aspect-ratio: 2 / 3;
+  clip-path: polygon(
+    35% 0,
+    64% 0,
+    74% 20%,
+    68% 31%,
+    90% 45%,
+    100% 65%,
+    76% 64%,
+    72% 100%,
+    50% 94%,
+    33% 100%,
+    23% 65%,
+    0 66%,
+    10% 43%,
+    29% 31%,
+    25% 17%
+  );
+  background: linear-gradient(110deg, #070b16, #241a27, #130f1a);
+}
+
+.betrayals-cine__closed-gate {
+  position: absolute;
+  inset: -13% 0 -33%;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #24121b31, #080811e6 70%);
+  animation: betrayals-cine-in 620ms both;
+}
+
+.betrayals-cine__closed-gate::before,
+.betrayals-cine__closed-gate::after {
+  position: absolute;
+  inset: 0 50% 0 0;
+  border-inline: 1px solid #5b3c38;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 30%, #0f0d16 33%, #594039 34%, #0f0d16 37%),
+    linear-gradient(90deg, #130e18, #2e1d25);
+  animation: betrayals-cine-gate-left 600ms ease-out both;
+  content: '';
+}
+
+.betrayals-cine__closed-gate::after {
+  inset: 0 0 0 50%;
+  animation-name: betrayals-cine-gate-right;
+}
+
+.betrayals-cine[data-reduced='true'] *,
+.betrayals-cine[data-reduced='true'] *::before,
+.betrayals-cine[data-reduced='true'] *::after,
+.betrayals-cine[data-reduced='true'] {
+  animation: none !important;
+  transition: none !important;
+}
+
+.betrayals-cine[data-reduced='true'] .betrayals-cine__hood {
+  opacity: 1;
+}
+
+.betrayals-cine[data-reduced='true'] [data-revealed='true'] .betrayals-cine__hood {
+  opacity: 0;
+}
+
+.betrayals-cine[data-reduced='true'] [data-sealed='true'] .betrayals-cine__wax {
+  opacity: 1;
+}
+
+@media (max-height: 570px) {
+  .betrayals-cine__caption {
+    min-height: 0;
+    padding-top: 1.5rem;
+    padding-bottom: calc(3.2rem + var(--cine-controls));
+  }
+
+  .betrayals-cine__caption p {
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+  }
+}
+
+@keyframes betrayals-cine-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes betrayals-cine-push {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.13) translateY(1.7%);
+  }
+}
+
+@keyframes betrayals-cine-table {
+  from {
+    transform: scale(1.18) translate(4%, 4%);
+  }
+  to {
+    transform: scale(1.04) translate(0, -2%);
+  }
+}
+
+@keyframes betrayals-cine-daybreak {
+  from {
+    filter: brightness(0.5) saturate(0.7);
+  }
+  to {
+    filter: brightness(1.2) saturate(1.08);
+  }
+}
+
+@keyframes betrayals-cine-caption {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes betrayals-cine-gather {
+  from {
+    opacity: 0;
+    transform: translateY(16%) scale(1.14);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes betrayals-cine-unhood {
+  from {
+    opacity: 1;
+    transform: rotateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(22%) rotateX(75deg);
+  }
+}
+
+@keyframes betrayals-cine-mantle-lower {
+  from {
+    clip-path: inset(0);
+  }
+  to {
+    clip-path: inset(18% 0 0);
+  }
+}
+
+@keyframes betrayals-cine-dispersal {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-35%) scale(0.72);
+  }
+}
+
+@keyframes betrayals-cine-letter {
+  from {
+    opacity: 0;
+    scale: 0.74;
+    translate: 0 -1rem;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes betrayals-cine-stamp {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(-85%) scale(1.13);
+  }
+  46% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  57% {
+    opacity: 1;
+    transform: translateY(3%) scale(1);
+  }
+}
+
+@keyframes betrayals-cine-sunrise {
+  from {
+    opacity: 0.11;
+    transform: translateY(28%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-8%);
+  }
+}
+
+@keyframes betrayals-cine-mist {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(9%);
+  }
+}
+
+@keyframes betrayals-cine-rain {
+  from {
+    transform: translate(0, -27%);
+  }
+  to {
+    transform: translate(-3.5%, 20%);
+  }
+}
+
+@keyframes betrayals-cine-wake {
+  from {
+    border-color: #3b3438;
+    filter: brightness(0.37) saturate(0.18);
+  }
+  63% {
+    border-color: #ffddab;
+    filter: brightness(1.34) saturate(1.08);
+  }
+  to {
+    border-color: #a37b57;
+    filter: none;
+  }
+}
+
+@keyframes betrayals-cine-sleep {
+  from {
+    border-color: #a37b57;
+    filter: none;
+  }
+  to {
+    border-color: #3b3438;
+    filter: brightness(0.29) saturate(0.16);
+  }
+}
+
+@keyframes betrayals-cine-verdict-stamp {
+  from {
+    opacity: 0;
+    scale: 1.46;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes betrayals-cine-depart {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  80% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-32%, -48%) scale(0.3);
+  }
+}
+
+@keyframes betrayals-cine-walk {
+  to {
+    background-position: calc(var(--walk-frames) * 100% / (var(--walk-frames) - 1)) 0;
+  }
+}
+
+@keyframes betrayals-cine-gate-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes betrayals-cine-gate-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

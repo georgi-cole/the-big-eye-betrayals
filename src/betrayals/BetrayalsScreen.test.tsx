@@ -31,6 +31,14 @@ vi.mock('../minigames/quickTapRace/QuickTapRaceCanvasGame', () => ({
   ),
 }))
 
+function finishCinematic() {
+  fireEvent.click(
+    within(screen.getByRole('dialog')).getByRole('button', {
+      name: /^(Skip cinematic|Continue)$/,
+    })
+  )
+}
+
 describe('Betrayals season review', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -63,8 +71,10 @@ describe('Betrayals season review', () => {
     expect(screen.getByRole('heading', { name: 'Your role' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Play: open Day 1' }))
+    finishCinematic()
     expect(screen.getByRole('heading', { name: 'Dawn' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Play: enter Social' }))
+    finishCinematic()
     expect(screen.getByRole('heading', { name: 'Social' })).toBeInTheDocument()
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'Season actions' })).getByRole('button', {
@@ -78,8 +88,14 @@ describe('Betrayals season review', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play: begin Immunity Challenge' }))
     fireEvent.click(screen.getByRole('button', { name: 'Play Quick Tap Race' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Finish challenge' }))
+    finishCinematic()
     expect(screen.getByRole('heading', { name: 'Safety Challenge' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'See results' }))
+    const results = screen.getByRole('dialog', { name: 'Safety Challenge results' })
+    expect(within(results).getAllByRole('row')).toHaveLength(25)
+    expect(within(results).getAllByLabelText('Hidden').length).toBeGreaterThan(65)
+    finishCinematic()
+    finishCinematic()
     expect(screen.getByRole('heading', { name: 'Round Table' })).toBeInTheDocument()
   })
 
@@ -96,8 +112,13 @@ describe('Betrayals season review', () => {
     saveRun(localStorage, 'edition-local', {
       ...run,
       phase: 'table-reveal',
+      immunityId: run.humanId,
       private: {
         ...run.private,
+        betrayers: run.seats
+          .filter(({ id }) => id !== run.humanId && id !== banished.id)
+          .slice(0, 3)
+          .map(({ id }) => id),
         pendingTable: {
           banishedId: banished.id,
           blind: false,
@@ -115,9 +136,27 @@ describe('Betrayals season review', () => {
       .indexOf(cast.getByRole('button', { name: banished.name }))
     expect(tv.getByText('The ballots are sealed.')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Reveal result' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'departure')
+    finishCinematic()
+    finishCinematic()
+    finishCinematic()
     expect(tv.getByText(banished.name + ' was banished. A Loyal.')).toBeVisible()
     const seats = cast.getAllByRole('button')
     expect(seats).toHaveLength(25)
     expect(seats[position]).toHaveAccessibleName(banished.name + ', Banished, Loyal')
+    expect(screen.queryByRole('region', { name: 'Private conclave' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Play: follow the Night' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'conclave-seal')
+    finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+    finishCinematic()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'awakening')
+    finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+    finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'elimination')
+    finishCinematic()
+    expect(cast.getAllByRole('button', { name: /Eliminated at Night/ })).toHaveLength(1)
   })
 })
