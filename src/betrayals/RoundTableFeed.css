@@ -1,56 +1,71 @@
-.round-table-feed {
+.betrayals-broadcast__readout:has(.round-table-feed--count) {
+  padding-block: 4px;
+}
+
+.betrayals-broadcast__readout:has(.round-table-feed--count) .betrayals-broadcast__title {
+  font-size: clamp(1.05rem, 4.5vw, 1.27rem);
+}
+
+.round-table-feed--count {
   display: grid;
-  gap: 7px;
-  color: #eadfdc;
-  font-size: 0.84rem;
-  line-height: 1.35;
+  gap: 3px;
+  color: #dfcebe;
+  font-size: 0.67rem;
+  line-height: 1.15;
 }
 
 .round-table-feed p {
   margin: 0;
 }
 
-.round-table-feed__count-heading strong {
-  color: var(--signal-ink, #ebc39d);
-}
-
-.round-table-feed__tie,
-.round-table-feed__call {
-  color: #e3c3b2;
-  font-size: 0.79rem;
-}
-
 .round-table-feed__call {
   margin: 0;
   padding: 6px 8px;
   border-inline-start: 2px solid var(--signal-ink, #ebc39d);
-  background: #2d1b26aa;
+  background: #271e19db;
+  color: #e9ccaf;
+  font-size: 0.79rem;
 }
 
-.round-table-feed__utility {
-  justify-self: start;
-  min-height: 44px;
-  padding: 4px 9px;
+.round-table-feed__count-heading,
+.round-table-feed__footer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.round-table-feed__count-heading strong {
+  color: var(--signal-ink, #ebc39d);
+}
+
+.round-table-feed__count-heading > span {
+  margin-inline-start: auto;
+}
+
+.round-table-feed__utility,
+.round-table-feed__pages button {
+  min-height: 22px;
+  padding: 1px 6px;
   border: 1px solid #af806c9c;
   border-radius: 6px;
-  background: #241a24;
+  background: #241c18;
   color: #f6dbba;
-  text-align: start;
   font: inherit;
   cursor: pointer;
 }
 
-.round-table-feed__count-heading {
-  display: flex;
-  flex-wrap: wrap;
+.round-table-feed__lineup {
+  display: grid;
   align-items: center;
-  justify-content: space-between;
-  gap: 3px 8px;
-  font-variant-numeric: tabular-nums;
+  min-height: 48px;
 }
 
 .round-table-feed__leaders {
   display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 3px;
   margin: 0;
   padding: 0;
@@ -59,15 +74,116 @@
 
 .round-table-feed__leaders li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 5px;
-  padding: 3px 8px;
-  border-inline-start: 2px solid #b18b70;
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(90deg, #4c3039, #342329a3);
+  justify-items: center;
+  min-width: 0;
+}
+
+.round-table-feed__portrait {
+  display: grid;
+  place-items: center;
+  width: clamp(25px, 5dvh, 36px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #b9926a;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 22%, #6c4c32, #1b1511 73%);
+  color: #f6dfc4;
+  font:
+    700 0.79rem Georgia,
+    serif;
+}
+
+.round-table-feed__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+}
+
+.round-table-feed__name {
+  width: 100%;
+  overflow: hidden;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .round-table-feed__leaders strong {
   color: #ffdeb2;
+  font-size: 0.84rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.round-table-feed__leaders li[data-counted] strong {
+  animation: betrayals-vote-register 250ms ease-out;
+}
+
+@keyframes betrayals-vote-register {
+  from {
+    transform: scale(1.28);
+    color: #fff7e7;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.round-table-feed__tie {
+  justify-self: center;
+  color: #f3d6b0;
+  font:
+    700 0.93rem Georgia,
+    serif;
+}
+
+.round-table-feed__footer {
+  justify-content: space-between;
+}
+
+.round-table-feed__footer:has(.round-table-feed__summary:empty):not(
+    :has(.round-table-feed__pages)
+  ) {
+  display: none;
+}
+
+.round-table-feed__pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.round-table-feed__pages button {
+  min-width: 28px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.round-table-feed__pages button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@media (max-height: 620px) {
+  .betrayals-broadcast__readout:has(.round-table-feed--count) {
+    padding-block: 2px;
+  }
+
+  .round-table-feed--count {
+    gap: 1px;
+  }
+
+  .round-table-feed__count-heading {
+    min-height: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .round-table-feed__leaders li[data-counted] strong {
+    animation: none;
+  }
 }

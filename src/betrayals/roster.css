@@ -28,30 +28,28 @@
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 30%, #463419, #130d0a 62%, #080705 90%);
   color: var(--betrayals-ink, #eff5f3);
-  border: 1px solid color-mix(in srgb, var(--betrayals-focus, #e3ad70) 45%, #17110d);
+  border: 1px solid #454648;
   border-radius: 8px;
   box-shadow:
     0 3px 9px #050405bf,
-    0 0 0 1px #171009;
+    0 0 0 1px #08090a;
   cursor: pointer;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease;
 }
 
-.betrayals-roster__seat[aria-pressed='true'],
-.betrayals-roster__seat:focus-visible {
-  outline: 2px solid var(--betrayals-focus, #e3ad70);
+.betrayals-layout .betrayals-roster__seat:focus-visible {
+  outline: 2px solid var(--seat-outline, #b7b9bd);
   outline-offset: 1px;
 }
 
 .betrayals-roster__seat[aria-pressed='true'] {
+  --seat-outline: var(--betrayals-focus, #e3ad70);
+  border-color: var(--betrayals-focus, #e3ad70);
+  outline: 2px solid var(--betrayals-focus, #e3ad70);
+  outline-offset: 1px;
   box-shadow: 0 0 13px #e3ad7033;
-}
-
-.betrayals-roster__seat[data-you='true'] {
-  border-color: #d5a56e;
-  box-shadow: 0 0 9px #c3853959;
 }
 
 .betrayals-roster__seat[aria-disabled='true'] {
@@ -82,7 +80,8 @@
 .betrayals-roster__portrait::after {
   z-index: 0;
   box-shadow:
-    inset 0 0 0 1px #ffda961a,
+    inset 0 1px 1px #c5c9cf38,
+    inset 0 -1px 1px #030405cf,
     inset 0 0 8px #05040763;
 }
 
@@ -121,7 +120,6 @@
 .betrayals-roster__seat[data-exit] {
   --seal-ink: #ba795c;
   --seal-glow: #5b2820;
-  border-color: #443b42;
 }
 
 .betrayals-roster__seat[data-exit='night'] {
@@ -140,8 +138,6 @@
 
 .betrayals-roster__seat[data-asleep='true'] {
   --sleep-mask-top: 32%;
-  border-color: #655373;
-  box-shadow: 0 0 10px #38294772;
   background: #171322;
 }
 

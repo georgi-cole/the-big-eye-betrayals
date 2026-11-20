@@ -118,22 +118,18 @@ describe('Betrayals private conversations', () => {
     expect(onMove).not.toHaveBeenCalled()
   })
 
-  it('exposes the incoming inbox and closes the same way on Escape and the back control', () => {
+  it('keeps Inbox in the dock and closes on Escape or the back control', () => {
     const onClose = vi.fn()
-    const onOpenIncoming = vi.fn()
     render(
       <BetrayalsSocialPanel
         actorId="human"
         prospects={prospects}
         resources={resources}
-        incomingCount={2}
         onClose={onClose}
-        onOpenIncoming={onOpenIncoming}
         onMove={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Incoming interactions, 2 pending' }))
-    expect(onOpenIncoming).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: /Incoming interactions/ })).not.toBeInTheDocument()
     fireEvent(
       screen.getByRole('dialog', { name: 'Social' }),
       new Event('cancel', { cancelable: true })

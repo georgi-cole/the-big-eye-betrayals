@@ -78,17 +78,18 @@ export function BetrayalsDock({
   return (
     <nav className="betrayals-dock" aria-label="Season actions">
       {utility && <div className="betrayals-dock__utility">{utility}</div>}
-      <div className="betrayals-dock__shell">
-        {home && <DockButton target="home" label="Home" action={home} />}
-        {social && <DockButton target="social" label="Social" action={social} />}
-        {incoming && (
-          <DockButton
-            target="incoming"
-            label="Incoming requests"
-            faceLabel="Inbox"
-            action={incoming}
-          />
-        )}
+      <div className="betrayals-dock__shell" data-play={Boolean(play)}>
+        <div className="betrayals-dock__wing">
+          {social && <DockButton target="social" label="Social" action={social} />}
+          {incoming && (
+            <DockButton
+              target="incoming"
+              label="Incoming requests"
+              faceLabel="Inbox"
+              action={incoming}
+            />
+          )}
+        </div>
         {play && (
           <button
             className="betrayals-dock__play"
@@ -104,8 +105,11 @@ export function BetrayalsDock({
             </span>
           </button>
         )}
-        {roster && <DockButton target="roster" label="Roster" action={roster} />}
-        {settings && <DockButton target="settings" label="Settings" action={settings} />}
+        <div className="betrayals-dock__wing">
+          {home && <DockButton target="home" label="Home" action={home} />}
+          {roster && <DockButton target="roster" label="Roster" action={roster} />}
+          {settings && <DockButton target="settings" label="Settings" action={settings} />}
+        </div>
       </div>
     </nav>
   )

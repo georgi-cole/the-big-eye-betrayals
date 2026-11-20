@@ -504,7 +504,6 @@ export default function BetrayalsScreen() {
           },
         }
       } else if (counting) {
-        message = 'The ballots are being counted.'
         detail = tableFeed
         play = {
           label: 'Open runoff ballot',
@@ -542,7 +541,7 @@ export default function BetrayalsScreen() {
       }
       break
     case 'table-reveal':
-      message = counting ? 'The ballots are being counted.' : 'The ballots are sealed.'
+      message = counting ? null : 'The ballots are sealed.'
       detail = tableFeed
       play = {
         label: 'Reveal result',
@@ -806,8 +805,6 @@ export default function BetrayalsScreen() {
             conversation={conversation}
             recent={recent}
             onClose={() => setSocialOpen(false)}
-            onOpenIncoming={openIncoming}
-            incomingCount={pendingIncoming.length}
             onMove={(kind, suspectId, recipientId) =>
               apply((active) => {
                 if (!canSocialize) return active

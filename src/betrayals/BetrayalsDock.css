@@ -15,7 +15,8 @@
 }
 
 .betrayals-dock__shell {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   justify-content: center;
   gap: 2px;
@@ -28,6 +29,16 @@
   box-shadow:
     inset 0 1px #e5bc8d24,
     0 4px 11px #07050a9c;
+}
+
+.betrayals-dock__shell[data-play='true'] {
+  grid-template-columns: minmax(0, 1fr) clamp(79px, 25%, 112px) minmax(0, 1fr);
+}
+
+.betrayals-dock__wing {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
 }
 
 .betrayals-dock .betrayals-dock__side,
@@ -103,8 +114,6 @@
 
 .betrayals-dock .betrayals-dock__play {
   display: flex;
-  flex: 1.6 1 67px;
-  max-width: 112px;
   align-items: center;
   justify-content: center;
   gap: 5px;

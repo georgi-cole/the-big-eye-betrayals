@@ -196,6 +196,7 @@
 }
 
 .betrayals-cast {
+  --caption-space: clamp(10px, 2.25dvh, 16px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -203,21 +204,22 @@
   min-block-size: 0;
 }
 
+.betrayals-cast::before {
+  content: '';
+  flex: 0 0 var(--caption-space);
+}
+
 .betrayals-cast__caption {
   box-sizing: border-box;
-  flex: 0 0 16px;
+  flex: 0 0 var(--caption-space);
   overflow: hidden;
   padding: 2px 3px 0;
   color: var(--betrayals-secondary);
   text-align: center;
-  font-size: 0.72rem;
-  line-height: 1.25;
+  font-size: 0.65rem;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.betrayals-layout .betrayals-roster__seat[aria-disabled='true']:not([data-exit]) {
-  border-color: #685746;
 }
 
 .betrayals-layout

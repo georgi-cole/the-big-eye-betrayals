@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePacedReveal } from '../hooks/usePacedReveal'
 import type { Run, Seat, TableCount } from './run'
 import { MAX_TABLE_ROUNDS } from './run'
@@ -10,6 +10,8 @@ type RoundTableFeedProps = {
   reducedMotion?: boolean
   onCountComplete?: () => void
 }
+
+const pageSize = 5
 
 function CountFeed({
   count,
@@ -30,7 +32,13 @@ function CountFeed({
   })
   const complete = visible >= ballots.length
   const notified = useRef(false)
-  const { rows, hiddenTie } = tableLeaderboard(ballots.slice(0, visible))
+  const [page, setPage] = useState(0)
+  const revealed = ballots.slice(0, visible)
+  const { rows: leaders, hiddenTie } = tableLeaderboard(revealed, pageSize)
+  const remaining = complete ? tableLeaderboard(revealed, Infinity).rows.slice(leaders.length) : []
+  const lastPage = Math.ceil(remaining.length / pageSize)
+  const rows = page === 0 ? leaders : remaining.slice((page - 1) * pageSize, page * pageSize)
+  const lastTarget = visible > 0 && !complete ? ballots[visible - 1].targetId : undefined
 
   useEffect(() => {
     if (!complete || notified.current) return
@@ -48,36 +56,77 @@ function CountFeed({
         <span>
           {visible} / {ballots.length} counted
         </span>
+        {!complete && (
+          <button type="button" className="round-table-feed__utility" onClick={revealAll}>
+            Show full count
+          </button>
+        )}
       </div>
-      {rows.length > 0 && (
-        <ol className="round-table-feed__leaders" aria-label="Current vote leaders">
-          {rows.map(({ id, votes }) => (
-            <li key={id}>
-              <span>{seats.find((seat) => seat.id === id)?.name ?? 'Contestant'}</span>
-              <strong>{votes}</strong>
-            </li>
-          ))}
-        </ol>
-      )}
-      {hiddenTie && (
-        <p className="round-table-feed__tie">
-          {hiddenTie.size}-way tie{' '}
-          {hiddenTie.position === 1 ? 'for the lead' : 'below the displayed leaders'}
+      <div className="round-table-feed__lineup">
+        {rows.length > 0 && (
+          <ol
+            className="round-table-feed__leaders"
+            aria-label={page === 0 ? 'Current vote leaders' : 'More vote totals'}
+          >
+            {rows.map(({ id, votes }) => {
+              const seat = seats.find((guest) => guest.id === id)
+              const name = seat?.name ?? 'Contestant'
+              return (
+                <li key={id} data-counted={id === lastTarget || undefined}>
+                  <span className="round-table-feed__portrait" aria-hidden="true">
+                    {seat?.portrait ? <img src={seat.portrait} alt="" /> : name.slice(0, 1)}
+                  </span>
+                  <span className="round-table-feed__name" title={name}>
+                    {name}
+                  </span>
+                  <strong key={votes} aria-label={`${votes} ${votes === 1 ? 'vote' : 'votes'}`}>
+                    {votes}
+                  </strong>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+        {!rows.length && hiddenTie && (
+          <p className="round-table-feed__tie">{hiddenTie.size}-way tie for the lead</p>
+        )}
+      </div>
+      <div className="round-table-feed__footer">
+        <p className="round-table-feed__summary" role="status">
+          {complete
+            ? tiedIds.length === 0
+              ? 'The count is complete.'
+              : round >= MAX_TABLE_ROUNDS
+                ? `Draw among ${tiedIds.length} tied guests`
+                : `Runoff among ${tiedIds.length} tied guests`
+            : hiddenTie && rows.length
+              ? `${hiddenTie.size} guests tied below the leaders`
+              : ''}
         </p>
-      )}
-      {complete ? (
-        <p className="round-table-feed__call" role="status">
-          {tiedIds.length === 0
-            ? 'The count is complete.'
-            : round >= MAX_TABLE_ROUNDS
-              ? 'The vote remains tied. The castle will draw a name from the tied contestants.'
-              : `Only the ${tiedIds.length} tied leaders can receive votes in the next round.`}
-        </p>
-      ) : (
-        <button type="button" className="round-table-feed__utility" onClick={revealAll}>
-          Show full count
-        </button>
-      )}
+        {lastPage > 0 && (
+          <div className="round-table-feed__pages" role="group" aria-label="Browse vote totals">
+            <button
+              type="button"
+              aria-label="Previous vote totals"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
+              ‹
+            </button>
+            <span aria-live="polite">
+              {page + 1} / {lastPage + 1}
+            </span>
+            <button
+              type="button"
+              aria-label="Next vote totals"
+              disabled={page === lastPage}
+              onClick={() => setPage(page + 1)}
+            >
+              ›
+            </button>
+          </div>
+        )}
+      </div>
     </section>
   )
 }

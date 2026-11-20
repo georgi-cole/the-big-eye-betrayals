@@ -63,10 +63,20 @@ describe('Round Table broadcast', () => {
 
     expect(screen.getByText('10-way tie for the lead')).toBeVisible()
     expect(screen.queryByRole('list', { name: 'Current vote leaders' })).not.toBeInTheDocument()
-    expect(
-      screen.getByText('Only the 10 tied leaders can receive votes in the next round.')
-    ).toBeVisible()
+    expect(screen.getByText('Runoff among 10 tied guests')).toBeVisible()
     expect(onCountComplete).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next vote totals' }))
+    const firstPage = within(screen.getByRole('list', { name: 'More vote totals' }))
+    expect(firstPage.getAllByLabelText('1 vote')).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: 'Next vote totals' }))
+    expect(screen.getByRole('button', { name: 'Next vote totals' })).toBeDisabled()
+    expect(
+      within(screen.getByRole('list', { name: 'More vote totals' })).getAllByLabelText('1 vote')
+    ).toHaveLength(5)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous vote totals' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Previous vote totals' }))
+    expect(screen.getByText('10-way tie for the lead')).toBeVisible()
 
     view.rerender(<RoundTableFeed run={run} onCountComplete={onCountComplete} />)
     expect(onCountComplete).toHaveBeenCalledTimes(1)

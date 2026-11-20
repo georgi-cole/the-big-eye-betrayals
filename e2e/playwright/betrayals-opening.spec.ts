@@ -44,6 +44,7 @@ for (const viewport of [
     const guestCards = social.getByRole('region', { name: 'Player roster' }).getByRole('button')
     const socialButton = dock.getByRole('button', { name: /^Social/ })
     await socialButton.click()
+    await expect(social.getByRole('button', { name: /Incoming interactions/ })).toHaveCount(0)
     await expect(guestCards).toHaveCount(24)
     await expect(guestCards.first()).toBeVisible()
     await guestCards.first().click()
@@ -66,12 +67,19 @@ for (const viewport of [
     const layout = await tiles.evaluateAll((elements) => {
       const rects = elements.map((element) => element.getBoundingClientRect())
       const dock = document.querySelector('.betrayals-dock')?.getBoundingClientRect()
+      const play = document.querySelector('.betrayals-dock__play')?.getBoundingClientRect()
+      const tv = document.querySelector('.betrayals-broadcast')?.getBoundingClientRect()
+      const top = Math.min(...rects.map(({ top }) => top))
+      const bottom = Math.max(...rects.map(({ bottom }) => bottom))
       return {
         columns: new Set(rects.map(({ left }) => Math.round(left))).size,
         rows: new Set(rects.map(({ top }) => Math.round(top))).size,
         minWidth: Math.min(...rects.map(({ width }) => width)),
         minHeight: Math.min(...rects.map(({ height }) => height)),
-        bottom: Math.max(...rects.map(({ bottom }) => bottom)),
+        bottom,
+        topGap: top - (tv?.bottom ?? 0),
+        bottomGap: (dock?.top ?? 0) - bottom,
+        playCenter: play && play.left + play.width / 2,
         dockTop: dock?.top ?? 0,
         pageHeight: document.documentElement.scrollHeight,
         windowHeight: window.innerHeight,
@@ -86,6 +94,11 @@ for (const viewport of [
     expect(layout.width).toBeLessThanOrEqual(layout.windowWidth)
     expect(layout.pageHeight).toBeLessThanOrEqual(layout.windowHeight)
     expect(layout.bottom).toBeLessThanOrEqual(layout.dockTop)
+    expect(Math.abs(layout.topGap - layout.bottomGap)).toBeLessThan(1)
+    expect(layout.playCenter).toBeCloseTo(viewport.width / 2, 0)
+    await expect(tiles.first()).toHaveCSS('border-top-color', 'rgb(69, 70, 72)')
+    await tiles.nth(1).click()
+    await expect(tiles.nth(1)).toHaveCSS('border-top-color', 'rgb(242, 194, 147)')
     await expect
       .poll(async () =>
         roster

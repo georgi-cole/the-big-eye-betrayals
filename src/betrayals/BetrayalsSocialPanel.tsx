@@ -8,7 +8,6 @@ import ActionCard from '../components/SocialPanelV2/ActionCard'
 import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
 import PlayerList from '../components/SocialPanelV2/PlayerList'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
-import IncomingInteractionIcon from '../components/IncomingInteractionsInbox/IncomingInteractionIcon'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
 import {
   choosesSocialSubject,
@@ -171,8 +170,6 @@ type Props = {
   canAct?: boolean
   conversation?: readonly SocialEntry[]
   recent?: SocialEntry
-  incomingCount?: number
-  onOpenIncoming?: () => void
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
 }
@@ -347,8 +344,6 @@ export function BetrayalsSocialPanel({
   canAct = moveKinds.length > 0,
   conversation = [],
   recent,
-  incomingCount = 0,
-  onOpenIncoming,
   onClose,
   onMove,
 }: Props) {
@@ -515,21 +510,6 @@ export function BetrayalsSocialPanel({
                   🔎 {resources.info}
                 </span>
               </>
-            )}
-            {onOpenIncoming && (
-              <button
-                className="sp2-resource-chip betrayals-social-inbox"
-                type="button"
-                onClick={onOpenIncoming}
-                aria-label={
-                  incomingCount > 0
-                    ? `Incoming interactions, ${incomingCount} pending`
-                    : 'Incoming interactions'
-                }
-              >
-                <IncomingInteractionIcon name="inbox" />
-                {incomingCount > 0 && <span aria-hidden="true">{incomingCount}</span>}
-              </button>
             )}
           </div>
           <GameBackButton

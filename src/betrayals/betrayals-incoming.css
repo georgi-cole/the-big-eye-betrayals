@@ -1,4 +1,7 @@
 .betrayals-incoming-dialog {
+  --color-card: #1c1916;
+  --color-card-2: #26201a;
+  --color-accent: #d5aa7e;
   box-sizing: border-box;
   width: 100%;
   height: 100%;
@@ -16,4 +19,44 @@
 
 .betrayals-incoming-dialog::backdrop {
   background: transparent;
+}
+
+.betrayals-incoming-dialog .inbox-panel {
+  box-sizing: border-box;
+  border-color: #715b49;
+  background: linear-gradient(167deg, #28211c, #131518 75%);
+}
+
+.betrayals-incoming-dialog .inbox-header {
+  border-color: #5c4a3a;
+  background: linear-gradient(115deg, #35291f, #1c1a18);
+}
+
+.betrayals-incoming-dialog
+  :is(.inbox-header__title, .inbox-header__title-text, .inbox-section__title) {
+  color: #e5b991;
+}
+
+.betrayals-incoming-dialog :is(.inbox-item__text, .inbox-item__outcome, .inbox-empty) {
+  color: #e0ccba;
+}
+
+.betrayals-incoming-dialog :is(.inbox-item, .inbox-item__feedback, .inbox-header__close) {
+  border-color: #65513f;
+  background: linear-gradient(145deg, #2b231c, #191918);
+}
+
+.betrayals-incoming-dialog .inbox-item--unread {
+  border-color: #a17e5d;
+}
+
+.betrayals-incoming-dialog :is(.inbox-action--positive, .inbox-action--neutral) {
+  border-color: #8f6c50;
+  background: #483325;
+  color: #ffe0bb;
+}
+
+.betrayals-incoming-dialog .game-back-button {
+  border-color: #8b6c50 !important;
+  background: linear-gradient(145deg, #594536, #29221c) !important;
 }
