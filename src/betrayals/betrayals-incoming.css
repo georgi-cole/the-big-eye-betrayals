@@ -1,121 +1,19 @@
-.betrayals-incoming {
-  display: grid;
-  gap: 7px;
-  min-width: 0;
-  color: #f4e9e0;
-}
-
-.betrayals-incoming__encounter {
-  display: grid;
-  gap: 8px;
-  padding: 9px;
-  border: 1px solid #786066;
-  border-radius: 10px;
-  background: linear-gradient(129deg, #36252e, #201821 76%);
-  box-shadow: inset 0 1px 0 #f6b68821;
-  animation: betrayals-incoming-arrival 350ms cubic-bezier(0.18, 0.74, 0.26, 1) both;
-}
-
-.betrayals-incoming__speaker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.betrayals-incoming__speaker img {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #9a7668;
-  border-radius: 6px;
-  background: #181222;
-  object-fit: cover;
-  object-position: center 29%;
-}
-
-.betrayals-incoming__speaker span {
-  display: block;
-  color: #e1bba0;
-  font-size: 0.7rem;
-  line-height: 1.2;
-}
-
-.betrayals-incoming__speaker h3 {
+.betrayals-incoming-dialog {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.3;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
 }
 
-.betrayals-incoming__encounter blockquote {
-  margin: 0;
-  font-size: 0.87rem;
-  line-height: 1.35;
-}
-
-.betrayals-incoming__choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 7px;
-}
-
-.betrayals-incoming .betrayals-incoming__choices button {
-  min-height: 44px;
-  padding: 5px 8px;
-  border: 1px solid #8e6d71;
-  border-radius: 7px;
-  color: inherit;
-  background: #2d212e;
-  font: inherit;
-  font-size: 0.76rem;
-  line-height: 1.2;
-  cursor: pointer;
-}
-
-.betrayals-incoming .betrayals-incoming__choices button:first-child {
-  border-color: #ba8869;
-  color: #ffe2c5;
-  background: linear-gradient(145deg, #57352f, #38242b);
-}
-
-.betrayals-incoming .betrayals-incoming__choices button:hover,
-.betrayals-incoming .betrayals-incoming__choices button:focus-visible {
-  border-color: #e9b782;
-}
-
-.betrayals-incoming__choices button:focus-visible {
-  outline: 2px solid #e9b782;
-  outline-offset: 2px;
-}
-
-.betrayals-incoming .betrayals-incoming__receipt {
-  margin: 0;
-  color: #e1bba0;
-  font-size: 0.77rem;
-  line-height: 1.35;
-}
-
-.betrayals-incoming__receipt:empty {
+.betrayals-incoming-dialog:not([open]) {
   display: none;
 }
 
-@keyframes betrayals-incoming-arrival {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-[data-betrayals-motion='reduced'] .betrayals-incoming__encounter {
-  animation: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .betrayals-incoming__encounter {
-    animation: none;
-  }
+.betrayals-incoming-dialog::backdrop {
+  background: transparent;
 }

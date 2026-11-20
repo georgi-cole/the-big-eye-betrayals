@@ -206,7 +206,7 @@ describe('Betrayals season review', () => {
     )
     const conversations = screen.getByRole('dialog', { name: 'Social' })
     expect(conversations).toBeVisible()
-    fireEvent.click(within(conversations).getByRole('button', { name: 'Close Social' }))
+    fireEvent.click(within(conversations).getByRole('button', { name: 'Close social panel' }))
     expect(screen.queryByRole('dialog', { name: 'Social' })).not.toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Play: begin Immunity Challenge' }))
     fireEvent.click(screen.getByRole('button', { name: 'Play Quick Tap Race' }))

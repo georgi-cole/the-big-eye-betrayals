@@ -2,10 +2,11 @@ import type { ReactNode } from 'react'
 import './BetrayalsBroadcast.css'
 
 export interface BetrayalsBroadcastProps {
-  phase: string
+  phase?: string
   title: string
   message?: ReactNode
   detail?: ReactNode
+  action?: ReactNode
   cueKey?: string | number
   mode?: 'default' | 'ceremony' | 'night' | 'daybreak' | 'immunity' | 'safety' | 'finale'
   art?: string
@@ -17,6 +18,7 @@ export function BetrayalsBroadcast({
   title,
   message,
   detail,
+  action,
   cueKey,
   mode = 'default',
   art,
@@ -33,20 +35,25 @@ export function BetrayalsBroadcast({
         {art && <img key={art} className="betrayals-broadcast__art" src={art} alt="" />}
         <div className="betrayals-broadcast__grain" aria-hidden="true" />
         <div
+          key={cueKey ?? title}
           className="betrayals-broadcast__readout"
           aria-live={interactive ? undefined : 'polite'}
           aria-atomic={interactive ? undefined : true}
+          tabIndex={0}
         >
-          <div className="betrayals-broadcast__transmission" key={cueKey ?? title}>
-            <header className="betrayals-broadcast__signal">
-              <span className="betrayals-broadcast__lamp" aria-hidden="true" />
-              {phase !== title && <span>{phase}</span>}
+          <div className="betrayals-broadcast__transmission">
+            <header className="betrayals-broadcast__heading">
+              <h1 className="betrayals-broadcast__title">{title}</h1>
+              <span className="betrayals-broadcast__signal">
+                <span className="betrayals-broadcast__lamp" aria-hidden="true" />
+                {phase && phase !== title && <span>{phase}</span>}
+              </span>
             </header>
-            <h1 className="betrayals-broadcast__title">{title}</h1>
             {message && <div className="betrayals-broadcast__message">{message}</div>}
             {detail && <div className="betrayals-broadcast__detail">{detail}</div>}
           </div>
         </div>
+        {action && <div className="betrayals-broadcast__action">{action}</div>}
       </div>
       <div className="betrayals-broadcast__vents" aria-hidden="true" />
     </section>

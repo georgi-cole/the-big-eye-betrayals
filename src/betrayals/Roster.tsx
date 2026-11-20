@@ -1,4 +1,5 @@
 import { statusBadgeImageSrc } from '../utils/statusBadges'
+import houseguestGridStyles from '../components/HouseguestGrid/HouseguestGrid.module.css'
 import type { viewFor } from './run'
 import './roster.css'
 import './sleep-mask.css'
@@ -63,7 +64,7 @@ export function Roster({ view, selectedId, humanId, sleeping, selectableIds, onS
                 {seat.exit && (
                   <span className="betrayals-roster__seal" title={exitLabel || undefined} />
                 )}
-                <span className="betrayals-roster__name">{seat.name}</span>
+                <span className={houseguestGridStyles.nameOverlay}>{seat.name}</span>
               </span>
               {confirmedRole && (
                 <span

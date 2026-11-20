@@ -1,10 +1,20 @@
 .betrayals-roster {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: clamp(4px, 1.3vw, 7px);
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  max-block-size: 540px;
+  gap: clamp(3px, 1vw, 6px);
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.betrayals-roster > li {
+  min-width: 0;
+  min-height: 0;
 }
 
 .betrayals-roster__seat {
@@ -12,8 +22,7 @@
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: 48px;
-  aspect-ratio: 1;
+  height: 100%;
   padding: 0;
   isolation: isolate;
   overflow: hidden;
@@ -67,7 +76,7 @@
 
 .betrayals-roster__portrait::before {
   z-index: 0;
-  background: linear-gradient(to top, #050402f5, #08060355 27%, transparent 52%);
+  background: linear-gradient(to top, #0009, #0003 38%, transparent 60%);
 }
 
 .betrayals-roster__portrait::after {
@@ -109,31 +118,6 @@
   transition: opacity 520ms ease;
 }
 
-.betrayals-roster__name {
-  position: absolute;
-  z-index: 2;
-  inset: auto 4px 4px;
-  overflow: hidden;
-  padding: 1px 3px 2px;
-  border: 1px solid #bb874d70;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #1b100be6, #0b0807f2);
-  color: #ffe9c5;
-  text-align: center;
-  text-shadow: 0 1px 2px #000;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(0.65rem, 2.8vw, 0.79rem);
-  font-weight: 730;
-  line-height: 1.06;
-  letter-spacing: 0.012em;
-}
-
-.betrayals-roster__seat[data-you='true'] .betrayals-roster__name {
-  border-color: #d2a169af;
-  background: linear-gradient(180deg, #392412ed, #150d09f5);
-}
-
 .betrayals-roster__seat[data-exit] {
   --seal-ink: #ba795c;
   --seal-glow: #5b2820;
@@ -154,11 +138,6 @@
   opacity: 0.48;
 }
 
-.betrayals-roster__seat[data-exit] .betrayals-roster__name {
-  color: #a8a9b2;
-  border-color: #65575b88;
-}
-
 .betrayals-roster__seat[data-asleep='true'] {
   --sleep-mask-top: 32%;
   border-color: #655373;
@@ -172,12 +151,6 @@
 
 .betrayals-roster__seat[data-asleep='true'] .betrayals-roster__initial {
   opacity: 0.18;
-}
-
-.betrayals-roster__seat[data-asleep='true'] .betrayals-roster__name {
-  border-color: #564467;
-  background: #191221ef;
-  color: #d6c5de;
 }
 
 .betrayals-roster__seal {

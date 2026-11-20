@@ -1,9 +1,9 @@
 .betrayals-dock {
-  position: sticky;
+  position: relative;
   z-index: 3;
-  inset-block-end: max(6px, env(safe-area-inset-bottom));
+  width: min(100%, 29rem);
   min-width: 0;
-  margin-block-start: 10px;
+  justify-self: center;
 }
 
 .betrayals-dock__utility {
@@ -15,161 +15,135 @@
 }
 
 .betrayals-dock__shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 4px;
-  min-block-size: 58px;
-  padding: 4px;
-  border: 1px solid #6d514d;
-  border-radius: 16px;
-  background:
-    radial-gradient(ellipse at 50% 0%, #886a5e33, transparent 64%),
-    linear-gradient(165deg, #211c23 3%, #131017 64%, #1d1820);
-  box-shadow:
-    inset 0 1px #ead0b32b,
-    0 6px 18px #050409bc;
-}
-
-.betrayals-dock__side-bank {
   display: flex;
-  grid-column: 1;
+  align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 0;
-}
-
-.betrayals-dock__side-bank:last-child {
-  grid-column: 3;
+  padding: 2px 4px;
+  border: 1px solid #775e4c;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, #dbb69012, transparent 54%),
+    linear-gradient(160deg, #211a21, #141117 60%, #1b1520);
+  box-shadow:
+    inset 0 1px #e5bc8d24,
+    0 4px 11px #07050a9c;
 }
 
 .betrayals-dock .betrayals-dock__side,
 .betrayals-dock .betrayals-dock__play {
+  box-sizing: border-box;
   appearance: none;
   -webkit-tap-highlight-color: transparent;
-  color: #eee5df;
+  min-width: 44px;
+  min-height: 44px;
+  color: #eadfd6;
   font: inherit;
   cursor: pointer;
-  min-height: 44px;
 }
 
 .betrayals-dock .betrayals-dock__side {
   position: relative;
   display: flex;
-  flex: 0 1 68px;
+  flex: 1 1 44px;
+  max-width: 66px;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  gap: 1px;
-  padding: 1px 3px 3px;
-  min-width: 44px;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px;
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
   line-height: 1;
-  font-size: 0.69rem;
+  font-size: 0.65rem;
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease;
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .betrayals-dock .betrayals-dock__side[aria-expanded='true'],
-.betrayals-dock .betrayals-dock__side[aria-pressed='true'],
 .betrayals-dock .betrayals-dock__side:enabled:hover {
-  border-color: #7e565745;
-  background: #5138426b;
-  color: #fff3df;
-}
-
-.betrayals-dock__side[data-target='music'][aria-pressed='false'] img {
-  opacity: 0.6;
-}
-
-.betrayals-dock__side[data-target='music'][aria-pressed='true'] .betrayals-dock__icon-frame::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  right: 0;
-  width: 4px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #f6d5a0;
-  box-shadow: 0 0 7px #f6d5a0;
+  border-color: #a282604d;
+  background: #b89a7330;
+  color: #fff0d8;
 }
 
 .betrayals-dock__icon-frame {
   position: relative;
   display: grid;
+  width: 23px;
+  height: 21px;
   place-items: center;
-  height: 24px;
-  width: 27px;
 }
 
 .betrayals-dock__icon-frame img {
-  width: 33px;
-  height: 33px;
+  position: absolute;
+  width: 30px;
+  height: 30px;
   max-width: none;
-  margin-block: -4px;
-  filter: sepia(0.45) saturate(0.72) brightness(1.16);
+  filter: sepia(0.38) saturate(0.75) brightness(1.08);
   pointer-events: none;
 }
 
 .betrayals-dock__count {
   position: absolute;
-  inset: 0 -11px auto auto;
-  min-width: 15px;
+  inset: -2px -8px auto auto;
+  min-width: 14px;
   padding: 2px 3px;
   border-radius: 9px;
-  background: #e2ad84;
-  color: #221624;
-  font-size: 0.61rem;
+  background: #dec08d;
+  color: #211625;
+  font-size: 0.57rem;
   line-height: 1;
   text-align: center;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .betrayals-dock .betrayals-dock__play {
-  position: relative;
-  grid-column: 2;
   display: flex;
-  justify-content: center;
+  flex: 1.6 1 67px;
+  max-width: 112px;
   align-items: center;
-  gap: 8px;
-  padding: 7px clamp(8px, 4vw, 16px);
-  min-width: clamp(70px, 24vw, 96px);
-  max-width: min(140px, 36vw);
-  border: 1px solid #bb896b;
-  border-radius: 18px;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 1px solid #c39a6c;
+  border-radius: 10px;
   background:
-    radial-gradient(ellipse at 50% 2%, #d4a17b8c, transparent 73%),
-    linear-gradient(157deg, #9c7059, #66454d 48%, #3e2935);
+    radial-gradient(ellipse at 50% 0%, #c28a586b, transparent 72%),
+    linear-gradient(165deg, #775b44, #493442 68%, #392934);
   box-shadow:
-    inset 0 1px #ffdfb27b,
-    inset 0 -2px #2115218f,
-    0 0 16px #bc815746;
-  color: #fff3e5;
-  text-shadow: 0 1px 3px #210f16;
-  font-size: 0.76rem;
+    inset 0 1px #ffdfac59,
+    0 0 9px #c88b3f2b;
+  color: #fff1d7;
+  text-shadow: 0 1px 2px #21121b;
+  font-size: 0.72rem;
   font-weight: 720;
-  letter-spacing: 0.06em;
+  line-height: 1.15;
   transition:
-    filter 200ms ease,
-    transform 200ms ease;
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.betrayals-dock__label {
+  min-width: 0;
+  text-align: center;
 }
 
 .betrayals-dock .betrayals-dock__play:enabled:hover {
-  filter: brightness(1.16);
+  filter: brightness(1.14);
 }
 
 .betrayals-dock .betrayals-dock__play:enabled:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .betrayals-dock__play-glyph {
-  width: 11px;
-  height: 13px;
-  background: #ffe0b9;
+  flex: 0 0 8px;
+  height: 10px;
+  background: #ffdfa8;
   clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
@@ -180,7 +154,7 @@
 
 .betrayals-dock :is(.betrayals-dock__side, .betrayals-dock__play):focus-visible {
   outline: 2px solid #f7c899;
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {

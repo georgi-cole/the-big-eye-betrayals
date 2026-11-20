@@ -33,7 +33,6 @@ import {
   getIncomingInteractionTone,
   orderIncomingInteractionResponseOptions,
 } from '../../social/incomingInteractionPresentation'
-import GameBackButton from '../ui/GameBackButton/GameBackButton'
 import {
   getIncomingSocialModuleAvailability,
   logBlockedSocialModuleOpen,
@@ -73,7 +72,7 @@ import {
   markContextualGuideSeen,
 } from '../../onboarding/contextualGuidePreference'
 import IncomingInteractionIcon from './IncomingInteractionIcon'
-import './IncomingInteractionsInbox.css'
+import { IncomingInboxCardHeader, IncomingInboxHeader } from './IncomingInboxChrome'
 
 function formatResponseLabel(interaction: IncomingInteraction): string {
   if (interaction.resolvedLabel) return `Resolved · ${interaction.resolvedLabel}`
@@ -409,32 +408,29 @@ function InteractionItem({
       }${interaction.resolved ? ' inbox-item--resolved' : ''}`}
       role="listitem"
     >
-      <div className="inbox-item__header">
-        {fromPlayer ? (
-          <PlayerAvatar
-            player={fromPlayer}
-            size="sm"
-            showRelationshipOutline={false}
-            showEvictedStyle={false}
-          />
-        ) : (
-          <span className="inbox-item__avatar-fallback" aria-label="Unknown hubmate">
-            <IncomingInteractionIcon name="person" />
-          </span>
-        )}
-
-        <div className="inbox-item__title">
-          <div className="inbox-item__from-row">
-            <span className="inbox-item__from">{fromName}</span>
-            {priority === 'high' && policy === 'required' && (
-              <span className="inbox-item__priority inbox-item__priority--high">Important</span>
-            )}
-          </div>
-          <div className="inbox-item__type-row">
-            <span className="inbox-item__type-icon">
-              <IncomingInteractionIcon name={interaction.type} />
+      <IncomingInboxCardHeader
+        avatar={
+          fromPlayer ? (
+            <PlayerAvatar
+              player={fromPlayer}
+              size="sm"
+              showRelationshipOutline={false}
+              showEvictedStyle={false}
+            />
+          ) : (
+            <span className="inbox-item__avatar-fallback" aria-label="Unknown hubmate">
+              <IncomingInteractionIcon name="person" />
             </span>
-            <span className="inbox-item__type">{typeLabel}</span>
+          )
+        }
+        sender={fromName}
+        icon={interaction.type}
+        typeLabel={typeLabel}
+        important={priority === 'high' && policy === 'required'}
+        status={resolvedLabel}
+        unread={isUnread}
+        context={
+          <>
             {relationshipContext && <span className="inbox-item__tone">{relationshipContext}</span>}
             {interactionDramaMode && policy === 'required' && tone && (
               <span className="inbox-item__tone">{tone}</span>
@@ -446,15 +442,9 @@ function InteractionItem({
                 {expiryLabel}
               </span>
             )}
-          </div>
-        </div>
-
-        {resolvedLabel && (
-          <span className={`inbox-item__status${isUnread ? ' inbox-item__status--new' : ''}`}>
-            {resolvedLabel}
-          </span>
-        )}
-      </div>
+          </>
+        }
+      />
 
       <p className="inbox-item__text">{interaction.text}</p>
       {shouldShowActions && safetyContextText && (
@@ -779,25 +769,15 @@ export default function IncomingInteractionsInbox() {
       aria-label="Incoming interactions"
     >
       <div className={`inbox-panel${globalDramaMode ? ' inbox-panel--drama' : ''}`}>
-        <header className="inbox-header">
-          <div className="inbox-header__top">
-            <div className="inbox-header__title">
-              <IncomingInteractionIcon name="inbox" className="inbox-header__title-icon" />
-              <span className="inbox-header__title-text">Incoming Interactions</span>
-              {globalDramaMode && <span className="inbox-header__mode">Reality</span>}
-            </div>
-            <GameBackButton
-              className="inbox-header__close"
-              label="Close inbox"
-              onClick={() => {
-                setRecentlyResolvedIds(new Set())
-                dispatch(closeIncomingInbox())
-              }}
-            />
-          </div>
-
-          <div className="inbox-header__meta">
-            {(globalDramaMode || humanCommitments.length > 0) && (
+        <IncomingInboxHeader
+          mode={globalDramaMode ? 'Reality' : undefined}
+          summary={headerSummary}
+          onClose={() => {
+            setRecentlyResolvedIds(new Set())
+            dispatch(closeIncomingInbox())
+          }}
+          reputation={
+            (globalDramaMode || humanCommitments.length > 0) && (
               <details className="inbox-header__reputation">
                 <summary>
                   {credibility.kept + credibility.broken === 0
@@ -827,10 +807,9 @@ export default function IncomingInteractionsInbox() {
                   ))}
                 </div>
               </details>
-            )}
-            <span className="inbox-header__summary">{headerSummary}</span>
-          </div>
-        </header>
+            )
+          }
+        />
 
         <div className="inbox-list">
           {allianceDecisionFeedback && (

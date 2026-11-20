@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import houseguestGridStyles from '../components/HouseguestGrid/HouseguestGrid.module.css'
 import { BETRAYALS_AI_POOL } from './cast'
 import { Roster } from './Roster'
 import { startRun, viewFor } from './run'
@@ -27,7 +28,8 @@ describe('Betrayals roster', () => {
     )
     const grid = screen.getByRole('list', { name: 'Contestant roster' })
     expect(within(grid).getAllByRole('button')).toHaveLength(25)
-    expect(within(grid).getByRole('button', { name: 'Georgi, Night Shield' })).toBeInTheDocument()
+    const humanSeat = within(grid).getByRole('button', { name: 'Georgi, Night Shield' })
+    expect(within(humanSeat).getByText('Georgi')).toHaveClass(houseguestGridStyles.nameOverlay)
     expect(within(grid).getByRole('button', { name: recipient.name })).toBeInTheDocument()
     expect(within(grid).getByRole('button', { name: /Full Immunity/ })).toBeInTheDocument()
     expect(within(grid).getByRole('button', { name: /Public Shield/ })).toBeInTheDocument()

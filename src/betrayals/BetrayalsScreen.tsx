@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { REALITY_MODE_PRESETS, REALITY_PRESET_TUNING } from '../modes/realityMode'
 import { mulberry32 } from '../store/rng'
@@ -142,44 +142,6 @@ function advanceDayBeat(run: Run): Run {
   return advancePreparation(active, commandToken(active))
 }
 
-function SocialSheet({ children, close }: { children: ReactNode; close: () => void }) {
-  const panel = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    const dialog = panel.current
-    if (!dialog) return
-    if (typeof dialog.showModal === 'function') {
-      dialog.showModal()
-      return () => dialog.close()
-    }
-    dialog.setAttribute('open', '')
-  }, [])
-
-  return (
-    <dialog
-      ref={panel}
-      className="betrayals-sheet"
-      aria-labelledby="betrayals-social-title"
-      onCancel={(event) => {
-        event.preventDefault()
-        close()
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) close()
-      }}
-    >
-      <div className="betrayals-sheet__content">
-        <header className="betrayals-sheet__head">
-          <h2 id="betrayals-social-title">Social</h2>
-          <button type="button" aria-label="Close Social" onClick={close}>
-            ×
-          </button>
-        </header>
-        {children}
-      </div>
-    </dialog>
-  )
-}
-
 export default function BetrayalsScreen() {
   const [run, setRun] = useState<Run | null>(restore)
   const current = useRef(run)
@@ -189,13 +151,21 @@ export default function BetrayalsScreen() {
   const [selected, setSelected] = useState<string>()
   const [contactId, setContactId] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
+  const [incomingOpen, setIncomingOpen] = useState(false)
+  const [homeOpen, setHomeOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [saveIssue, setSaveIssue] = useState(false)
-  const utilities = useBetrayalsUtilities(run?.phase, playing)
+  const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing)
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = getBetrayalsPortrait(utilities.preferences.lookId)
+
+  function openIncoming() {
+    utilities.playEffect('ui:navigate', 0.45)
+    setSocialOpen(false)
+    setIncomingOpen(true)
+  }
 
   async function commit(updated: Run) {
     const before = current.current
@@ -212,6 +182,7 @@ export default function BetrayalsScreen() {
       // The current visit can continue when device storage is unavailable.
     }
     setRun(next)
+    if (before?.id !== next.id) setHomeOpen(false)
     setSaveIssue(!saved)
     const phaseChanged = before?.phase !== next.phase || next.id !== before?.id
     if (phaseChanged || before?.runoffIds !== next.runoffIds) setSelected(undefined)
@@ -225,11 +196,13 @@ export default function BetrayalsScreen() {
         utilities.playEffect('tv:ceremony_transition', 0.4)
       }
       setSocialOpen(false)
+      setIncomingOpen(false)
     }
     setPlaying(false)
   }
 
-  if (!run) {
+  if (!run || homeOpen) {
+    const resumable = run && run.phase !== 'settled'
     return (
       <main className="betrayals-layout betrayals-entry" data-betrayals-motion={motion}>
         <img className="betrayals-entry__art" src={hero} alt="" fetchPriority="high" />
@@ -241,53 +214,73 @@ export default function BetrayalsScreen() {
           <p className="betrayals-franchise">The Big Eye</p>
           <h1>Betrayals</h1>
         </div>
-        <form
-          className="betrayals-entry__form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void commit(begin(name, publicMode, realityMode, portrait))
-          }}
-        >
-          <label>
-            Your name
-            <input
-              value={name}
-              maxLength={24}
-              autoComplete="nickname"
-              placeholder="Enter the observatory"
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
-          <div className="betrayals-entry__options">
-            <label className="betrayals-entry__toggle">
+        {resumable ? (
+          <section className="betrayals-entry__form" aria-label="Current season">
+            <p className="betrayals-entry__progress">
+              Day {run.day} · {phaseLabel[run.phase]}
+            </p>
+            <button className="betrayals-primary" type="button" onClick={() => setHomeOpen(false)}>
+              Continue season
+            </button>
+          </section>
+        ) : (
+          <form
+            className="betrayals-entry__form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void commit(begin(name, publicMode, realityMode, portrait))
+            }}
+          >
+            <label>
+              Your name
               <input
-                type="checkbox"
-                checked={publicMode}
-                onChange={(event) => setPublicMode(event.target.checked)}
+                value={name}
+                maxLength={24}
+                autoComplete="nickname"
+                placeholder="Enter the observatory"
+                onChange={(event) => setName(event.target.value)}
               />
-              Public Mode
             </label>
-            <label className="betrayals-entry__preset">
-              <span>Reality Mode</span>
-              <select
-                value={realityMode}
-                onChange={(event) => setRealityMode(event.target.value as RealityPreset)}
+            <div className="betrayals-entry__options">
+              <label className="betrayals-entry__toggle">
+                <input
+                  type="checkbox"
+                  checked={publicMode}
+                  onChange={(event) => setPublicMode(event.target.checked)}
+                />
+                Public Mode
+              </label>
+              <label className="betrayals-entry__preset">
+                <span>Reality Mode</span>
+                <select
+                  value={realityMode}
+                  onChange={(event) => setRealityMode(event.target.value as RealityPreset)}
+                >
+                  <option value="off">Off</option>
+                  {REALITY_MODE_PRESETS.filter(({ minimumAge }) => minimumAge === undefined).map(
+                    ({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+            </div>
+            <button type="submit" className="betrayals-primary">
+              Start season
+            </button>
+            {run && (
+              <button
+                className="betrayals-inline-action"
+                type="button"
+                onClick={() => setHomeOpen(false)}
               >
-                <option value="off">Off</option>
-                {REALITY_MODE_PRESETS.filter(({ minimumAge }) => minimumAge === undefined).map(
-                  ({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-          </div>
-          <button type="submit" className="betrayals-primary">
-            Start season
-          </button>
-        </form>
+                View season result
+              </button>
+            )}
+          </form>
+        )}
         <BetrayalsUtilityPanel utilities={utilities} />
       </main>
     )
@@ -422,6 +415,7 @@ export default function BetrayalsScreen() {
 
   let message: ReactNode = null
   let detail: ReactNode = null
+  let broadcastAction: ReactNode = null
   let play: { label: string; onClick: () => void; disabled?: boolean; faceLabel?: string }
   const outcome = run.lastTable
   const tableExit = outcome
@@ -469,12 +463,8 @@ export default function BetrayalsScreen() {
           ? pendingIncoming[0].speaker.name + ' wants a word with you.'
           : 'Speak privately before the challenge.'
         : 'The survivors trade suspicions.'
-      detail = pendingIncoming.length ? (
-        <button
-          type="button"
-          className="betrayals-inline-action"
-          onClick={() => setSocialOpen(true)}
-        >
+      broadcastAction = pendingIncoming.length ? (
+        <button type="button" className="betrayals-inline-action" onClick={openIncoming}>
           Hear them out
         </button>
       ) : undefined
@@ -600,12 +590,12 @@ export default function BetrayalsScreen() {
             guests, the season ends automatically. Any surviving Betrayer wins the pot for their
             side.
           </p>
-          {participating && (
-            <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
-              Banish Again
-            </button>
-          )}
         </div>
+      )
+      broadcastAction = participating && (
+        <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
+          Banish Again
+        </button>
       )
       play = {
         label: participating ? 'End Season' : 'View decision',
@@ -725,14 +715,15 @@ export default function BetrayalsScreen() {
         <BetrayalsBroadcast
           phase={
             stage === 'role-reveal'
-              ? 'Private transmission'
+              ? 'Private'
               : stage === 'table-reveal'
-                ? 'Round Table feed'
-                : 'Observatory feed'
+                ? 'Round Table'
+                : undefined
           }
           title={conclave ? 'The Conclave' : phaseLabel[stage]}
           message={message}
           detail={detail}
+          action={broadcastAction}
           interactive={Boolean(tableFeed || conclave || (canSocialize && pendingIncoming.length))}
           cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
           mode={broadcastMode}
@@ -770,9 +761,14 @@ export default function BetrayalsScreen() {
 
         <BetrayalsDock
           play={play}
-          music={{
-            onClick: utilities.toggleMusic,
-            active: utilities.preferences.musicOn,
+          home={{
+            onClick: () => {
+              utilities.playEffect('ui:navigate', 0.45)
+              setName(human?.name ?? '')
+              setPublicMode(run.options.publicMode)
+              setRealityMode(run.options.realityMode)
+              setHomeOpen(true)
+            },
           }}
           store={{
             onClick: () => {
@@ -788,8 +784,17 @@ export default function BetrayalsScreen() {
             },
             active: socialOpen,
             disabled: !participating,
-            count: pendingIncoming.length || (canSocialize ? actionsLeft : undefined),
+            count: canSocialize ? actionsLeft : undefined,
           }}
+          incoming={
+            pendingIncoming.length
+              ? {
+                  onClick: openIncoming,
+                  active: incomingOpen,
+                  count: pendingIncoming.length,
+                }
+              : undefined
+          }
           settings={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
@@ -800,52 +805,56 @@ export default function BetrayalsScreen() {
         />
 
         {socialOpen && (
-          <SocialSheet close={() => setSocialOpen(false)}>
-            <BetrayalsIncomingInteractions
-              interactions={incoming}
-              onRespond={(id, answer) =>
-                apply((active) => respondToIncomingInteraction(active, token, id, answer))
-              }
-            />
-            <BetrayalsSocialPanel
-              key={run.id}
-              actorId={run.humanId}
-              contact={contact}
-              prospects={activeCast}
-              cast={view.seats}
-              actionsLeft={actionsLeft}
-              canAct={canSocialize}
-              day={run.day}
-              conversation={conversation}
-              recent={recent}
-              onContactChange={setContactId}
-              onMove={(kind, suspectId, recipient) =>
-                apply((active) => {
-                  const id = recipient ?? contactId
-                  if (!id || !canSocialize) return active
-                  const choice =
-                    kind === 'question'
-                      ? chooseTarget(
-                          resolutionPerspective(
-                            active,
-                            id,
-                            activeCast
-                              .map((seat) => seat.id)
-                              .filter((candidate) => candidate !== id && candidate !== run.humanId)
-                          ),
-                          'table'
-                        )
-                      : suspectId
-                  return applySocialMove(active, token, {
-                    actorId: active.humanId,
-                    recipientId: id,
-                    kind,
-                    suspectId: choice,
-                  })
+          <BetrayalsSocialPanel
+            key={run.id}
+            actorId={run.humanId}
+            contact={contact}
+            prospects={activeCast}
+            cast={view.seats}
+            actionsLeft={actionsLeft}
+            canAct={canSocialize}
+            day={run.day}
+            conversation={conversation}
+            recent={recent}
+            onClose={() => setSocialOpen(false)}
+            onOpenIncoming={openIncoming}
+            incomingCount={pendingIncoming.length}
+            onContactChange={setContactId}
+            onMove={(kind, suspectId, recipient) =>
+              apply((active) => {
+                const id = recipient ?? contactId
+                if (!id || !canSocialize) return active
+                const choice =
+                  kind === 'question'
+                    ? chooseTarget(
+                        resolutionPerspective(
+                          active,
+                          id,
+                          activeCast
+                            .map((seat) => seat.id)
+                            .filter((candidate) => candidate !== id && candidate !== run.humanId)
+                        ),
+                        'table'
+                      )
+                    : suspectId
+                return applySocialMove(active, token, {
+                  actorId: active.humanId,
+                  recipientId: id,
+                  kind,
+                  suspectId: choice,
                 })
-              }
-            />
-          </SocialSheet>
+              })
+            }
+          />
+        )}
+        {incomingOpen && (
+          <BetrayalsIncomingInteractions
+            interactions={incoming}
+            onClose={() => setIncomingOpen(false)}
+            onRespond={(id, answer) =>
+              apply((active) => respondToIncomingInteraction(active, token, id, answer))
+            }
+          />
         )}
         <BetrayalsUtilityPanel utilities={utilities} />
       </main>
