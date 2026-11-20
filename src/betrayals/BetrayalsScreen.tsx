@@ -189,21 +189,22 @@ export default function BetrayalsScreen() {
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = getBetrayalsPortrait(utilities.preferences.lookId)
 
-  function commit(updated: Run) {
+  async function commit(updated: Run) {
     const before = current.current
+    if (before !== run) return
     const cues = before ? presentationAfter(before, updated) : []
     const next = cues.length ? { ...updated, presentation: cues } : updated
     current.current = next
-    setRun(next)
+    let saved = false
     try {
       saveRun(saveStorage, profile, next)
-      setSaveIssue(false)
-      void flushDurablePersistence().then((ok) => {
-        if (!ok && current.current?.id === next.id) setSaveIssue(true)
-      })
+      // A reload must resume a beat as soon as it is visible.
+      saved = await flushDurablePersistence()
     } catch {
-      setSaveIssue(true)
+      // The current visit can continue when device storage is unavailable.
     }
+    setRun(next)
+    setSaveIssue(!saved)
     const phaseChanged = before?.phase !== next.phase || next.id !== before?.id
     if (phaseChanged || before?.runoffIds !== next.runoffIds) setSelected(undefined)
     if (phaseChanged) {
@@ -236,7 +237,7 @@ export default function BetrayalsScreen() {
           className="betrayals-entry__form"
           onSubmit={(event) => {
             event.preventDefault()
-            commit(begin(name, publicMode, realityMode, portrait))
+            void commit(begin(name, publicMode, realityMode, portrait))
           }}
         >
           <label>
@@ -327,7 +328,7 @@ export default function BetrayalsScreen() {
     const active = current.current
     if (!active?.presentation || active.presentation !== run?.presentation) return
     const [, ...rest] = active.presentation
-    commit({ ...active, presentation: rest.length ? rest : undefined })
+    void commit({ ...active, presentation: rest.length ? rest : undefined })
   }
 
   function apply(transform: (active: Run) => Run) {
@@ -341,7 +342,7 @@ export default function BetrayalsScreen() {
       return
     }
     const next = transform(active)
-    if (next !== active) commit(next)
+    if (next !== active) void commit(next)
   }
 
   function end(continueVoting: boolean) {
@@ -601,10 +602,11 @@ export default function BetrayalsScreen() {
       play = {
         label: 'New season',
         faceLabel: 'New season',
-        onClick: () =>
-          commit(
+        onClick: () => {
+          void commit(
             begin(human?.name ?? 'You', run.options.publicMode, run.options.realityMode, portrait)
-          ),
+          )
+        },
       }
       break
   }
