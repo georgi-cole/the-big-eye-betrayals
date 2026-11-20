@@ -10,6 +10,7 @@ on:
       - 'public/assets/betrayals/**'
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -23,6 +24,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      PAGES_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -44,7 +47,23 @@ jobs:
       - run: npx playwright test --config playwright.betrayals.config.ts
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: dist
+      - name: Wait for the Pages artifact index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..12}; do
+            if count=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?name=${PAGES_ARTIFACT_NAME}" --jq '.total_count') \
+              && [[ "$count" == "1" ]]; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "GitHub did not index the Pages artifact for this attempt." >&2
+          exit 1
       - name: Deploy preview
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
