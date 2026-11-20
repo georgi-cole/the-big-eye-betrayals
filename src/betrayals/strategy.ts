@@ -1,12 +1,13 @@
 import { mulberry32 } from '../store/rng.ts'
-import type { Role, SocialEntry } from './run.ts'
-import { rapport } from './social.ts'
+import type { Phase, Role, SocialEntry } from './run.ts'
+import { hasAlliance, rapport } from './social.ts'
 
 type Perspective = {
   actorId: string
   role: Role
   teammates: readonly string[]
   day: number
+  phase?: Phase
   seed: number
   ownConversations: readonly SocialEntry[]
   publicTally: Readonly<Record<string, number>>
@@ -20,18 +21,37 @@ function hashId(id: string): number {
   )
 }
 
-function dealWeight(perspective: Perspective, id: string): number {
-  return (
-    perspective.ownConversations.filter(
-      (entry) =>
-        entry.day === perspective.day &&
-        ((entry.kind === 'vote-plan' && entry.accepted) || entry.kind === 'question') &&
-        entry.suspectId === id
-    ).length * 0.55
-  )
+function socialPressure({ actorId, day, ownConversations }: Perspective) {
+  const pledges = new Map<string, string>()
+  const suspicions = new Map<string, string>()
+
+  for (const entry of ownConversations) {
+    if (entry.day !== day || !entry.suspectId) continue
+    const incoming = entry.recipientId === actorId
+    if (!incoming && entry.actorId !== actorId) continue
+
+    if (entry.kind === 'vote-plan' && entry.accepted)
+      pledges.set(incoming ? entry.actorId : entry.recipientId, entry.suspectId)
+    if (entry.kind === 'question' && incoming) suspicions.set(entry.actorId, entry.suspectId)
+  }
+
+  const pressure = new Map<string, number>()
+  for (const [, suspectId] of suspicions) {
+    pressure.set(suspectId, Math.min(0.2, (pressure.get(suspectId) ?? 0) + 0.1))
+  }
+  for (const [peerId, suspectId] of pledges) {
+    const weight = hasAlliance(ownConversations, actorId, peerId) ? 0.72 : 0.55
+    pressure.set(suspectId, Math.min(0.85, (pressure.get(suspectId) ?? 0) + weight))
+  }
+  return pressure
 }
 
-function scoreChoice(perspective: Perspective, id: string, night: boolean): number {
+function scoreChoice(
+  perspective: Perspective,
+  id: string,
+  night: boolean,
+  pressure: number
+): number {
   const { actorId, day, role, seed, teammates, publicTally, ownConversations } = perspective
   const random = mulberry32(seed ^ Math.imul(day, 1021) ^ hashId(actorId + ':' + id))
   const uncertainty = random() * 0.8
@@ -39,16 +59,19 @@ function scoreChoice(perspective: Perspective, id: string, night: boolean): numb
   const targetPressure = (publicTally[id] ?? 0) / 12
   if (night) return uncertainty - trust * 0.6 - targetPressure * 0.2
   const teammateCost = role === 'betrayer' && teammates.includes(id) ? 0.75 : 0
-  return uncertainty - trust - teammateCost + targetPressure + dealWeight(perspective, id)
+  return uncertainty - trust - teammateCost + targetPressure + pressure
 }
 
 export function chooseTarget(
   perspective: Perspective,
   context: 'table' | 'night'
 ): string | undefined {
+  const night = context === 'night'
+  const pressure =
+    !night && perspective.phase !== 'final-banishment' ? socialPressure(perspective) : undefined
   const ranked = perspective.eligibleIds.map((id) => ({
     id,
-    score: scoreChoice(perspective, id, context === 'night'),
+    score: scoreChoice(perspective, id, night, pressure?.get(id) ?? 0),
   }))
   ranked.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
   return ranked[0]?.id
