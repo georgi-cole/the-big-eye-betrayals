@@ -98,26 +98,17 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
   if (!standings || standings.day !== run.day) return []
   const view = viewFor(run, actorId)
   const activeViewer = view.seats.some(({ id, exit }) => id === actorId && !exit)
-  const byId = new Map(
-    standings.rows.map((row, index) => [row.contestantId, { ...row, place: index + 1 }])
-  )
-  // Keep cast order even when every score is masked. Row position must never encode rank.
-  return view.seats.flatMap(({ id, name, portrait }) => {
-    const standing = byId.get(id)
-    if (!standing) return []
-    const own = activeViewer && id === actorId
-    const hasShield = view.knownNightShieldIds.includes(id)
-    return [
-      {
-        id,
-        name,
-        portrait,
-        own,
-        score: own ? standing.score : null,
-        place: own ? standing.place : null,
-        forfeited: own && Boolean(standing.forfeited),
-        shield: own || hasShield ? hasShield : null,
-      },
-    ]
+  const names = new Map(view.seats.map(({ id, name }) => [id, name]))
+  return standings.rows.map(({ contestantId, score, forfeited }, index) => {
+    const own = activeViewer && contestantId === actorId
+    const revealName = own || view.knownNightShieldIds.includes(contestantId)
+    return {
+      name: revealName ? (names.get(contestantId) ?? null) : null,
+      own,
+      score,
+      place: index + 1,
+      forfeited: Boolean(forfeited),
+      shield: run.private.nightShieldIds.includes(contestantId),
+    }
   })
 }

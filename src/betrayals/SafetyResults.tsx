@@ -4,10 +4,6 @@ import './safety-results.css'
 
 const score = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
 
-function Mask() {
-  return <span aria-label="Hidden">✦✦✦</span>
-}
-
 export function SafetyResults({
   rows,
   onComplete,
@@ -38,7 +34,7 @@ export function SafetyResults({
     >
       <header>
         <h2 id="betrayals-safety-results-title">Safety Challenge results</h2>
-        <p>Two shields are in play tonight. Your own result is visible to you.</p>
+        <p>Scores and placements are public. Most contestant names are hidden.</p>
       </header>
       <div className="betrayals-safety-results__scores" tabIndex={0}>
         <table>
@@ -52,19 +48,11 @@ export function SafetyResults({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} data-own={row.own || undefined}>
-                <th scope="row">{row.name}</th>
-                <td>{row.forfeited ? '—' : (row.place ?? <Mask />)}</td>
-                <td>
-                  {row.forfeited ? (
-                    'Forfeit'
-                  ) : row.score === null ? (
-                    <Mask />
-                  ) : (
-                    score.format(row.score)
-                  )}
-                </td>
-                <td>{row.shield === null ? <Mask /> : row.shield ? 'Won' : '—'}</td>
+              <tr key={row.place} data-own={row.own || undefined}>
+                <th scope="row">{row.name ?? <span aria-label="Hidden">✦✦✦</span>}</th>
+                <td>{row.forfeited ? '—' : row.place}</td>
+                <td>{row.forfeited ? 'Forfeit' : score.format(row.score)}</td>
+                <td>{row.shield ? 'Won' : '—'}</td>
               </tr>
             ))}
           </tbody>
