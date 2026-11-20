@@ -31,7 +31,6 @@ describe('Betrayals private conversations', () => {
     render(
       <BetrayalsSocialPanel
         actorId="human"
-        contact={prospects[1]}
         prospects={prospects}
         actionsLeft={3}
         day={2}
@@ -40,11 +39,16 @@ describe('Betrayals private conversations', () => {
       />
     )
 
-    expect(screen.getByRole('heading', { name: 'Ren' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Deselect Ren and show roster' }))
     const roster = screen.getByRole('region', { name: 'Player roster' })
     expect(within(roster).queryByRole('button', { name: /Georgi/ })).toBeNull()
-    fireEvent.click(within(roster).getByRole('button', { name: /Sable/ }))
+    fireEvent.click(within(roster).getByRole('button', { name: /Ren/ }))
+    expect(screen.getByRole('heading', { name: 'Ren' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Deselect Ren and show roster' }))
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: /Sable/,
+      })
+    )
     expect(screen.queryByRole('group', { name: 'Vote target' })).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: 'Strategic' }))
     expect(screen.queryByRole('button', { name: /Build trust/ })).toBeNull()
@@ -63,7 +67,7 @@ describe('Betrayals private conversations', () => {
     expect(screen.queryByRole('group', { name: 'Vote target' })).toBeNull()
   })
 
-  it('keeps only the player’s private notes readable after the social window', () => {
+  it('lets the player browse guests and their own private notes outside the social window', () => {
     const onMove = vi.fn()
     const conversation: SocialEntry[] = [
       { actorId: 'human', recipientId: 'ren', day: 2, kind: 'question', suspectId: 'ivy' },
@@ -84,8 +88,22 @@ describe('Betrayals private conversations', () => {
       />
     )
 
-    expect(screen.queryByRole('button', { name: /Build trust/ })).toBeNull()
-    expect(screen.queryByRole('region', { name: 'Player roster' })).toBeNull()
+    const roster = screen.getByRole('region', { name: 'Player roster' })
+    expect(within(roster).getAllByRole('button')).toHaveLength(3)
+    expect(within(roster).queryByRole('button', { name: /Ivy/ })).toBeNull()
+    fireEvent.click(within(roster).getByRole('button', { name: /Ren/ }))
+    expect(screen.getByRole('heading', { name: 'Ren' })).toBeInTheDocument()
+    expect(screen.getByText('Social moves are available during the Social phase.')).toBeVisible()
+    expect(screen.queryByRole('region', { name: 'Social actions' })).toBeNull()
+    fireEvent.keyDown(
+      screen.getByRole('group', { name: 'Browse guests with left and right arrows' }),
+      {
+        key: 'ArrowRight',
+      }
+    )
+    expect(screen.getByRole('heading', { name: 'Sable' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Deselect Sable and show roster' }))
+    expect(screen.getByRole('region', { name: 'Player roster' })).toBeVisible()
     expect(screen.getByRole('status')).toHaveTextContent('Ren suspects Ivy.')
     expect(screen.queryByText('Opal suspects Georgi.')).toBeNull()
     const history = screen.getByRole('region', { name: 'Private notes' })

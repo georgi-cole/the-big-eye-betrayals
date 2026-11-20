@@ -149,7 +149,6 @@ export default function BetrayalsScreen() {
   const [publicMode, setPublicMode] = useState(false)
   const [realityMode, setRealityMode] = useState<RealityPreset>('off')
   const [selected, setSelected] = useState<string>()
-  const [contactId, setContactId] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
   const [incomingOpen, setIncomingOpen] = useState(false)
   const [homeOpen, setHomeOpen] = useState(false)
@@ -311,7 +310,6 @@ export default function BetrayalsScreen() {
   const briefing = challengeBriefing[gameId]
   const challengeName = briefing.title
   const activeCast = view.seats.filter(({ exit }) => !exit)
-  const contact = activeCast.find(({ id }) => id === contactId && id !== run.humanId)
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
   const conversation = participating ? getSocialView(run, run.humanId) : []
@@ -373,13 +371,6 @@ export default function BetrayalsScreen() {
       const updated = awardPublicShield(active, token, pulse)
       return updated === active ? active : { ...updated, audienceApproval: pulse }
     })
-  }
-
-  function selectContestant(id: string) {
-    setSelected(id)
-    if (canSocialize && id !== run?.humanId && activeCast.some((seat) => seat.id === id)) {
-      setContactId(id)
-    }
   }
 
   if (playing && canPlay) {
@@ -737,7 +728,7 @@ export default function BetrayalsScreen() {
             humanId={run.humanId}
             sleeping={stage === 'night-resolved' || cue === 'awakening'}
             selectableIds={targets.length ? targets : undefined}
-            onSelect={selectContestant}
+            onSelect={setSelected}
           />
           <div className="betrayals-cast__caption">
             {selectedSeat ? (
@@ -808,7 +799,6 @@ export default function BetrayalsScreen() {
           <BetrayalsSocialPanel
             key={run.id}
             actorId={run.humanId}
-            contact={contact}
             prospects={activeCast}
             cast={view.seats}
             actionsLeft={actionsLeft}
@@ -819,27 +809,27 @@ export default function BetrayalsScreen() {
             onClose={() => setSocialOpen(false)}
             onOpenIncoming={openIncoming}
             incomingCount={pendingIncoming.length}
-            onContactChange={setContactId}
-            onMove={(kind, suspectId, recipient) =>
+            onMove={(kind, suspectId, recipientId) =>
               apply((active) => {
-                const id = recipient ?? contactId
-                if (!id || !canSocialize) return active
+                if (!canSocialize) return active
                 const choice =
                   kind === 'question'
                     ? chooseTarget(
                         resolutionPerspective(
                           active,
-                          id,
+                          recipientId,
                           activeCast
                             .map((seat) => seat.id)
-                            .filter((candidate) => candidate !== id && candidate !== run.humanId)
+                            .filter(
+                              (candidate) => candidate !== recipientId && candidate !== run.humanId
+                            )
                         ),
                         'table'
                       )
                     : suspectId
                 return applySocialMove(active, token, {
                   actorId: active.humanId,
-                  recipientId: id,
+                  recipientId,
                   kind,
                   suspectId: choice,
                 })

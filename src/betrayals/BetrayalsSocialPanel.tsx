@@ -57,10 +57,10 @@ const filters = [
   { id: 'alliance', label: 'Alliances' },
 ] as const
 type Filter = (typeof filters)[number]['id']
+const socialWindowHint = 'Social moves are available during the Social phase.'
 
 type Props = {
   actorId: string
-  contact?: Contestant
   prospects: readonly Contestant[]
   cast?: readonly Contestant[]
   actionsLeft: number
@@ -71,7 +71,6 @@ type Props = {
   incomingCount?: number
   onOpenIncoming?: () => void
   onClose: () => void
-  onContactChange?: (id: string) => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
 }
 
@@ -202,7 +201,6 @@ function CastleWire({
 
 export function BetrayalsSocialPanel({
   actorId,
-  contact,
   prospects,
   cast = prospects,
   actionsLeft,
@@ -213,11 +211,10 @@ export function BetrayalsSocialPanel({
   incomingCount = 0,
   onOpenIncoming,
   onClose,
-  onContactChange,
   onMove,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const [contactId, setContactId] = useState(contact?.id)
+  const [contactId, setContactId] = useState<string>()
   const [selectedAction, setSelectedAction] = useState<SocialEntry['kind']>()
   const [target, setTarget] = useState<string>()
   const [filter, setFilter] = useState<Filter>('all')
@@ -254,7 +251,6 @@ export function BetrayalsSocialPanel({
     setContactId(id)
     setSelectedAction(undefined)
     setTarget(undefined)
-    if (id) onContactChange?.(id)
   }
 
   function browse(direction: -1 | 1) {
@@ -317,12 +313,12 @@ export function BetrayalsSocialPanel({
       }}
     >
       <a className="sp2-skip-link" href="#betrayals-social-body">
-        Skip to actions
+        {canAct ? 'Skip to actions' : 'Skip to relationships'}
       </a>
       <div className="sp2-modal sp2-modal--normal">
         <header className="sp2-header">
           <span className="sp2-header__identity">
-            <span className="sp2-header__title">Social Phase</span>
+            <span className="sp2-header__title">{canAct ? 'Social Phase' : 'Social'}</span>
             <span className="sp2-header__subtitle">Castle relationships</span>
           </span>
           <div className="sp2-header__resources sp2-header__resources--normal">
@@ -362,8 +358,11 @@ export function BetrayalsSocialPanel({
           id="betrayals-social-body"
           className={'sp2-body' + (peer && canAct ? ' sp2-body--focused-target' : '')}
         >
-          {canAct && !peer && contacts.length > 0 && (
+          {!peer && contacts.length > 0 && (
             <section className="sp2-hubmates" aria-label="Player roster">
+              <div className="sp2-section-heading">
+                <span className="sp2-section-heading__title">Choose a guest</span>
+              </div>
               <PlayerList
                 players={contacts}
                 humanPlayerId={actorId}
@@ -377,8 +376,8 @@ export function BetrayalsSocialPanel({
               />
             </section>
           )}
-          <section className={'sp2-focus' + (peer && canAct ? ' sp2-focus--active' : '')}>
-            {peer && canAct ? (
+          <section className={'sp2-focus' + (peer ? ' sp2-focus--active' : '')}>
+            {peer ? (
               <>
                 <button
                   className="sp2-focus__clear"
@@ -432,6 +431,7 @@ export function BetrayalsSocialPanel({
                   >
                     <span style={{ width: `${Math.max(6, affinity ?? 0)}%` }} />
                   </div>
+                  {!canAct && <p>{socialWindowHint}</p>}
                 </div>
               </>
             ) : (
@@ -446,7 +446,7 @@ export function BetrayalsSocialPanel({
                   </h2>
                   <p>
                     {!canAct
-                      ? 'Private notes are read-only in this phase.'
+                      ? socialWindowHint
                       : contacts.length
                         ? 'Choose a guest to see your relationship and make a move.'
                         : 'No guests are available to speak.'}
