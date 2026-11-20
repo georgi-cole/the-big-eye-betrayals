@@ -32,7 +32,7 @@ const ignoredDevelopmentRoots = [
 ].map((directory) => normalizeWatchPath(resolve(process.cwd(), directory)))
 
 export default defineConfig(({ mode }) => ({
-  base: mobileModes.has(mode) ? './' : process.env.VITE_BASE_PATH || '/bbmobilenew/',
+  base: mobileModes.has(mode) ? './' : process.env.VITE_BASE_PATH || '/the-big-eye-betrayals/',
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
     'import.meta.env.VITE_CINEMATIC_PACK_EXTERNAL': JSON.stringify(

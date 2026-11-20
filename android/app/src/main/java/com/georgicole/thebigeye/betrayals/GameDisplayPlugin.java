@@ -1,4 +1,4 @@
-package com.georgicole.thebigeye;
+package com.georgicole.thebigeye.betrayals;
 
 import android.content.pm.ActivityInfo;
 import android.view.Window;
