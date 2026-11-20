@@ -10,65 +10,11 @@
   margin: 0;
 }
 
-.round-table-feed__chat {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  max-block-size: min(10.5rem, 24dvh);
-  min-block-size: 50px;
-  padding: 5px 5px 5px 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #7a5659 #21171e;
-}
-
-.round-table-feed__chat:focus-visible {
-  outline: 1px solid var(--signal-ink, #ebc39d);
-  outline-offset: 2px;
-}
-
-.round-table-feed__speech {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  align-items: start;
-  gap: 7px;
-  animation: round-table-speech 220ms ease-out both;
-}
-
-.round-table-feed__speech > img,
-.round-table-feed__initial {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #c19676a8;
-  border-radius: 7px;
-  background: #34212a;
-  object-fit: cover;
-  color: #ead3af;
-  font-weight: 700;
-}
-
-.round-table-feed__speech > div {
-  padding: 5px 8px;
-  border: 1px solid #a681724d;
-  border-radius: 3px 8px 8px;
-  background: #211720dc;
-}
-
-.round-table-feed__speech strong,
 .round-table-feed__count-heading strong {
   color: var(--signal-ink, #ebc39d);
 }
 
-.round-table-feed__speech p {
-  margin-top: 2px;
-}
-
-.round-table-feed__waiting,
 .round-table-feed__tie,
-.round-table-feed__sway > p,
 .round-table-feed__call {
   color: #e3c3b2;
   font-size: 0.79rem;
@@ -81,19 +27,8 @@
   background: #2d1b26aa;
 }
 
-.round-table-feed__sway {
-  display: grid;
-  gap: 6px;
-}
-
-.round-table-feed__sway label {
-  display: grid;
-  gap: 3px;
-}
-
-.round-table-feed__sway select,
-.round-table-feed__sway button,
 .round-table-feed__utility {
+  justify-self: start;
   min-height: 44px;
   padding: 4px 9px;
   border: 1px solid #af806c9c;
@@ -102,26 +37,7 @@
   color: #f6dbba;
   text-align: start;
   font: inherit;
-}
-
-.round-table-feed__sway button,
-.round-table-feed__utility {
   cursor: pointer;
-}
-
-.round-table-feed__sway button:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.round-table-feed__sway-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.round-table-feed__utility {
-  justify-self: start;
 }
 
 .round-table-feed__count-heading {
@@ -154,22 +70,4 @@
 .round-table-feed__leaders strong {
   color: #ffdeb2;
   font-variant-numeric: tabular-nums;
-}
-
-@keyframes round-table-speech {
-  from {
-    opacity: 0.4;
-    transform: translateY(3px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .round-table-feed__speech {
-    animation: none;
-  }
 }

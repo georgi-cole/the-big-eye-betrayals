@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import walkManifest from '../cinematic/ceremonies/walk-manifest.json'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import './CinematicScene.css'
+import './sleep-mask.css'
 
 export type CinematicCastMember = {
   id: string
@@ -53,7 +54,10 @@ const corridor = sceneArt + 'night.jpg'
 const mantle = sceneArt + 'conclave-mantle.png'
 const shield = assetBase + 'ceremonies/shared/safety-shield-reveal.webp'
 const ballotBox = assetBase + 'ceremonies/vfx/obsidian-ballot-box-v1.webp'
-const crackedGlass = assetBase + 'avatar_badges/overlay_eliminated_cracked_glass.svg'
+const verdictStamps = {
+  murdered: sceneArt + 'verdict-murdered.png',
+  evicted: sceneArt + 'verdict-evicted.png',
+} as const
 
 const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat[] }> = {
   'conclave-arrival': {
@@ -114,6 +118,7 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
     backdrop: corridor,
     beats: [
       { title: 'The verdict', hold: 1650, cue: 'reveal' },
+      { title: 'Evicted from the castle', hold: 1300, cue: 'impact' },
       { title: 'The final walk', hold: 2450, cue: 'door' },
       { title: 'The gates are closed', cue: 'impact' },
     ],
@@ -122,7 +127,7 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
     backdrop: corridor,
     beats: [
       { title: 'One seat stays dark', hold: 1550, cue: 'suspense' },
-      { title: 'Eliminated at night', cue: 'impact' },
+      { title: 'Murdered at night', cue: 'impact' },
     ],
   },
   sunset: {
@@ -245,6 +250,11 @@ function RollCall({
             style={{ '--wake-order': index } as CSSProperties}
           >
             <Portrait member={member} />
+            <span
+              className="betrayals-sleep-mask"
+              data-symbolic={!member.portrait || undefined}
+              aria-hidden="true"
+            />
             {beat > 1 && dark && <span className="betrayals-cine__dark-mark" aria-hidden="true" />}
             <span className="betrayals-cine__tile-name">{member.name}</span>
           </li>
@@ -279,14 +289,14 @@ function ExitingFigure({ subject }: { subject?: CinematicCastMember }) {
 function PortraitVerdict({
   subject,
   role,
-  eliminated,
+  stamp,
 }: {
   subject: CinematicCastMember
   role?: string
-  eliminated: boolean
+  stamp?: keyof typeof verdictStamps
 }) {
   return (
-    <div className="betrayals-cine__verdict" data-eliminated={eliminated}>
+    <div className="betrayals-cine__verdict" data-stamp={stamp}>
       <div className="betrayals-cine__verdict-photo" aria-hidden="true">
         <Portrait member={subject} />
       </div>
@@ -294,11 +304,13 @@ function PortraitVerdict({
         <strong>{subject.name}</strong>
         {role && <span data-role={role.toLowerCase()}>“I was a {role}.”</span>}
       </div>
-      {eliminated && (
-        <div className="betrayals-cine__verdict-treatment" aria-hidden="true">
-          <img src={crackedGlass} alt="" draggable={false} />
-          <span>Eliminated</span>
-        </div>
+      {stamp && (
+        <img
+          className="betrayals-cine__verdict-stamp"
+          src={verdictStamps[stamp]}
+          alt={stamp === 'evicted' ? 'Evicted' : 'Murdered'}
+          draggable={false}
+        />
       )}
     </div>
   )
@@ -360,15 +372,17 @@ function Stage({ scene, beat }: { scene: CinematicSceneData; beat: number }) {
     case 'round-table':
       return <img className="betrayals-cine__ballot-box" src={ballotBox} alt="" draggable={false} />
     case 'departure':
-      return beat === 0 && subject ? (
-        <PortraitVerdict subject={subject} role={role} eliminated={false} />
-      ) : beat === 1 ? (
+      return beat < 2 && subject ? (
+        <PortraitVerdict subject={subject} role={role} stamp={beat === 1 ? 'evicted' : undefined} />
+      ) : beat === 2 ? (
         <ExitingFigure subject={subject} />
       ) : (
         <div className="betrayals-cine__closed-gate" aria-hidden="true" />
       )
     case 'elimination':
-      return subject && <PortraitVerdict subject={subject} eliminated={beat > 0} />
+      return (
+        subject && <PortraitVerdict subject={subject} stamp={beat > 0 ? 'murdered' : undefined} />
+      )
     case 'interlude':
       return null
   }
@@ -402,7 +416,7 @@ export function CinematicScene({
   const caption = complete && scene.subtitle
   const stageBeat =
     motionReduced && scene.kind === 'departure'
-      ? 0
+      ? 1
       : motionReduced && scene.kind === 'conclave-seal'
         ? 1
         : beat

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { RoundTableDiscussion } from './RoundTableDiscussion'
 import { RoundTableFeed } from './RoundTableFeed'
 import { startRun } from './run'
 import type { Run } from './run'
@@ -17,19 +18,33 @@ function createRound(): Run {
 }
 
 describe('Round Table broadcast', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('reveals nominations before letting the player make a case', () => {
+    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
+      this: HTMLDialogElement
+    ) {
+      this.open = true
+    })
     const run = createRound()
     const onSway = vi.fn()
-    render(<RoundTableFeed run={run} onSway={onSway} />)
-    expect(screen.queryByRole('button', { name: 'Make a case' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Show all arguments' }))
+    render(
+      <RoundTableDiscussion run={run} open art="/council.jpg" onBack={vi.fn()} onSway={onSway} />
+    )
+    expect(screen.queryByRole('button', { name: 'Take the floor' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Read all' }))
 
     const chat = screen.getByRole('log', { name: 'Round Table conversation' })
     expect(within(chat).getAllByRole('article')).toHaveLength(24)
-    const candidate = run.seats[1].id
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: candidate } })
+    const candidate = run.seats[1]
+    fireEvent.click(screen.getByRole('button', { name: 'Take the floor' }))
+    fireEvent.click(screen.getByRole('button', { name: candidate.name }))
+    expect(screen.getByRole('button', { name: candidate.name })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Make a case' }))
-    expect(onSway).toHaveBeenCalledWith({ targetId: candidate, tone: 'careful' })
+    expect(onSway).toHaveBeenCalledWith({ targetId: candidate.id, tone: 'careful' })
   })
 
   it('holds the revote until the count is shown and summarizes a large tie', () => {

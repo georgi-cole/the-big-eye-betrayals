@@ -1,124 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePacedReveal } from '../hooks/usePacedReveal'
-import type { Run, Seat, TableCount, TableSway } from './run'
+import type { Run, Seat, TableCount } from './run'
 import { MAX_TABLE_ROUNDS } from './run'
-import {
-  tableDiscussion,
-  tableDiscussionOpen,
-  tableLeaderboard,
-  tableSwayResponse,
-  tableTargets,
-} from './table'
+import { tableLeaderboard, tableSwayResponse } from './table'
 import './RoundTableFeed.css'
 
 type RoundTableFeedProps = {
   run: Run
   reducedMotion?: boolean
-  onSway?: (choice: TableSway) => void
   onCountComplete?: () => void
-}
-
-function DiscussionFeed({ run, reducedMotion, onSway }: RoundTableFeedProps) {
-  const [speeches] = useState(() => tableDiscussion(run))
-  const chatRef = useRef<HTMLDivElement>(null)
-  const followLatest = useRef(true)
-  const [targetId, setTargetId] = useState('')
-  const { visible, revealAll } = usePacedReveal(speeches.length, {
-    firstDelay: 550,
-    stepDelay: 680,
-    immediate: reducedMotion,
-  })
-  const candidates = tableTargets(run, run.humanId)
-  const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
-  const complete = visible >= speeches.length
-
-  useEffect(() => {
-    const chat = chatRef.current
-    if (chat && followLatest.current) chat.scrollTop = chat.scrollHeight
-  }, [visible])
-
-  return (
-    <div className="round-table-feed">
-      <div
-        className="round-table-feed__chat"
-        role="log"
-        aria-label="Round Table conversation"
-        tabIndex={0}
-        ref={chatRef}
-        onScroll={(event) => {
-          const chat = event.currentTarget
-          followLatest.current = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 35
-        }}
-      >
-        {speeches.slice(0, visible).map(({ speakerId, targetId: nomination, argument }) => {
-          const speaker = seats.get(speakerId)
-          return (
-            <article className="round-table-feed__speech" key={speakerId}>
-              {speaker?.portrait ? (
-                <img src={speaker.portrait} alt="" width="34" height="34" />
-              ) : (
-                <span className="round-table-feed__initial" aria-hidden="true">
-                  {speaker?.name.slice(0, 1)}
-                </span>
-              )}
-              <div>
-                <strong>{speaker?.name}</strong>
-                <p>
-                  <b>{seats.get(nomination)?.name}.</b> {argument}
-                </p>
-              </div>
-            </article>
-          )
-        })}
-        {!complete && <p className="round-table-feed__waiting">The guests are speaking…</p>}
-      </div>
-      {!complete && (
-        <button
-          type="button"
-          className="round-table-feed__utility"
-          onClick={() => {
-            followLatest.current = false
-            if (chatRef.current) chatRef.current.scrollTop = 0
-            revealAll()
-          }}
-        >
-          Show all arguments
-        </button>
-      )}
-      {complete && Boolean(candidates.length) && onSway && (
-        <div className="round-table-feed__sway">
-          <label>
-            Who do you want the table to consider?
-            <select value={targetId} onChange={(event) => setTargetId(event.target.value)}>
-              <option value="">Choose a contestant</option>
-              {candidates.map((id) => (
-                <option key={id} value={id}>
-                  {seats.get(id)?.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="round-table-feed__sway-actions">
-            <button
-              type="button"
-              disabled={!candidates.includes(targetId)}
-              onClick={() => onSway({ targetId, tone: 'careful' })}
-            >
-              Make a case
-            </button>
-            <button
-              type="button"
-              disabled={!candidates.includes(targetId)}
-              onClick={() => onSway({ targetId, tone: 'forceful' })}
-            >
-              Press hard
-            </button>
-          </div>
-          <p>A harder push can move more votes and draw suspicion toward you.</p>
-        </div>
-      )}
-    </div>
-  )
 }
 
 function CountFeed({
@@ -209,10 +99,6 @@ export function RoundTableFeed(props: RoundTableFeedProps) {
       />
     )
   }
-  if (tableDiscussionOpen(run)) {
-    return <DiscussionFeed key={`${run.id}:${run.day}`} {...props} reducedMotion={immediate} />
-  }
-
   const response = tableSwayResponse(run)
   const challenged = run.seats.find(({ id }) => id === run.tableSway?.targetId)
   return response ? (

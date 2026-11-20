@@ -1,20 +1,23 @@
 import { statusBadgeImageSrc } from '../utils/statusBadges'
 import type { viewFor } from './run'
 import './roster.css'
+import './sleep-mask.css'
 
 type CastView = ReturnType<typeof viewFor>
 type Props = {
   view: CastView
   selectedId?: string
   humanId: string
+  sleeping?: boolean
   selectableIds?: readonly string[]
   onSelect: (id: string) => void
 }
 
-export function Roster({ view, selectedId, humanId, selectableIds, onSelect }: Props) {
+export function Roster({ view, selectedId, humanId, sleeping, selectableIds, onSelect }: Props) {
   return (
     <ul className="betrayals-roster" aria-label="Contestant roster">
       {view.seats.map((seat) => {
+        const asleep = sleeping && !seat.exit
         const hasNightShield = !seat.exit && view.knownNightShieldIds.includes(seat.id)
         const selectable = !selectableIds || selectableIds.includes(seat.id)
         const confirmedRole = seat.exit?.revealedRole ?? seat.finaleRole
@@ -25,6 +28,7 @@ export function Roster({ view, selectedId, humanId, selectableIds, onSelect }: P
           seat.fullImmunity && 'Full Immunity',
           seat.publicShield && 'Public Shield',
           hasNightShield && 'Night Shield',
+          asleep && 'Asleep',
           exitLabel,
           roleLabel,
         ].filter(Boolean)
@@ -41,6 +45,7 @@ export function Roster({ view, selectedId, humanId, selectableIds, onSelect }: P
               data-you={seat.id === humanId || undefined}
               data-exit={seat.exit?.cause}
               data-role={confirmedRole}
+              data-asleep={asleep || undefined}
               onClick={selectable ? () => onSelect(seat.id) : undefined}
             >
               <span className="betrayals-roster__portrait" aria-hidden="true">
@@ -48,6 +53,12 @@ export function Roster({ view, selectedId, humanId, selectableIds, onSelect }: P
                   <img src={seat.portrait} alt="" decoding="async" draggable={false} />
                 ) : (
                   <span className="betrayals-roster__initial">{seat.name[0]}</span>
+                )}
+                {asleep && (
+                  <span
+                    className="betrayals-sleep-mask"
+                    data-symbolic={!seat.portrait || undefined}
+                  />
                 )}
                 {seat.exit && (
                   <span className="betrayals-roster__seal" title={exitLabel || undefined} />

@@ -159,6 +159,27 @@
   border-color: #65575b88;
 }
 
+.betrayals-roster__seat[data-asleep='true'] {
+  --sleep-mask-top: 32%;
+  border-color: #655373;
+  box-shadow: 0 0 10px #38294772;
+  background: #171322;
+}
+
+.betrayals-roster__seat[data-asleep='true'] .betrayals-roster__portrait > img {
+  filter: brightness(0.54) saturate(0.45);
+}
+
+.betrayals-roster__seat[data-asleep='true'] .betrayals-roster__initial {
+  opacity: 0.18;
+}
+
+.betrayals-roster__seat[data-asleep='true'] .betrayals-roster__name {
+  border-color: #564467;
+  background: #191221ef;
+  color: #d6c5de;
+}
+
 .betrayals-roster__seal {
   position: absolute;
   z-index: 1;

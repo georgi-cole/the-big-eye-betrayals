@@ -58,6 +58,27 @@ describe('Betrayals cinematic scenes', () => {
     const roster = within(screen.getByRole('list', { name: 'Morning roll call' }))
     expect(roster.getByText('Ash').closest('li')).toHaveAttribute('data-awake', 'true')
     expect(roster.getByText('Finn').closest('li')).toHaveAttribute('data-awake', 'false')
+    expect(
+      roster.getByText('Finn').closest('li')?.querySelector('.betrayals-sleep-mask')
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ['elimination', 'Murdered'],
+    ['departure', 'Evicted'],
+  ] as const)('uses the correct verdict stamp for %s with reduced motion', (kind, name) => {
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: kind, kind, subject: known }}
+        reducedMotion
+        onComplete={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('img', { name })).toHaveAttribute(
+      'src',
+      expect.stringContaining('verdict-' + name.toLowerCase() + '.png')
+    )
+    expect(container.querySelector('[src*="cracked_glass"]')).not.toBeInTheDocument()
   })
 
   it('hands off an intermediate scene once after its final beat', () => {

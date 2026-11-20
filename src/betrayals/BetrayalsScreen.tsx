@@ -36,6 +36,7 @@ import {
   tableTargets,
 } from './table'
 import { awardPublicShield } from './publicShield'
+import { RoundTableDiscussion } from './RoundTableDiscussion'
 import { RoundTableFeed } from './RoundTableFeed'
 import { SafetyResults } from './SafetyResults'
 import { resolveEndVote } from './settlement'
@@ -184,6 +185,7 @@ export default function BetrayalsScreen() {
   const [socialOpen, setSocialOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
+  const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [saveIssue, setSaveIssue] = useState(false)
   const utilities = useBetrayalsUtilities(run?.phase, playing)
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
@@ -321,6 +323,8 @@ export default function BetrayalsScreen() {
   const incoming = getIncomingInteractions(run)
   const pendingIncoming = incoming.filter(({ response }) => !response)
   const cue = run.presentation?.[0]
+  const discussionKey = run.id + ':' + run.day
+  const discussionVisible = discussion && !cue && closedDiscussion !== discussionKey
   const cinematic =
     cue && cue !== 'safety-results' ? cinematicFor(run, cue, viewerId, castleExterior) : undefined
 
@@ -435,13 +439,11 @@ export default function BetrayalsScreen() {
     : 'The observatory opens.'
   const publicShieldId = run.publicShield?.day === run.day ? run.publicShield.id : undefined
   const tableFeed =
-    !cue &&
-    (discussion || counting || (stage === 'round-table' && !run.runoffIds && run.tableSway)) ? (
+    !cue && (counting || (stage === 'round-table' && !run.runoffIds && run.tableSway)) ? (
       <RoundTableFeed
         key={counting ? countKey : run.id + ':debate:' + run.day}
         run={run}
         reducedMotion={utilities.preferences.reducedMotion}
-        onSway={(choice) => apply((active) => recordTableSway(active, token, choice))}
         onCountComplete={() => setCountReady(countKey)}
       />
     ) : undefined
@@ -506,11 +508,13 @@ export default function BetrayalsScreen() {
         message = publicShieldId
           ? label(publicShieldId) + ' has the Public Shield. The floor is open.'
           : 'The floor is open.'
-        detail = tableFeed
         play = {
-          label: 'Skip discussion and open voting',
-          faceLabel: 'Vote',
-          onClick: () => apply((active) => recordTableSway(active, token, null)),
+          label: 'Enter Round Table',
+          faceLabel: 'Enter',
+          onClick: () => {
+            utilities.playEffect('tv:ceremony_transition', 0.45)
+            setClosedDiscussion(undefined)
+          },
         }
       } else if (counting) {
         message = 'The ballots are being counted.'
@@ -615,7 +619,8 @@ export default function BetrayalsScreen() {
     votePhase || stage === 'table-reveal' || stage === 'end-vote' || stage === 'settled'
   const afterDark = stage === 'night' || stage === 'night-resolved' || stage === 'role-reveal'
   const scene = council ? 'council' : afterDark ? 'night' : 'observatory'
-  const beat = run.runoffIds?.join('|') ?? (audiencePending ? 'audience' : '')
+  const beat =
+    run.runoffIds?.join('|') ?? (audiencePending ? 'audience' : discussion ? 'discussion' : '')
   const broadcastMode =
     stage === 'immunity'
       ? 'immunity'
@@ -644,7 +649,16 @@ export default function BetrayalsScreen() {
         data-phase={stage}
         data-scene={scene}
         data-betrayals-motion={motion}
-        inert={Boolean(cue)}
+        data-round-table-view={
+          stage === 'round-table'
+            ? discussionVisible
+              ? 'room'
+              : closedDiscussion === discussionKey || run.tableSway !== undefined
+                ? 'return'
+                : undefined
+            : undefined
+        }
+        inert={Boolean(cue) || discussionVisible}
       >
         <div className="betrayals-room" aria-hidden="true">
           <img
@@ -703,6 +717,7 @@ export default function BetrayalsScreen() {
             view={view}
             selectedId={selected}
             humanId={run.humanId}
+            sleeping={stage === 'night-resolved' || cue === 'awakening'}
             selectableIds={targets.length ? targets : undefined}
             onSelect={selectContestant}
           />
@@ -807,6 +822,24 @@ export default function BetrayalsScreen() {
         )}
         <BetrayalsUtilityPanel utilities={utilities} />
       </main>
+      {discussion && !cue && (
+        <RoundTableDiscussion
+          key={discussionKey}
+          run={run}
+          open={discussionVisible}
+          art={artBase + 'council.jpg'}
+          shieldName={publicShieldId ? label(publicShieldId) : undefined}
+          reducedMotion={utilities.preferences.reducedMotion}
+          onBack={() => {
+            utilities.playEffect('ui:navigate', 0.45)
+            setClosedDiscussion(discussionKey)
+          }}
+          onSway={(choice) => {
+            utilities.playEffect('tv:ceremony_transition', 0.45)
+            apply((active) => recordTableSway(active, token, choice))
+          }}
+        />
+      )}
       {cue === 'safety-results' && (
         <SafetyResults rows={safetyResultsFor(run, viewerId)} onComplete={finishCue} />
       )}
