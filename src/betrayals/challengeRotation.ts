@@ -1,6 +1,7 @@
 import { getCompetitionProfile } from '../data/houseguests'
 import { simulateQuickTapAiScore } from '../ai/competition/quickTapSimulation'
 import { simulateColorMatchAiRoundScore } from '../components/ColorMatchComp/colorMatchUtils'
+import { getGame, type GameRegistryEntry } from '../minigames/registryBase'
 import { challengeContestantIds } from './challenges'
 import type { RankedScore } from './challenges'
 import type { Run } from './run'
@@ -10,6 +11,18 @@ export function challengeGame(run: Run): 'quick-tap' | 'color-match' {
   const quickTap = run.phase === 'immunity' ? run.day % 2 === 1 : run.day % 2 === 0
   return quickTap ? 'quick-tap' : 'color-match'
 }
+
+export const challengeBriefing = {
+  'quick-tap': getGame('quickTap')!,
+  'color-match': {
+    ...getGame('colorMatch')!,
+    instructions: [
+      'Use the red, green, and blue sliders to match the target color.',
+      'Submit your mix before time runs out. A timeout scores zero for that round.',
+      'You can use up to two hints. Each hint takes 5% off your final average score.',
+    ],
+  },
+} satisfies Record<ReturnType<typeof challengeGame>, GameRegistryEntry>
 
 export function challengeSeed(run: Run): number {
   return (run.publicSeed ^ Math.imul(run.day, 1193) ^ Math.imul(run.revision, 71)) >>> 0 || 1

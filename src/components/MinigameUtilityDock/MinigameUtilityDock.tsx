@@ -14,6 +14,7 @@ interface Props {
   onOpenRules: () => void
   onRequestExit: () => void
   exitAvailable?: boolean
+  exitLabel?: string
 }
 
 function EyeIcon(): ReactNode {
@@ -53,6 +54,7 @@ export default function MinigameUtilityDock({
   onOpenRules,
   onRequestExit,
   exitAvailable = true,
+  exitLabel = 'Leave competition',
 }: Props) {
   const rulesAvailable = phase === 'countdown' || phase === 'playing'
   const position = useDockPosition(onCloseMenu)
@@ -114,7 +116,7 @@ export default function MinigameUtilityDock({
                   <ExitIcon />
                 </span>
                 <span>
-                  <strong>Leave competition</strong>
+                  <strong>{exitLabel}</strong>
                   <small>Record a score of 0</small>
                 </span>
               </button>

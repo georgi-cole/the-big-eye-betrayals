@@ -5,6 +5,7 @@ import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
 import { saveRun } from './persistence'
 import { startRun } from './run'
+import { settleRun } from './settlement'
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
@@ -83,6 +84,99 @@ describe('Betrayals season review', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await act(async () => completeSave(true))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+  })
+
+  it.each([
+    ['immunity', 'Quick Tap Race', /Wait for the start signal/],
+    ['safety', 'Color Match', /red, green, and blue sliders/],
+  ] as const)('offers the shared Eye controls during %s', async (phase, game, rule) => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-challenge-eye', roleSeed: 32, publicSeed: 12 }
+    )
+    saveRun(localStorage, 'edition-local', { ...run, phase })
+    render(<BetrayalsScreen />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play ' + game }))
+    const openEye = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'Open minigame menu' }))
+    openEye()
+    fireEvent.click(screen.getByRole('menuitem', { name: /View rules/ }))
+    const rules = within(screen.getByRole('dialog', { name: game + ' rules' }))
+    expect(rules.getByText(rule)).toBeVisible()
+    fireEvent.click(rules.getByRole('button', { name: 'Return to game' }))
+
+    openEye()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Forfeit challenge/ }))
+    const confirm = () => within(screen.getByRole('dialog', { name: 'Forfeit ' + game + '?' }))
+    fireEvent.click(confirm().getByRole('button', { name: 'Keep playing' }))
+    openEye()
+    fireEvent.click(screen.getByRole('menuitem', { name: /Forfeit challenge/ }))
+    await clickAndSave(confirm().getByRole('button', { name: 'Confirm forfeit' }))
+
+    expect(screen.queryByRole('button', { name: 'Open minigame menu' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeVisible()
+  })
+
+  it('explains the sealed finale vote and why a loyal final two win', () => {
+    const base = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-finale-explanation', roleSeed: 32, publicSeed: 12 }
+    )
+    const finalists = base.seats
+      .filter(({ id }) => !base.private.betrayers.includes(id))
+      .slice(0, 3)
+    const banished = base.seats.find(({ id }) => base.private.betrayers.includes(id))!
+    const endVote = {
+      ...base,
+      phase: 'end-vote' as const,
+      humanId: finalists[0].id,
+      pot: 700,
+      seats: base.seats.map((seat) =>
+        finalists.includes(seat) ? seat : { ...seat, exit: { cause: 'banished' as const, day: 1 } }
+      ),
+      lastTable: {
+        banishedId: banished.id,
+        blind: true,
+        tally: { [banished.id]: 3 },
+        tiedByDraw: false,
+      },
+    }
+    saveRun(localStorage, 'edition-local', endVote)
+    const app = render(<BetrayalsScreen />)
+    expect(
+      screen.getByText(banished.name + ' was banished. Their role stays sealed.')
+    ).toBeVisible()
+    expect(screen.getByText(/Ending takes a unanimous vote/)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'End Season' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Banish Again' })).toBeVisible()
+    app.unmount()
+
+    saveRun(
+      localStorage,
+      'edition-local',
+      settleRun(
+        {
+          ...endVote,
+          seats: endVote.seats.map((seat) =>
+            seat.id === finalists[2].id
+              ? { ...seat, exit: { cause: 'banished' as const, day: 1 } }
+              : seat
+          ),
+        },
+        'final-two'
+      )
+    )
+    render(<BetrayalsScreen />)
+    expect(screen.getByText('The Loyals win.')).toBeVisible()
+    expect(
+      screen.getByText('The season ended automatically when two guests remained.')
+    ).toBeVisible()
+    expect(screen.getByText('Only Loyals remained, so they split the pot.')).toBeVisible()
   })
 
   it('opens a 25-seat season, restores it, and advances through both challenge windows', async () => {

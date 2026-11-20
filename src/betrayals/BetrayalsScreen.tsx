@@ -9,6 +9,7 @@ import {
 } from '../store/durablePersistence'
 import { currentAudienceApproval } from './audience'
 import { BetrayalsBroadcast } from './BetrayalsBroadcast'
+import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
 import { BetrayalsConclave } from './BetrayalsConclave'
 import { BetrayalsDock } from './BetrayalsDock'
 import { BetrayalsIncomingInteractions } from './BetrayalsIncomingInteractions'
@@ -19,7 +20,7 @@ import type { Run, Phase, RealityPreset } from './run'
 import { acknowledgeRole, advancePreparation, commandToken, startRun, viewFor } from './run'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
-import { challengeGame, challengeSeed, scoreField } from './challengeRotation'
+import { challengeBriefing, challengeGame, challengeSeed, scoreField } from './challengeRotation'
 import { CinematicScene } from './CinematicScene'
 import { getIncomingInteractions, respondToIncomingInteraction } from './incoming'
 import { getConclaveView, resolveConclave, revealDawn } from './night'
@@ -51,6 +52,11 @@ const profile = 'edition-local'
 const artBase = import.meta.env.BASE_URL + 'assets/betrayals/'
 const hero = artBase + 'observatory.jpg'
 const castleExterior = artBase + 'castle-exterior.jpg'
+const finaleEnding = {
+  'last-betrayer': 'The last Betrayer was banished at the Round Table.',
+  unanimous: 'Every remaining guest voted to end the season.',
+  'final-two': 'The season ended automatically when two guests remained.',
+} as const
 const saveStorage = {
   getItem: getDurableItem,
   setItem(key: string, value: string) {
@@ -308,8 +314,9 @@ export default function BetrayalsScreen() {
       : (conclave?.targetIds ?? [])
   const field = challengeContestantIds(run)
   const canPlay = field.includes(run.humanId)
-  const quickTap = challengeGame(run) === 'quick-tap'
-  const challengeName = quickTap ? 'Quick Tap Race' : 'Color Match'
+  const gameId = challengeGame(run)
+  const briefing = challengeBriefing[gameId]
+  const challengeName = briefing.title
   const activeCast = view.seats.filter(({ exit }) => !exit)
   const contact = activeCast.find(({ id }) => id === contactId && id !== run.humanId)
   const selectedSeat = view.seats.find(({ id }) => id === selected)
@@ -384,18 +391,14 @@ export default function BetrayalsScreen() {
 
   if (playing && canPlay) {
     return (
-      <main className="betrayals-layout betrayals-layout--challenge" data-betrayals-motion={motion}>
-        <header className="betrayals-challenge-header">
-          <h1>{phaseLabel[stage]}</h1>
-          <button
-            type="button"
-            onClick={() => apply((active) => resolveChallenge(active, token, scoreField(active)))}
-          >
-            Forfeit challenge
-          </button>
-        </header>
+      <BetrayalsChallengeStage
+        title={phaseLabel[stage]}
+        game={briefing}
+        motion={motion}
+        onForfeit={() => apply((active) => resolveChallenge(active, token, scoreField(active)))}
+      >
         <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
-          {quickTap ? (
+          {gameId === 'quick-tap' ? (
             <QuickTap
               autoStart
               onFinish={(score) =>
@@ -413,7 +416,7 @@ export default function BetrayalsScreen() {
             />
           )}
         </Suspense>
-      </main>
+      </BetrayalsChallengeStage>
     )
   }
 
@@ -487,9 +490,8 @@ export default function BetrayalsScreen() {
             ? label(run.immunityId) + ' is immune. Two shields protect at Night.'
             : 'Two shields protect at Night.'
           : stage === 'final-challenge'
-            ? enteredFinaleByBanishment
-              ? challengeName + ' adds to the pot.'
-              : 'One last chance to grow the pot.'
+            ? (enteredFinaleByBanishment ? challengeName : 'This challenge') +
+              ' adds to the pot. In the finale, banished roles stay sealed until the season ends.'
             : 'The winner is safe at the Round Table and at Night.'
       play = canPlay
         ? { label: 'Play ' + challengeName, onClick: () => setPlaying(true) }
@@ -536,11 +538,15 @@ export default function BetrayalsScreen() {
                 : 'The cast is ready to vote.'
         detail =
           tableFeed ??
-          (stage === 'round-table' && run.publicShield?.day === run.day
-            ? label(run.publicShield.id) + ' has the Public Shield.'
-            : view.hasNightShield
-              ? 'You hold a Night Shield.'
-              : undefined)
+          (stage === 'final-banishment'
+            ? !run.runoffIds && run.lastTable?.blind
+              ? 'At least one guest voted to banish again. This ballot keeps the banished role sealed.'
+              : 'The banished guest’s role stays sealed until the season ends.'
+            : publicShieldId
+              ? label(publicShieldId) + ' has the Public Shield.'
+              : view.hasNightShield
+                ? 'You hold a Night Shield.'
+                : undefined)
         play = {
           label: targets.length > 0 ? 'Lock vote' : 'View votes',
           faceLabel: targets.length > 0 ? 'Vote' : 'View votes',
@@ -586,12 +592,21 @@ export default function BetrayalsScreen() {
       }
       break
     case 'end-vote':
-      message = banishment ?? 'Will you end the season?'
-      detail = participating ? (
-        <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
-          Banish Again
-        </button>
-      ) : undefined
+      message = banishment ? banishment + ' Their role stays sealed.' : 'Will you end the season?'
+      detail = (
+        <div className="betrayals-finale-detail">
+          <p>
+            Ending takes a unanimous vote. One Banish Again vote starts another ballot. At two
+            guests, the season ends automatically. Any surviving Betrayer wins the pot for their
+            side.
+          </p>
+          {participating && (
+            <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
+              Banish Again
+            </button>
+          )}
+        </div>
+      )
       play = {
         label: participating ? 'End Season' : 'View decision',
         faceLabel: participating ? 'End' : undefined,
@@ -600,9 +615,21 @@ export default function BetrayalsScreen() {
       break
     case 'settled':
       message = run.result?.winningRole === 'loyal' ? 'The Loyals win.' : 'The Betrayers win.'
-      detail = Object.entries(run.result?.payouts ?? {})
-        .map(([id, amount]) => label(id) + ' ' + amount.toLocaleString())
-        .join(' · ')
+      detail = run.result && (
+        <div className="betrayals-finale-detail">
+          <p>{finaleEnding[run.result.reason]}</p>
+          <p>
+            {run.result.winningRole === 'loyal'
+              ? 'Only Loyals remained, so they split the pot.'
+              : 'A Betrayer was still in the game. The surviving Betrayers take the pot.'}
+          </p>
+          <p>
+            {Object.entries(run.result.payouts)
+              .map(([id, amount]) => label(id) + ' ' + amount.toLocaleString())
+              .join(', ')}
+          </p>
+        </div>
+      )
       play = {
         label: 'New season',
         faceLabel: 'New season',

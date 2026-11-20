@@ -271,7 +271,6 @@
 }
 
 .betrayals-sheet__head button,
-.betrayals-challenge-header button,
 .betrayals-inline-action {
   display: inline-grid;
   place-items: center;
@@ -299,9 +298,20 @@
   margin-bottom: 12px;
 }
 
-.betrayals-challenge-header button {
-  font-size: 0.75rem;
-  white-space: nowrap;
+.betrayals-challenge-utility {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+}
+
+.betrayals-finale-detail {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+}
+
+.betrayals-finale-detail p {
+  margin: 0;
 }
 
 .betrayals-entry {
