@@ -7,11 +7,18 @@ for (const viewport of [
   test(`Betrayals opens with a five-column cast at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport)
     await page.goto('./#/betrayals')
+    await expect(page.getByRole('button', { name: 'Music' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Store' })).toBeVisible()
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible()
+    await page.getByRole('button', { name: 'Close settings' }).click()
     await page.getByLabel('Your name').fill('Georgi')
     await page.getByRole('button', { name: 'Start season' }).click()
-    await expect(page.getByRole('heading', { name: 'Your role' })).toBeVisible()
+    const television = page.getByRole('region', { name: 'Faux TV' })
+    const dock = page.getByRole('navigation', { name: 'Season actions' })
+    await expect(television.getByRole('heading', { name: 'Your role' })).toBeVisible()
 
-    const roster = page.getByRole('list', { name: 'Active contestants' })
+    const roster = page.getByRole('list', { name: 'Contestant roster' })
     const tiles = roster.getByRole('button')
     await expect(tiles).toHaveCount(25)
 
@@ -44,7 +51,13 @@ for (const viewport of [
       )
       .toBe(24)
 
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByRole('heading', { name: 'Dawn' })).toBeVisible()
+    await dock.getByRole('button', { name: 'Play: open Day 1' }).click()
+    await expect(television.getByRole('heading', { name: 'Dawn' })).toBeVisible()
+    await dock.getByRole('button', { name: 'Play: enter Social' }).click()
+    await dock.getByRole('button', { name: /^Social/ }).click()
+    await expect(page.getByRole('dialog', { name: 'Social' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Social' })).toHaveCount(0)
+    await expect(tiles).toHaveCount(25)
   })
 }

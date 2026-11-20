@@ -1,156 +1,502 @@
 .betrayals-layout {
-  --betrayals-tile: #15252d;
-  --betrayals-ink: #edf4f3;
-  --betrayals-edge: #456971;
-  --betrayals-focus: #ebb180;
-  color: var(--betrayals-ink);
-  background: radial-gradient(ellipse at top, #1c343f 0%, #0a1118 60%);
-  width: min(100%, 440px);
+  --betrayals-ink: #f1e6dc;
+  --betrayals-tile: #15181e;
+  --betrayals-edge: #6a5449;
+  --betrayals-focus: #f2c293;
+  --betrayals-secondary: #c7b4a8;
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 460px);
   min-height: 100dvh;
   margin-inline: auto;
-  padding: 16px max(12px, env(safe-area-inset-left)) calc(20px + env(safe-area-inset-bottom));
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+    calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  font-family: system-ui, sans-serif;
+  color: var(--betrayals-ink);
+  color-scheme: dark;
+  background: #0e1017;
 }
 
-.betrayals-layout h1 {
-  margin: 0 0 5px;
-  font-family: Georgia, serif;
-  font-size: 1.65rem;
+.betrayals-layout h1,
+.betrayals-layout h2,
+.betrayals-wordmark {
+  font-family: Georgia, 'Times New Roman', serif;
 }
 
-.betrayals-layout p {
-  margin: 0 0 10px;
+.betrayals-layout :is(button, input, select):focus-visible {
+  outline: 2px solid var(--betrayals-focus);
+  outline-offset: 2px;
+}
+
+.betrayals-room {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  --room-glow: #3e4345;
+  background:
+    radial-gradient(ellipse at 58% 9%, var(--room-glow), transparent 58%),
+    linear-gradient(90deg, #94705522 0 1px, transparent 1px calc(100% - 1px), #94705522 0),
+    linear-gradient(168deg, #151720, #0b1017 65%, #140f17);
+}
+
+.betrayals-room img,
+.betrayals-room::after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.betrayals-room img {
+  object-fit: cover;
+  object-position: 50% 58%;
+  opacity: 0.53;
+  animation: betrayals-room-light 440ms ease-out both;
+}
+
+.betrayals-room::after {
+  content: '';
+  background:
+    linear-gradient(180deg, #13111bc7, #0b101793 41%, #090b1254 80%, #0b0b12b0),
+    linear-gradient(90deg, #110d1985, transparent 27% 73%, #110d1985);
+}
+
+[data-scene='council'] .betrayals-room {
+  --room-glow: #543631;
+}
+
+[data-scene='night'] .betrayals-room {
+  --room-glow: #382d49;
+}
+
+.betrayals-layout--game {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.betrayals-layout--game .betrayals-broadcast {
+  margin-block: 0;
 }
 
 .betrayals-header {
-  border-bottom: 1px solid #456971;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
 }
 
-.betrayals-franchise {
-  color: #ebb180;
-  letter-spacing: 0.12em;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-}
-
-.betrayals-header div,
-.betrayals-controls {
+.betrayals-brand-row,
+.betrayals-wordmark {
   display: flex;
+  align-items: center;
+}
+
+.betrayals-brand-row {
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.betrayals-wordmark {
+  gap: 8px;
+  font-size: clamp(1rem, 5vw, 1.4rem);
+  letter-spacing: -0.035em;
+  color: #f2e0ce;
+}
+
+.betrayals-eye {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: #e3b27d;
+  filter: drop-shadow(0 0 7px #e9a55b70);
+}
+
+.betrayals-eye::before,
+.betrayals-eye::after {
+  content: '';
+  position: absolute;
+}
+
+.betrayals-eye::before {
+  width: 66%;
+  height: 66%;
+  border: 1px solid;
+  border-radius: 66% 4%;
+  transform: rotate(45deg);
+}
+
+.betrayals-eye::after {
+  width: 30%;
+  height: 30%;
+  border: 1px solid;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 38%, #ffe6c4 16%, #bd8052 23% 37%, #3c252c 45%);
+}
+
+.betrayals-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: stretch;
+  min-width: 0;
+  border: 1px solid #82675978;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #211a21e8, #100f18f0);
+  color: #e9dcd5;
+  box-shadow: inset 0 1px #ffe9d21a;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  font-weight: 640;
+}
+
+.betrayals-status > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 31px;
+  min-width: 0;
+  padding: 4px clamp(5px, 1.7vw, 9px);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.betrayals-status > span + span {
+  border-inline-start: 1px solid #b6967c38;
+}
+
+.betrayals-status__day,
+.betrayals-status__pot {
+  gap: 4px;
+  color: var(--betrayals-focus);
+  white-space: nowrap;
+}
+
+.betrayals-status__phase {
+  text-wrap: balance;
+}
+
+.betrayals-status__denominator,
+.betrayals-status__pot span {
+  color: var(--betrayals-secondary);
+}
+
+.betrayals-cast {
+  min-width: 0;
+}
+
+.betrayals-cast__caption {
+  min-height: 1.05rem;
+  padding: 3px 3px 0;
+  color: var(--betrayals-secondary);
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.betrayals-layout .betrayals-roster__seat[aria-disabled='true']:not([data-exit]) {
+  border-color: #4a4252;
+}
+
+.betrayals-layout
+  .betrayals-roster__seat[aria-disabled='true']:not([data-exit])
+  .betrayals-roster__portrait
+  img {
+  filter: saturate(0.75) brightness(0.88);
+}
+
+.betrayals-layout--game .betrayals-dock {
+  margin-block-start: auto;
+}
+
+.betrayals-save-issue {
+  margin: 0;
+  color: #ffc688;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.betrayals-sheet {
+  box-sizing: border-box;
+  width: min(calc(100% - 14px), 460px);
+  margin: auto auto 0;
+  max-height: min(83dvh, 680px);
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #98795d;
+  border-radius: 18px 18px 0 0;
+  background: radial-gradient(ellipse at 60% 0%, #4a3033, transparent 70%), #14131c;
+  color: var(--betrayals-ink);
+  box-shadow: 0 -10px 50px #06040bd4;
+  animation: betrayals-sheet-rise 250ms cubic-bezier(0.18, 0.65, 0.24, 1) both;
+}
+
+.betrayals-sheet::backdrop {
+  background: #080610b3;
+  backdrop-filter: blur(3px);
+}
+
+.betrayals-sheet__content {
+  padding: 12px 15px calc(16px + env(safe-area-inset-bottom));
+}
+
+.betrayals-sheet__head,
+.betrayals-challenge-header {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.betrayals-phase {
-  min-height: 66px;
+.betrayals-sheet__head h2,
+.betrayals-challenge-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.betrayals-sheet__head button,
+.betrayals-challenge-header button,
+.betrayals-inline-action {
+  display: inline-grid;
+  place-items: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 4px 9px;
+  border: 1px solid #b7906c82;
+  border-radius: 8px;
+  background: #22202b;
+  color: #f4d2aa;
+  font: inherit;
+  cursor: pointer;
+}
+
+.betrayals-sheet__head button {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.betrayals-layout--challenge {
+  background: radial-gradient(ellipse at 50% 7%, #352a3d, #0a1019 67%);
+}
+
+.betrayals-challenge-header {
   margin-bottom: 12px;
 }
 
-.betrayals-selection,
-.betrayals-note {
-  margin-top: 12px !important;
-  color: #b4c7ca;
-}
-
-.betrayals-controls {
-  margin-top: 14px;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-}
-
-.betrayals-layout button {
-  min-height: 44px;
-}
-
-.betrayals-controls button,
-.betrayals-primary {
-  padding: 0.55rem 0.8rem;
-  color: var(--betrayals-ink);
-  background: #193943;
-  border: 1px solid #567a80;
-  border-radius: 8px;
-}
-
-.betrayals-controls button:first-child,
-.betrayals-primary {
-  background: #e8ac76;
-  color: #131f26;
-  font-weight: 700;
-}
-
-.betrayals-controls button:disabled {
-  opacity: 0.45;
+.betrayals-challenge-header button {
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .betrayals-entry {
-  display: grid;
-  align-content: center;
-  gap: 12px;
-}
-
-.betrayals-entry h1 {
-  font-size: clamp(3rem, 11vw, 4rem);
-}
-.betrayals-entry form {
-  display: grid;
-  gap: 14px;
-}
-.betrayals-entry label {
-  display: grid;
-  gap: 6px;
-}
-.betrayals-entry input:not([type='checkbox']) {
-  border-radius: 8px;
-  padding: 12px;
-  background: #15252d;
-  color: inherit;
-  border: 1px solid #567a80;
-}
-.betrayals-entry .betrayals-option {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  justify-content: end;
+  gap: 18px;
+  padding-inline: clamp(16px, 5vw, 24px);
+  padding-block-end: max(23px, env(safe-area-inset-bottom));
 }
 
-.betrayals-entry {
-  isolation: isolate;
-  position: relative;
-  align-content: end;
-  padding-block-end: max(36px, env(safe-area-inset-bottom));
-}
 .betrayals-entry__art {
   position: absolute;
+  inset: 0;
+  z-index: -2;
   width: 100%;
   height: 100%;
-  inset: 0;
   object-fit: cover;
-  z-index: -2;
+  object-position: 50% 34%;
 }
+
 .betrayals-entry::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 28%, #070f16ba 54%, #070f16 88%);
   z-index: -1;
+  background:
+    linear-gradient(180deg, #0a0a1570, transparent 27%, #100e1773 53%, #0d0d18 88%),
+    linear-gradient(90deg, #0908104f, transparent 28% 72%, #09081045);
 }
-.betrayals-layout[data-phase='night'],
-.betrayals-layout[data-phase='night-resolved'] {
-  --betrayals-tile: #271f29;
-  --betrayals-edge: #806456;
-  background: radial-gradient(ellipse at top, #392b36 0%, #0a1118 60%);
+
+.betrayals-entry__utilities {
+  display: flex;
+  justify-content: end;
+  margin-bottom: auto;
 }
-.betrayals-social__actions {
+
+.betrayals-entry__identity {
+  text-align: center;
+  text-shadow: 0 3px 20px #08080e;
+  margin-top: clamp(86px, 20vh, 210px);
+}
+
+.betrayals-entry__identity .betrayals-eye {
+  width: 50px;
+  height: 44px;
+  margin-bottom: 2px;
+}
+
+.betrayals-franchise {
+  margin: 4px 0;
+  color: #f4c18a;
+  letter-spacing: 0.28em;
+  font-weight: 650;
+  text-transform: uppercase;
+  font-size: 0.69rem;
+}
+
+.betrayals-entry h1 {
+  margin: 0;
+  font-size: clamp(3.2rem, 14vw, 4.7rem);
+  line-height: 1;
+  letter-spacing: -0.067em;
+  font-weight: 500;
+}
+
+.betrayals-entry__form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-block: 10px;
+  justify-self: center;
+  gap: 11px;
+  margin: 0 auto;
+  width: min(100%, 365px);
+  padding: 12px;
+  border: 1px solid #b38a663f;
+  border-radius: 12px;
+  background: #171520dc;
+  box-shadow: inset 0 1px #f6dcb818;
 }
-.betrayals-social select,
-.betrayals-entry select {
+
+.betrayals-entry__form label {
+  display: grid;
+  gap: 5px;
+  color: #e3d3ca;
+  font-size: 0.78rem;
+  font-weight: 550;
+}
+
+.betrayals-entry__form :is(input:not([type='checkbox']), select) {
+  min-width: 0;
   min-height: 44px;
-  color: inherit;
-  background: #15252d;
-  border: 1px solid #567a80;
+  padding: 6px 9px;
+  border: 1px solid #8e726476;
+  border-radius: 7px;
+  background: #12131b;
+  color: #f5e6dc;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.betrayals-entry__options {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 1.25fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.betrayals-entry__form .betrayals-entry__toggle {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+}
+
+.betrayals-entry__toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #d9aa80;
+}
+
+.betrayals-primary {
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 1px solid #e7b98e;
   border-radius: 8px;
-  padding-inline: 8px;
+  background: linear-gradient(160deg, #d3a67f, #bb8863 54%, #a56e54);
+  color: #201418;
+  box-shadow:
+    inset 0 1px #fff1d982,
+    0 4px 13px #02030799;
+  font-family: Georgia, serif;
+  font-size: 1.11rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+.betrayals-primary:hover {
+  filter: brightness(1.12);
+}
+
+.betrayals-primary:active {
+  transform: translateY(1px);
+}
+
+.betrayals-layout[data-betrayals-motion='reduced'] *,
+.betrayals-layout[data-betrayals-motion='reduced'] *::before,
+.betrayals-layout[data-betrayals-motion='reduced'] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}
+
+@keyframes betrayals-sheet-rise {
+  from {
+    opacity: 0.4;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes betrayals-room-light {
+  from {
+    opacity: 0.14;
+  }
+
+  to {
+    opacity: 0.53;
+  }
+}
+
+@media (min-height: 720px) {
+  .betrayals-layout--game .betrayals-roster__seat {
+    aspect-ratio: 0.88;
+  }
+
+  .betrayals-layout--game .betrayals-broadcast__readout {
+    min-block-size: 130px;
+  }
+}
+
+@media (max-height: 620px) and (max-width: 380px) {
+  .betrayals-layout--game {
+    gap: 6px;
+  }
+
+  .betrayals-layout--game :is(.betrayals-broadcast__glass, .betrayals-broadcast__readout) {
+    min-block-size: 86px;
+  }
+
+  .betrayals-layout--game .betrayals-roster__seat {
+    aspect-ratio: 1.1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .betrayals-room img,
+  .betrayals-sheet,
+  .betrayals-primary {
+    animation: none;
+    transition: none;
+  }
 }
