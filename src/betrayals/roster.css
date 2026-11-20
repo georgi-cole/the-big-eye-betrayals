@@ -1,0 +1,72 @@
+.betrayals-roster {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(4px, 1.4vw, 8px);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.betrayals-roster__seat {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  aspect-ratio: 0.92;
+  padding: 3px;
+  overflow: hidden;
+  background: var(--betrayals-tile, #142129);
+  color: var(--betrayals-ink, #eff5f3);
+  border: 1px solid var(--betrayals-edge, #537474);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.betrayals-roster__seat[aria-pressed='true'],
+.betrayals-roster__seat:focus-visible {
+  outline: 2px solid var(--betrayals-focus, #e3ad70);
+  outline-offset: 1px;
+}
+
+.betrayals-roster__seat[data-departed='true'] img {
+  filter: grayscale(1);
+}
+
+.betrayals-roster__seat img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.betrayals-roster__initial {
+  justify-self: center;
+  font-size: 1.25em;
+}
+
+.betrayals-roster__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+}
+
+.betrayals-roster__protections {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  gap: 2px;
+}
+
+.betrayals-roster__protections > span {
+  border-radius: 4px;
+  padding-inline: 4px;
+  background: #132a32;
+  color: #f4cb95;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
