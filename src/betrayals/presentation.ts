@@ -6,37 +6,33 @@ import type { PresentationCue, Run } from './run'
 export function presentationAfter(before: Run, after: Run): PresentationCue[] {
   if (before.id !== after.id || before.phase === after.phase) return []
 
+  if (after.phase === 'settled') {
+    return before.phase === 'table-reveal' ? ['departure', 'finale'] : ['finale']
+  }
+
   switch (before.phase) {
     case 'role-reveal':
       return ['sunrise']
-    case 'dawn':
-      return ['interlude']
     case 'immunity':
       return ['shield']
     case 'safety':
-      return ['safety-results', 'round-table']
+      return after.day === 1 ? ['safety-results', 'round-table'] : ['safety-results']
     case 'final-challenge':
       return ['round-table']
     case 'table-reveal':
-      return after.phase === 'night' ? ['departure', 'sunset', 'conclave-arrival'] : ['departure']
-    case 'night':
-      return [
-        'conclave-seal',
-        ...(after.private.pendingNight?.targetId === after.humanId &&
-        !after.private.pendingNight.blocked
-          ? (['death-letter'] as const)
-          : []),
-        'sunrise',
-      ]
-    case 'night-resolved': {
-      const victim = after.lastDawn?.eliminatedId
-      if (!victim) return ['awakening']
-      return victim === after.humanId
-        ? ['awakening', 'elimination']
-        : ['awakening', 'death-letter', 'elimination']
+      return after.phase === 'night' && after.day === 1
+        ? ['departure', 'conclave-arrival']
+        : ['departure']
+    case 'night': {
+      const decision = after.private.pendingNight
+      if (decision?.targetId === after.humanId && !decision.blocked) return ['death-letter']
+      const participating = after.seats.some(({ id, exit }) => id === after.humanId && !exit)
+      return participating && after.private.betrayers.includes(after.humanId)
+        ? ['conclave-seal']
+        : []
     }
-    case 'end-vote':
-      return after.phase === 'final-banishment' ? ['round-table'] : []
+    case 'night-resolved':
+      return ['awakening']
     default:
       return []
   }
@@ -58,29 +54,33 @@ export function cinematicFor(
   const seat = (id?: string | null) => run.seats.find((contestant) => contestant.id === id)
   const victim = run.lastDawn?.day === run.day ? run.lastDawn.eliminatedId : null
   const cast = run.seats.filter(({ exit }) => !exit)
-  const hoods = run.private.betrayers.filter((id) => cast.some((member) => member.id === id))
+  const guests = (members: typeof run.seats) =>
+    members.map((member) => ({ ...member, human: member.id === run.humanId }))
   switch (cue) {
     case 'conclave-arrival': {
+      const inside = actorId !== null && run.private.betrayers.includes(actorId)
       const known = knownTeammateIds(run, actorId)
+      const guestsInRoom = inside
+        ? guests(cast.filter(({ id }) => id === actorId || known.includes(id)))
+        : []
       return {
         ...scene,
-        cast: hoods.map((id, index) =>
-          id === actorId || known.includes(id)
-            ? cast.find((member) => member.id === id)!
-            : { id: 'hood-' + index, name: 'Hooded figure', concealed: true }
-        ),
+        cast: guestsInRoom,
+        backdrop: guestsInRoom.length
+          ? undefined
+          : import.meta.env.BASE_URL + 'assets/betrayals/night.jpg',
+        title: guestsInRoom.length ? 'The Conclave' : 'Lights out',
       }
     }
     case 'conclave-seal': {
       const verdict = getConclaveVerdict(run, actorId)
       return {
         ...scene,
-        castCount: hoods.length,
-        subject: seat(verdict?.targetId),
+        repeat: run.day > 1,
         subtitle: verdict?.targetId
           ? (seat(verdict.targetId)?.name ?? 'A guest') +
             (verdict.byDraw ? ' was chosen by draw.' : ' was chosen by the Conclave.')
-          : undefined,
+          : 'The decision stays behind closed doors.',
       }
     }
     case 'sunrise':
@@ -94,7 +94,9 @@ export function cinematicFor(
     case 'awakening':
       return {
         ...scene,
-        cast: run.seats.filter(({ id, exit }) => !exit || id === victim),
+        cast: guests(run.seats),
+        repeat: !victim,
+        weather: castleWeather(run),
         darkSeatId: victim ?? undefined,
         subtitle: victim ? seat(victim)?.name + ' is missing.' : 'Everyone returned.',
       }
@@ -110,7 +112,10 @@ export function cinematicFor(
       const role = subject?.exit?.revealedRole
       return {
         ...scene,
-        subject,
+        subject: subject ? guests([subject])[0] : undefined,
+        repeat:
+          run.day > 1 && role !== 'betrayer' && !run.lastTable?.blind && !run.lastTable?.tiedByDraw,
+        angle: run.day % 2 === 0 ? 'door' : 'hall',
         role: role ? (role === 'loyal' ? 'Loyal' : 'Betrayer') : undefined,
       }
     }
@@ -120,11 +125,21 @@ export function cinematicFor(
         cast,
         title: run.phase === 'final-banishment' ? 'Final banishment' : undefined,
       }
-    case 'interlude':
+    case 'finale': {
+      const result = run.result
+      const winners = Object.entries(result?.payouts ?? {}).map(([id, amount]) => ({
+        name: seat(id)?.name ?? 'Contestant',
+        amount,
+      }))
       return {
         ...scene,
-        title: 'Between the walls',
-        subtitle: 'The corridors fill with whispers before the next challenge.',
+        title: result?.winningRole === 'loyal' ? 'The Loyals win' : 'The Betrayers win',
+        winners,
+        pot: run.pot,
+        verdict: result?.winningRole,
       }
+    }
+    case 'interlude':
+      return { ...scene, title: 'Social' }
   }
 }

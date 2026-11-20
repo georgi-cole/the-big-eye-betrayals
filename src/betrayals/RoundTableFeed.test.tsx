@@ -20,7 +20,7 @@ function createRound(): Run {
 describe('Round Table broadcast', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('reveals nominations before letting the player make a case', () => {
+  it('lets the player read the transcript or make a case immediately', () => {
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
       this: HTMLDialogElement
     ) {
@@ -31,7 +31,7 @@ describe('Round Table broadcast', () => {
     render(
       <RoundTableDiscussion run={run} open art="/council.jpg" onBack={vi.fn()} onSway={onSway} />
     )
-    expect(screen.queryByRole('button', { name: 'Take the floor' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Take the floor' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Read all' }))
 
     const chat = screen.getByRole('log', { name: 'Round Table conversation' })

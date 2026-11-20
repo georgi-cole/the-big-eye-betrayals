@@ -13,15 +13,17 @@ describe('Betrayals cinematic scenes', () => {
     const onComplete = vi.fn()
     const { container } = render(
       <CinematicScene
-        scene={{ id: 'conclave', kind: 'conclave-arrival', cast: [known, hidden], castCount: 4 }}
+        scene={{ id: 'conclave', kind: 'conclave-arrival', cast: [known, hidden] }}
         onComplete={onComplete}
       />
     )
-    expect(container.querySelectorAll('.betrayals-cine__hood')).toHaveLength(4)
     expect(screen.queryByText(known.name)).not.toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(1600))
-    act(() => vi.advanceTimersByTime(1400))
+    act(() => vi.advanceTimersByTime(680))
     expect(screen.getByText(known.name)).toBeInTheDocument()
+    expect(container.querySelector('.betrayals-cine__guest img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('Ash_informal.webp')
+    )
     expect(screen.queryByText(hidden.name)).not.toBeInTheDocument()
     expect(container.querySelector(`[src="${hidden.portrait}"]`)).not.toBeInTheDocument()
     expect(onComplete).not.toHaveBeenCalled()
@@ -37,7 +39,7 @@ describe('Betrayals cinematic scenes', () => {
         onComplete={vi.fn()}
       />
     )
-    expect(screen.getByRole('heading', { name: 'The shield is awarded' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Full Immunity' })).toBeInTheDocument()
     expect(screen.queryByText(hidden.name)).not.toBeInTheDocument()
     expect(container.querySelector(`[src="${hidden.portrait}"]`)).not.toBeInTheDocument()
   })
@@ -79,6 +81,39 @@ describe('Betrayals cinematic scenes', () => {
       expect.stringContaining('verdict-' + name.toLowerCase() + '.png')
     )
     expect(container.querySelector('[src*="cracked_glass"]')).not.toBeInTheDocument()
+  })
+
+  it('walks backstage in the saved casual look and then closes the door', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <CinematicScene
+        scene={{
+          id: 'exit',
+          kind: 'departure',
+          angle: 'door',
+          subject: {
+            id: 'human',
+            human: true,
+            name: 'Georgi',
+            portrait: '/assets/player_characters/character%2015/main.webp',
+          },
+        }}
+        onComplete={vi.fn()}
+      />
+    )
+    act(() => vi.advanceTimersByTime(670))
+    act(() => vi.advanceTimersByTime(740))
+    expect(container.querySelector('[data-walk="character-15"]')).toBeInTheDocument()
+    expect(container.querySelector('.betrayals-cine__corridor-plane')).toHaveAttribute(
+      'data-closed',
+      'false'
+    )
+    act(() => vi.advanceTimersByTime(2550))
+    expect(container.querySelector('.betrayals-cine__corridor-plane')).toHaveAttribute(
+      'data-closed',
+      'true'
+    )
+    expect(container.querySelector('[data-walk]')).not.toBeInTheDocument()
   })
 
   it('hands off an intermediate scene once after its final beat', () => {

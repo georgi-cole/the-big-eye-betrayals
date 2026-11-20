@@ -122,10 +122,6 @@ for (const viewport of [
     await expect(television.getByRole('heading', { name: 'Dawn' })).toBeVisible()
     expect(await tiles.first().boundingBox()).toEqual(firstSeat)
     await dock.getByRole('button', { name: 'Play: enter Social' }).click()
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: /Skip cinematic|Continue/ })
-      .click()
     await socialButton.click()
     await expect(social.getByLabel('Energy: 4')).toBeVisible()
     await guestCards.first().click()

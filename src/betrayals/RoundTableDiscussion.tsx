@@ -44,11 +44,14 @@ export function RoundTableDiscussion({
   const [behind, setBehind] = useState(false)
   const prefersReducedMotion = usePresentationReducedMotion()
   const motionReduced = reducedMotion || prefersReducedMotion
-  const { visible, revealAll } = usePacedReveal(speeches.length, {
-    firstDelay: 650,
-    stepDelay: 1150,
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
+  const previewLength = Math.min(4, speeches.length)
+  const preview = usePacedReveal(previewLength, {
+    firstDelay: 250,
+    stepDelay: 750,
     immediate: motionReduced,
   })
+  const visible = transcriptOpen || motionReduced ? speeches.length : preview.visible
   const complete = visible >= speeches.length
   const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
   const candidates = tableTargets(run, run.humanId)
@@ -147,7 +150,9 @@ export function RoundTableDiscussion({
                   </div>
                 </article>
               ))}
-            {!complete && <p className="round-table-room__waiting">A guest takes the floor…</p>}
+            {visible < previewLength && (
+              <p className="round-table-room__waiting">A guest takes the floor…</p>
+            )}
             {!speeches.length && <p className="round-table-room__waiting">The room is silent.</p>}
           </div>
 
@@ -213,7 +218,7 @@ export function RoundTableDiscussion({
             ) : (
               <>
                 {!complete && (
-                  <button type="button" onClick={revealAll}>
+                  <button type="button" onClick={() => setTranscriptOpen(true)}>
                     Read all
                   </button>
                 )}
@@ -222,7 +227,7 @@ export function RoundTableDiscussion({
                     Latest
                   </button>
                 )}
-                {complete && Boolean(candidates.length) && (
+                {Boolean(candidates.length) && (
                   <button type="button" onClick={() => setCaseOpen(true)}>
                     Take the floor
                   </button>
