@@ -19,10 +19,12 @@ for (const viewport of [
     await expect(television.getByRole('heading', { name: 'Your role' })).toBeVisible()
     await expect(dock.getByRole('button', { name: 'Music' })).toHaveCount(0)
     await expect(dock.getByRole('button', { name: 'Store' })).toHaveCount(0)
-    const inboxButton = dock.getByRole('button', { name: /^Incoming requests/ })
+    const inboxButton = dock.getByRole('button', { name: /^Inbox/ })
     const incoming = page.getByRole('dialog', { name: 'Incoming interactions' })
-    await expect(dock.locator('[data-target="social"] + [data-target="incoming"]')).toBeVisible()
-    await expect(inboxButton).toHaveAccessibleName('Incoming requests')
+    await expect(
+      dock.locator('[data-target="social"] + .betrayals-dock__play + [data-target="incoming"]')
+    ).toBeVisible()
+    await expect(inboxButton).toHaveAccessibleName('Inbox')
     await inboxButton.click()
     await expect(incoming.getByText('No incoming interactions.')).toBeVisible()
     await incoming.getByRole('button', { name: 'Close inbox' }).click()
@@ -68,7 +70,7 @@ for (const viewport of [
       const rects = elements.map((element) => element.getBoundingClientRect())
       const dock = document.querySelector('.betrayals-dock')?.getBoundingClientRect()
       const play = document.querySelector('.betrayals-dock__play')?.getBoundingClientRect()
-      const tv = document.querySelector('.betrayals-broadcast')?.getBoundingClientRect()
+      const status = document.querySelector('.betrayals-status')?.getBoundingClientRect()
       const top = Math.min(...rects.map(({ top }) => top))
       const bottom = Math.max(...rects.map(({ bottom }) => bottom))
       return {
@@ -77,7 +79,7 @@ for (const viewport of [
         minWidth: Math.min(...rects.map(({ width }) => width)),
         minHeight: Math.min(...rects.map(({ height }) => height)),
         bottom,
-        topGap: top - (tv?.bottom ?? 0),
+        topGap: top - (status?.bottom ?? 0),
         bottomGap: (dock?.top ?? 0) - bottom,
         playCenter: play && play.left + play.width / 2,
         dockTop: dock?.top ?? 0,
@@ -131,14 +133,14 @@ for (const viewport of [
     await expect(social.getByRole('status')).toContainText('You built trust')
     await page.keyboard.press('Escape')
     await expect(social).toHaveCount(0)
-    await expect(inboxButton).toHaveAccessibleName('Incoming requests (1)')
+    await expect(inboxButton).toHaveAccessibleName('Inbox (1)')
     await inboxButton.click()
     await expect(incoming).toBeVisible()
     await incoming.getByRole('button', { name: 'Pass' }).first().click()
     await expect(incoming.getByLabel('Response').first()).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(incoming).toHaveCount(0)
-    await expect(inboxButton).toHaveAccessibleName('Incoming requests')
+    await expect(inboxButton).toHaveAccessibleName('Inbox')
     await dock.getByRole('button', { name: 'Play: begin Immunity Challenge' }).click()
     await socialButton.click()
     await guestCards.first().click()
