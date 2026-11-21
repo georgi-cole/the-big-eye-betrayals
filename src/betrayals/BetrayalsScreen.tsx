@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { REALITY_MODE_PRESETS } from '../modes/realityMode'
 import {
@@ -11,6 +11,8 @@ import { BetrayalsBroadcast } from './BetrayalsBroadcast'
 import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
 import { BetrayalsConclave } from './BetrayalsConclave'
 import { BetrayalsDock } from './BetrayalsDock'
+import { BetrayalsGameLog } from './BetrayalsGameLog'
+import { gameLogFor, recordGameActivity } from './gameLog'
 import { BetrayalsIncomingInteractions } from './BetrayalsIncomingInteractions'
 import { BetrayalsSocialPanel } from './BetrayalsSocialPanel'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
@@ -51,7 +53,7 @@ import './season.css'
 
 const ColorMatch = lazy(() => import('../components/ColorMatchComp/ColorMatchComp'))
 const QuickTap = lazy(() => import('../minigames/quickTapRace/QuickTapRaceCanvasGame'))
-const profile = 'edition-local'
+const saveId = 'edition-local'
 const artBase = import.meta.env.BASE_URL + 'assets/betrayals/'
 const hero = artBase + 'observatory.jpg'
 const castleExterior = artBase + 'castle-exterior.jpg'
@@ -88,8 +90,8 @@ const phaseGroupLabel: Record<Phase, string> = {
   immunity: 'Day',
   safety: 'Day',
   'final-challenge': 'Finale',
-  'round-table': 'Round Table',
-  'table-reveal': 'Round Table',
+  'round-table': 'Council',
+  'table-reveal': 'Council',
   night: 'Night',
   'night-resolved': 'Night',
   'final-banishment': 'Finale',
@@ -112,13 +114,29 @@ function begin(
   )
 }
 
-function restore(): Run | null {
-  const snapshot = restoreRun(saveStorage, profile)
+function restore(saveId: string): Run | null {
+  const snapshot = restoreRun(saveStorage, saveId)
   return snapshot.status === 'ready' ? snapshot.run : null
 }
 
+type InboxReads = { runId: string; ids: readonly string[] }
+
+function restoreInboxReads(key: string): InboxReads | undefined {
+  try {
+    const saved = JSON.parse(getDurableItem(key) ?? 'null')
+    if (
+      typeof saved?.runId === 'string' &&
+      Array.isArray(saved.ids) &&
+      saved.ids.every((id: unknown) => typeof id === 'string')
+    )
+      return saved
+  } catch {
+    // A missing or invalid read receipt should never prevent opening the inbox.
+  }
+}
+
 export default function BetrayalsScreen() {
-  const [run, setRun] = useState<Run | null>(restore)
+  const [run, setRun] = useState<Run | null>(() => restore(saveId))
   const current = useRef(run)
   const [name, setName] = useState('')
   const [publicMode, setPublicMode] = useState(false)
@@ -130,8 +148,26 @@ export default function BetrayalsScreen() {
   const [homeOpen, setHomeOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
+  const [voteActionsTarget, setVoteActionsTarget] = useState<HTMLDivElement | null>(null)
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [saveIssue, setSaveIssue] = useState(false)
+  const inboxReadsKey = 'big-eye:betrayals:inbox:' + saveId
+  const [inboxReads, setInboxReads] = useState(() => restoreInboxReads(inboxReadsKey))
+  const runId = run?.id
+  const markIncomingRead = useCallback(
+    (id: string) => {
+      if (!runId) return
+      setInboxReads((previous) => {
+        const ids = previous?.runId === runId ? previous.ids : []
+        return ids.includes(id) ? previous : { runId, ids: [...ids, id] }
+      })
+    },
+    [runId]
+  )
+  useEffect(() => {
+    if (inboxReads) setDurableItem(inboxReadsKey, JSON.stringify(inboxReads))
+  }, [inboxReads, inboxReadsKey])
+
   const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing)
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = getBetrayalsPortrait(utilities.preferences.lookId)
@@ -146,11 +182,14 @@ export default function BetrayalsScreen() {
     const before = current.current
     if (before !== run) return
     const cues = before ? presentationAfter(before, updated) : []
-    const next = cues.length ? { ...updated, presentation: cues } : updated
+    const next = recordGameActivity(
+      before,
+      cues.length ? { ...updated, presentation: cues } : updated
+    )
     current.current = next
     let saved = false
     try {
-      saveRun(saveStorage, profile, next)
+      saveRun(saveStorage, saveId, next)
       // A reload must resume a beat as soon as it is visible.
       saved = await flushDurablePersistence()
     } catch {
@@ -290,27 +329,7 @@ export default function BetrayalsScreen() {
   const countKey = [run.id, run.day, stage, activeCast.length, run.tableCount?.round].join(':')
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
-  const gameLogEntries = [
-    { day: run.day, text: 'Current phase · ' + phaseLabel[stage] },
-    ...run.seats.flatMap((seat) =>
-      seat.exit
-        ? [
-            {
-              day: seat.exit.day,
-              text:
-                seat.name +
-                (seat.exit.cause === 'night'
-                  ? ' was lost during the night.'
-                  : ' was banished at the Round Table.'),
-            },
-          ]
-        : []
-    ),
-    ...run.social.map((entry) => ({
-      day: entry.day,
-      text: label(entry.actorId) + ' spoke privately with ' + label(entry.recipientId) + '.',
-    })),
-  ].sort((a, b) => b.day - a.day)
+  const gameLogEntries = logOpen ? [...gameLogFor(run)].reverse().sort((a, b) => b.day - a.day) : []
   const conversation = participating ? getSocialView(run, run.humanId) : []
   const lead = leadForPlayer(run)
   const recent = conversation
@@ -321,12 +340,13 @@ export default function BetrayalsScreen() {
   const socialResources = socialWalletFor(run, run.humanId)
   const incoming = getIncomingInteractions(run)
   const pendingIncoming = incoming.filter(({ response }) => !response)
+  const readIncoming = new Set(inboxReads?.runId === run.id ? inboxReads.ids : [])
+  const unreadIncoming = pendingIncoming.filter(({ id }) => !readIncoming.has(id))
   const cue = run.presentation?.[0]
   const discussionKey = run.id + ':' + run.day
   const discussionVisible = discussion && !cue && closedDiscussion !== discussionKey
   const cinematic =
     cue && cue !== 'safety-results' ? cinematicFor(run, cue, viewerId, castleExterior) : undefined
-
   function finishCue() {
     const active = current.current
     if (!active?.presentation || active.presentation !== run?.presentation) return
@@ -377,7 +397,7 @@ export default function BetrayalsScreen() {
         motion={motion}
         onForfeit={() => apply((active) => resolveChallenge(active, token, scoreField(active)))}
       >
-        <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
+        <Suspense fallback={<p role="status">Loading {challengeName}ΓÇª</p>}>
           {gameId === 'quick-tap' ? (
             <QuickTap
               autoStart
@@ -402,7 +422,6 @@ export default function BetrayalsScreen() {
 
   let message: ReactNode = null
   let detail: ReactNode = null
-  let broadcastAction: ReactNode = null
   let play: { label: string; onClick: () => void; disabled?: boolean; faceLabel?: string }
   const outcome = run.lastTable
   const tableExit = outcome
@@ -429,6 +448,7 @@ export default function BetrayalsScreen() {
         run={run}
         reducedMotion={utilities.preferences.reducedMotion}
         onCountComplete={() => setCountReady(countKey)}
+        actionsTarget={voteActionsTarget}
       />
     ) : undefined
   switch (stage) {
@@ -454,24 +474,8 @@ export default function BetrayalsScreen() {
     }
     case 'social':
       message = canSocialize
-        ? pendingIncoming.length
-          ? pendingIncoming[0].speaker.name + ' wants a word with you.'
-          : 'Speak privately before the challenge.'
+        ? 'Speak privately before the challenge.'
         : 'The survivors trade suspicions.'
-      broadcastAction =
-        lead && !lead.promised ? (
-          <button
-            type="button"
-            className="betrayals-inline-action"
-            onClick={() => setSocialOpen(true)}
-          >
-            Review private lead
-          </button>
-        ) : pendingIncoming.length ? (
-          <button type="button" className="betrayals-inline-action" onClick={openIncoming}>
-            Hear them out
-          </button>
-        ) : undefined
       play = { label: 'Play: begin Immunity Challenge', onClick: () => apply(advanceDayBeat) }
       break
     case 'immunity':
@@ -595,11 +599,6 @@ export default function BetrayalsScreen() {
           </p>
         </div>
       )
-      broadcastAction = participating && (
-        <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
-          Banish Again
-        </button>
-      )
       play = {
         label: participating ? 'End Season' : 'View decision',
         faceLabel: participating ? 'End' : undefined,
@@ -698,64 +697,63 @@ export default function BetrayalsScreen() {
               Betrayals
             </div>
           </div>
-          <div
-            className="betrayals-phase-strip"
-            aria-label={phaseGroupLabel[stage] + ' phase, ' + phaseLabel[stage]}
-          >
-            <span className="betrayals-phase-strip__group">{phaseGroupLabel[stage]}</span>
-            <span className="betrayals-phase-strip__divider" aria-hidden="true">
-              /
-            </span>
-            <span className="betrayals-phase-strip__subphase">{phaseLabel[stage]}</span>
+          <div className="betrayals-phase-strip">
+            <div className="betrayals-phase-strip__copy" aria-live="polite">
+              <span className="betrayals-phase-strip__group">{phaseGroupLabel[stage]}</span>
+              <span className="betrayals-phase-strip__subphase">{phaseLabel[stage]}</span>
+            </div>
             <button
               className="betrayals-phase-strip__log"
               type="button"
               aria-label="Open game log"
+              aria-haspopup="dialog"
+              aria-expanded={logOpen}
               title="Game log"
-              data-onboarding-target="game-log"
-              onClick={() => setLogOpen(true)}
+              onClick={() => {
+                utilities.playEffect('ui:navigate', 0.45)
+                setLogOpen(true)
+              }}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3.25a6 6 0 0 0-6 6v3.4c0 .7-.25 1.38-.72 1.8L4 15.55v1.2h16v-1.2l-1.28-1.1a2.4 2.4 0 0 1-.72-1.8v-3.4a6 6 0 0 0-6-6Z" />
-                <path d="M9.5 19a2.65 2.65 0 0 0 5 0M12 1.5v1.7M19 5l1.3-1.2" />
+                <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
+                <path d="M12 3v3l1.5-1 1.5 1V3" />
               </svg>
-              <span>Log</span>
             </button>
           </div>
         </header>
 
         <BetrayalsBroadcast
-          phase={
-            stage === 'role-reveal'
-              ? 'Private'
-              : stage === 'table-reveal'
-                ? 'Round Table'
-                : undefined
-          }
           title={conclave ? 'The Conclave' : phaseLabel[stage]}
           message={message}
           detail={detail}
-          action={broadcastAction}
-          interactive={Boolean(
-            tableFeed || conclave || (stage === 'social' && pendingIncoming.length)
-          )}
+          interactive={Boolean(tableFeed || conclave)}
           cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
           mode={broadcastMode}
           art={artBase + scene + '.jpg'}
         />
-        <div className="betrayals-status" aria-label="Season status">
+
+        <div className="betrayals-status" role="group" aria-label="Season status">
           <span className="betrayals-status__day">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="3" />
+              <path d="M10 2v2m0 12v2M2 10h2m12 0h2M4.4 4.4l1.4 1.4m8.4 8.4 1.4 1.4m0-11.2-1.4 1.4m-8.4 8.4-1.4 1.4" />
+            </svg>
             Day <strong>{String(run.day).padStart(2, '0')}</strong>
           </span>
-          <span aria-label={activeCast.length + ' contestants remaining'}>
-            <strong>{activeCast.length}</strong>
-            <span className="betrayals-status__denominator">/{view.seats.length} alive</span>
+          <span className="betrayals-status__cast">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="7" r="2.5" />
+              <path d="M5 16v-1a5 5 0 0 1 10 0v1M5 6a2 2 0 0 0 0 4m10-4a2 2 0 0 1 0 4M3.5 12a3 3 0 0 0-2 3m15-3a3 3 0 0 1 2 3" />
+            </svg>
+            <span>
+              <strong>{activeCast.length}</strong>/{view.seats.length} left
+            </span>
           </span>
-          <span
-            className="betrayals-status__pot"
-            aria-label={run.pot.toLocaleString() + ' in the pot'}
-          >
-            {run.pot.toLocaleString()} <span>pot</span>
+          <span className="betrayals-status__pot">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M5 6h10l3 4-8 7-8-7zm0 0 2.5 4L10 17m5-11-2.5 4-2.5 7M2 10h16M10 2v1" />
+            </svg>
+            <strong>{run.pot.toLocaleString()}</strong> pot
           </span>
         </div>
 
@@ -766,6 +764,7 @@ export default function BetrayalsScreen() {
             humanId={run.humanId}
             sleeping={stage === 'night-resolved' || cue === 'awakening'}
             selectableIds={targets.length ? targets : undefined}
+            runoffIds={votePhase ? run.runoffIds : undefined}
             onSelect={setSelected}
           />
           <div className="betrayals-cast__caption">
@@ -788,48 +787,19 @@ export default function BetrayalsScreen() {
           </p>
         )}
 
-        {logOpen && (
-          <div
-            className="betrayals-log-backdrop"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setLogOpen(false)
-            }}
-          >
-            <section
-              className="betrayals-log"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="betrayals-log-title"
-            >
-              <header className="betrayals-log__header">
-                <div>
-                  <span className="betrayals-log__eyebrow">Observatory record</span>
-                  <h2 id="betrayals-log-title">Game Log</h2>
-                </div>
-                <button
-                  type="button"
-                  className="betrayals-log__close"
-                  aria-label="Close game log"
-                  onClick={() => setLogOpen(false)}
-                >
-                  ×
-                </button>
-              </header>
-              <ol className="betrayals-log__entries">
-                {gameLogEntries.map((entry, index) => (
-                  <li key={entry.day + ':' + index}>
-                    <span className="betrayals-log__day">
-                      DAY {String(entry.day).padStart(2, '0')}
-                    </span>
-                    <p>{entry.text}</p>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          </div>
-        )}
+        {logOpen && <BetrayalsGameLog entries={gameLogEntries} onClose={() => setLogOpen(false)} />}
+
         <BetrayalsDock
           play={play}
+          utility={
+            !cue && counting ? (
+              <div className="betrayals-dock__vote-slot" ref={setVoteActionsTarget} />
+            ) : stage === 'end-vote' && participating ? (
+              <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
+                Banish Again
+              </button>
+            ) : undefined
+          }
           home={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
@@ -852,6 +822,8 @@ export default function BetrayalsScreen() {
             onClick: openIncoming,
             active: incomingOpen,
             count: pendingIncoming.length,
+            unread: unreadIncoming.length,
+            attentionKey: run.id + ':' + run.day + ':' + stage,
           }}
           settings={{
             onClick: () => {
@@ -918,6 +890,8 @@ export default function BetrayalsScreen() {
         {incomingOpen && (
           <BetrayalsIncomingInteractions
             interactions={incoming}
+            readIds={readIncoming}
+            onRead={markIncomingRead}
             onClose={() => setIncomingOpen(false)}
             onRespond={(id, answer) =>
               apply((active) => respondToIncomingInteraction(active, token, id, answer))

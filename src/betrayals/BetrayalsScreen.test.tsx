@@ -297,8 +297,12 @@ describe('Betrayals season review', () => {
     saveRun(localStorage, 'edition-local', counted)
     render(<BetrayalsScreen />)
     const feed = within(screen.getByRole('region', { name: 'Round Table vote count' }))
-    fireEvent.click(feed.getByRole('button', { name: 'Show full count' }))
+    fireEvent.click(screen.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to vote totals' }))
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+    expect(
+      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
+    ).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
     const social = within(screen.getByRole('dialog', { name: 'Social' }))
@@ -311,6 +315,9 @@ describe('Betrayals season review', () => {
     fireEvent.click(social.getByRole('button', { name: 'Close social panel' }))
 
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+    expect(
+      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reveal result' })).toBeEnabled()
   })
 

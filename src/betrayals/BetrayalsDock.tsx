@@ -2,11 +2,14 @@ import type { ReactNode } from 'react'
 import './BetrayalsDock.css'
 
 type DockTarget = 'home' | 'social' | 'incoming' | 'settings'
+
 type DockAction = {
   onClick: () => void
   active?: boolean
   disabled?: boolean
   count?: number
+  unread?: number
+  attentionKey?: string
 }
 
 export interface BetrayalsDockProps {
@@ -23,41 +26,40 @@ export interface BetrayalsDockProps {
   utility?: ReactNode
 }
 
-function Glyph({ target }: { target: DockTarget }) {
-  if (target === 'home') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="m5 14 11-9 11 9v13H5V14Z" />
-        <path d="M12 27V17h8v10M16 17v-4M16 13c-3-2-3-4 0-6 3 2 3 4 0 6Z" />
-      </svg>
-    )
-  }
-  if (target === 'social') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M7 7.5h18v13H15l-7 5v-5H7v-13Z" />
-        <path d="M12 14h.1M16 14h.1M20 14h.1" />
-        <path d="M22 5c3 2 4 5 3 8" />
-      </svg>
-    )
-  }
-  if (target === 'incoming') {
-    return (
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M8 21c2-2 2-4 2-8a6 6 0 0 1 12 0c0 4 0 6 2 8l2 2H6l2-2Z" />
-        <path d="M13 26a3.2 3.2 0 0 0 6 0M16 4V2M25 7l2-2" />
-        <circle cx="25" cy="8" r="1.3" className="betrayals-dock__glyph-star" />
-      </svg>
-    )
-  }
+function Glyph({ target }: { target: DockTarget | 'play' }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true">
-      <path
-        d="M16 4 19 8l5-1 .6 5 4.4 2-2 4.5 2 4.5-4.4 2-.6 5-5-1-3 4-4-3-5 1-.6-5-4.4-2 2-4.5-2-4.5 4.4-2 .6-5 5 1 3-4Z"
-        transform="translate(0 -3)"
-      />
-      <circle cx="16" cy="16" r="4.5" />
-      <path d="M16 11V8M21 16h3" />
+      {target === 'home' && (
+        <>
+          <path d="M7 27V15c0-6 4-9 9-12 5 3 9 6 9 12v12M4 27h24M12 26V15c0-3 2-5 4-7 2 2 4 4 4 7v11" />
+          <path d="m16 15 2 3-2 3-2-3z" className="betrayals-dock__metal-inlay" />
+        </>
+      )}
+      {target === 'social' && (
+        <>
+          <path d="M4 25c4-1 5-4 5-8a5 5 0 0 1 10 0c0 4 1 7 5 8H4Zm14-17a5 5 0 0 1 7 5c0 4 1 7 4 8h-6" />
+          <path d="m14 15 2 2-2 2-2-2zM22 5v5m-2.5-2.5h5" className="betrayals-dock__metal-inlay" />
+        </>
+      )}
+      {target === 'incoming' && (
+        <>
+          <path d="M6 7h17v4l3 3v10H9V12C9 9 8 7 6 7H4v5h5m3 1 6 4 6-4m-11 8 4-3m7 3-4-3" />
+          <path d="m18 16 2 2-2 2-2-2z" className="betrayals-dock__metal-inlay" />
+        </>
+      )}
+      {target === 'settings' && (
+        <>
+          <path d="m16 3 4 4 5 1 1 5 3 3-3 3-1 5-5 1-4 4-4-4-5-1-1-5-3-3 3-3 1-5 5-1z" />
+          <circle cx="16" cy="16" r="6" />
+          <path d="m16 11 2 5-2 5-2-5z" className="betrayals-dock__metal-inlay" />
+        </>
+      )}
+      {target === 'play' && (
+        <>
+          <path d="M12 4 6 10v12l6 6m8-24 6 6v12l-6 6M16 3v2m0 22v2" />
+          <path d="m13 10 9 6-9 6z" className="betrayals-dock__metal-inlay" />
+        </>
+      )}
     </svg>
   )
 }
@@ -73,18 +75,24 @@ function DockButton({
   faceLabel?: string
   action: DockAction
 }) {
-  const { onClick, active, disabled, count = 0 } = action
+  const { onClick, active, disabled, count = 0, unread = 0, attentionKey } = action
+
   return (
     <button
       className="betrayals-dock__side"
       type="button"
       onClick={onClick}
       aria-label={count > 0 ? `${label} (${count})` : label}
+      aria-description={unread > 0 ? `${unread} unread` : undefined}
       aria-expanded={active}
       aria-haspopup={target !== 'home' ? 'dialog' : undefined}
       disabled={disabled}
       data-target={target}
+      data-unread={unread > 0 || undefined}
     >
+      {unread > 0 && (
+        <span key={attentionKey} className="betrayals-dock__spotlight" aria-hidden="true" />
+      )}
       <span className="betrayals-dock__icon-frame" aria-hidden="true">
         <Glyph target={target} />
         {count > 0 && <span className="betrayals-dock__count">{Math.min(count, 99)}</span>}
@@ -119,16 +127,17 @@ export function BetrayalsDock({
             title={play.label}
             disabled={play.disabled}
           >
-            <span className="betrayals-dock__play-glyph" aria-hidden="true">
-              <i />
-              <i />
+            <span className="betrayals-dock__play-glyph">
+              <Glyph target="play" />
             </span>
             <span className="betrayals-dock__label" aria-hidden="true">
               {play.faceLabel ?? 'Play'}
             </span>
           </button>
         )}
-        {incoming && <DockButton target="incoming" label="Inbox" action={incoming} />}
+        {incoming && (
+          <DockButton target="incoming" label="Inbox" faceLabel="Inbox" action={incoming} />
+        )}
         {settings && <DockButton target="settings" label="Settings" action={settings} />}
       </div>
     </nav>
