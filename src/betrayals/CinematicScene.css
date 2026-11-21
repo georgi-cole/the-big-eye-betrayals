@@ -1004,3 +1004,231 @@
 .betrayals-cine__corridor-plane[data-empty='true'] {
   --close-at: 220ms;
 }
+
+.betrayals-cine[data-scene='departure'][data-beat='0'] .betrayals-cine__backdrop,
+.betrayals-cine[data-scene='departure'][data-beat='1'] .betrayals-cine__backdrop {
+  object-position: 50% 44%;
+  filter: brightness(0.46) saturate(0.85) blur(1px);
+}
+
+.betrayals-verdict-stage {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  text-align: center;
+}
+
+.betrayals-verdict-stage__figure {
+  position: absolute;
+  inset: 8% 10% 2%;
+  background: radial-gradient(ellipse at 50% 60%, #f2c28d4d, transparent 64%);
+}
+
+.betrayals-verdict-stage__figure img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 5px 9px #120d0dd4);
+}
+
+.betrayals-verdict-stage figcaption {
+  position: absolute;
+  z-index: 1;
+  inset: auto 4% 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: #fbe4c9;
+  font:
+    700 clamp(1.2rem, 5vw, 2.3rem) Georgia,
+    serif;
+  text-shadow:
+    0 2px 16px #110806,
+    0 1px 4px #110806;
+}
+
+.betrayals-verdict-stage__role {
+  padding: 0.4em 0.8em;
+  border-block: 1px solid #b08857;
+  background: linear-gradient(90deg, transparent, #211810f0 20% 80%, transparent);
+  color: #ffddae;
+  font-size: 0.85em;
+  animation: betrayals-role-reveal 520ms ease-out both;
+}
+
+.betrayals-verdict-stage[data-role='betrayer'] .betrayals-verdict-stage__figure {
+  background: radial-gradient(ellipse at 50% 65%, #d7544b66, transparent 65%);
+}
+
+.betrayals-verdict-stage[data-role='betrayer'] .betrayals-verdict-stage__role {
+  border-color: #c47a69;
+  color: #ffc6b9;
+  background: linear-gradient(90deg, transparent, #3a1b22ee 20% 80%, transparent);
+}
+
+@keyframes betrayals-role-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+    letter-spacing: 0.09em;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: normal;
+  }
+}
+
+.betrayals-cine[data-scene='death-letter'] .betrayals-cine__camera {
+  animation: none;
+}
+
+.betrayals-cine[data-scene='death-letter'] .betrayals-cine__backdrop {
+  object-position: 54% center;
+  animation: betrayals-hotel-push 1.1s ease-out both;
+}
+
+.betrayals-cine[data-scene='death-letter'][data-beat='0'] .betrayals-cine__backdrop {
+  object-position: 60% center;
+  animation: betrayals-hotel-knock 920ms ease-out both;
+}
+
+.betrayals-cine[data-scene='death-letter'][data-beat='1'] .betrayals-cine__backdrop {
+  object-position: 72% center;
+}
+
+.betrayals-cine[data-scene='death-letter'][data-beat='3'] .betrayals-cine__backdrop,
+.betrayals-cine[data-scene='death-letter'][data-beat='4'] .betrayals-cine__backdrop {
+  object-position: 53% 58%;
+  animation: none;
+}
+
+.betrayals-hotel__foreground {
+  position: absolute;
+  inset: 0;
+}
+
+.betrayals-hotel__room-name {
+  position: absolute;
+  inset: auto 1rem 5%;
+  margin: 0;
+  color: #f2dac4;
+  font:
+    1.2rem Georgia,
+    serif;
+  text-align: center;
+  text-shadow: 0 1px 7px #0e0b10;
+}
+
+.betrayals-hotel__standing {
+  position: absolute;
+  inset: 21% -5% -8% 49%;
+}
+
+.betrayals-hotel__standing img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: brightness(0.51) saturate(0.75) drop-shadow(0 8px 8px #0b0a0d);
+  animation: betrayals-hotel-enter 670ms ease-out both;
+}
+
+.betrayals-hotel__seated {
+  position: absolute;
+  left: 50%;
+  bottom: -18%;
+  width: min(85%, 25rem);
+  height: 94%;
+  object-fit: contain;
+  object-position: center bottom;
+  transform: translateX(-50%);
+  filter: saturate(0.59) brightness(0.71) drop-shadow(0 7px 9px #100709b8);
+}
+
+.betrayals-hotel__foreground .betrayals-cine__letter {
+  position: absolute;
+  inset: auto auto 0 12%;
+  width: 30%;
+}
+
+.betrayals-hotel__foreground .betrayals-cine__notice {
+  box-sizing: border-box;
+  position: absolute;
+  inset: auto 9% -4%;
+  width: auto;
+  max-width: none;
+  transform: none;
+  background-color: #d6b085;
+}
+
+@keyframes betrayals-hotel-push {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.09);
+  }
+}
+
+@keyframes betrayals-hotel-knock {
+  0%,
+  28% {
+    transform: scale(1.07);
+  }
+  34%,
+  53% {
+    transform: scale(1.085) translateX(-0.7%);
+  }
+  40%,
+  60% {
+    transform: scale(1.085);
+  }
+  100% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes betrayals-hotel-enter {
+  from {
+    translate: 9% 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+.betrayals-cine__shield-plinth {
+  position: absolute;
+  z-index: -1;
+  inset: auto 8% 6%;
+  height: 17%;
+  border: 1px solid #a47949;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 10%, #98704f80, #251b1b 57%, #0c080b);
+  box-shadow:
+    0 0.55rem #140d10,
+    0 0.66rem #745139,
+    0 1rem 1.35rem #110904cc;
+}
+
+.betrayals-cine[data-scene='shield'] .betrayals-cine__backdrop {
+  filter: brightness(0.57) saturate(0.8);
+}
+
+.betrayals-hotel__throw {
+  position: absolute;
+  left: 50%;
+  bottom: -16%;
+  width: min(72%, 21rem);
+  height: 66%;
+  object-fit: fill;
+  transform: translateX(-50%);
+  filter: brightness(0.82) saturate(0.82) drop-shadow(0 6px 7px #1007098e);
+}
+
+.betrayals-cine[data-scene='death-letter'][data-beat='2'] .betrayals-cine__backdrop {
+  object-position: 50% 54%;
+}

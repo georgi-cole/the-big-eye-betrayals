@@ -287,3 +287,29 @@
     animation: none;
   }
 }
+
+.betrayals-roster__seat[data-night-reveal] .betrayals-roster__portrait > img {
+  animation: betrayals-night-portrait 820ms ease-out both;
+}
+
+.betrayals-roster__seat[data-night-reveal] .betrayals-roster__seal {
+  animation: betrayals-seat-seal 520ms 350ms ease-out both;
+}
+
+@keyframes betrayals-night-portrait {
+  from {
+    filter: grayscale(0.15) brightness(0.82);
+    opacity: 1;
+  }
+  to {
+    filter: grayscale(1) brightness(0.53) contrast(0.94);
+    opacity: 0.66;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .betrayals-roster__seat[data-night-reveal] .betrayals-roster__portrait > img,
+  .betrayals-roster__seat[data-night-reveal] .betrayals-roster__seal {
+    animation: none;
+  }
+}

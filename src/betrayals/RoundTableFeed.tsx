@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { preload } from 'react-dom'
 import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { Ballot, Run, Seat, TableCount } from './run'
 import { MAX_TABLE_ROUNDS } from './run'
 import { tableLeaderboard, tableSwayResponse } from './table'
+import { ceremonyArt, seatedArt, tableShots } from './ceremonyArtwork'
 import './RoundTableFeed.css'
 
 type RoundTableFeedProps = {
@@ -13,13 +15,47 @@ type RoundTableFeedProps = {
 }
 
 const pageSize = 5
-const council = import.meta.env.BASE_URL + 'assets/betrayals/council.jpg'
 
-function BallotPortrait({ seat }: { seat?: Seat }) {
+function TableCast({
+  cast,
+  voter,
+  nominee,
+  angle,
+}: {
+  cast: readonly Seat[]
+  voter?: Seat
+  nominee?: Seat
+  angle: number
+}) {
+  const active = cast.filter(({ exit }) => !exit)
+  const focus = voter ? active.findIndex(({ id }) => id === voter.id) : 0
+  const count = Math.min(angle === 0 ? 7 : angle === 3 ? 3 : 5, active.length)
+  const center = Math.floor(count / 2)
+  const window = Array.from(
+    { length: count },
+    (_, index) => active[(focus - center + index + active.length) % active.length]
+  )
   return (
-    <span className="round-table-ballot__portrait" aria-hidden="true">
-      {seat?.portrait ? <img src={seat.portrait} alt="" /> : (seat?.name[0] ?? '?')}
-    </span>
+    <div className="round-table-ballot__people" aria-hidden="true">
+      {window.map((seat, index) => (
+        <figure
+          key={seat.id}
+          data-contestant={seat.id}
+          data-speaking={seat.id === voter?.id || undefined}
+          data-nominated={seat.id === nominee?.id || undefined}
+          style={{
+            left:
+              (angle === 1 ? 61 : angle === 2 ? 39 : 50) +
+              (index - center) * (angle === 0 ? 12.2 : angle === 3 ? 29 : 16.4) +
+              '%',
+            bottom: 43 + (index - center) * (angle === 1 ? 0.7 : angle === 2 ? -0.7 : 0) + '%',
+          }}
+        >
+          <img src={seatedArt(seat)} alt="" draggable={false} />
+          <figcaption>{seat.name}</figcaption>
+        </figure>
+      ))}
+    </div>
   )
 }
 
@@ -52,8 +88,8 @@ function CountFeed({
   const perShot = Math.ceil(ballots.length / 4)
   const shots = Math.ceil(ballots.length / Math.max(1, perShot))
   const { visible: shot, revealAll } = usePacedReveal(shots ? shots + 1 : 0, {
-    firstDelay: 500,
-    stepDelay: 620,
+    firstDelay: 720,
+    stepDelay: 830,
     immediate: reducedMotion,
   })
   const complete = shot > shots || !shots
@@ -69,9 +105,15 @@ function CountFeed({
 
   const cast = new Map(seats.map((seat) => [seat.id, seat]))
   const ballot = visible > 0 ? featuredBallot(ballots, (shot - 1) * perShot, visible) : undefined
-  const voter = ballot && cast.get(ballot.voterId)
-  const nominee = ballot && cast.get(ballot.targetId)
+  const voter = ballot ? cast.get(ballot.voterId) : undefined
+  const nominee = ballot ? cast.get(ballot.targetId) : undefined
   const dialog = useRef<HTMLDialogElement>(null)
+  const angle = shot === 0 ? 0 : ((shot + round - 2) % 3) + 1
+
+  useEffect(() => {
+    if (reducedMotion) return
+    for (const shot of tableShots) preload(ceremonyArt + shot + '.webp', { as: 'image' })
+  }, [reducedMotion])
 
   useEffect(() => {
     const element = dialog.current
@@ -152,7 +194,7 @@ function CountFeed({
             >
               ‹
             </button>
-            <span aria-live="polite">
+            <span className="round-table-feed__page" aria-live="polite">
               {page + 1} / {lastPage + 1}
             </span>
             <button
@@ -176,31 +218,27 @@ function CountFeed({
             revealAll()
           }}
         >
-          <div className="round-table-ballot__frame" data-shot={shot % 3}>
-            <img className="round-table-ballot__room" src={council} alt="" />
+          <div className="round-table-ballot__frame" data-shot={angle}>
+            <div className="round-table-ballot__shot">
+              <img
+                key={angle}
+                className="round-table-ballot__room"
+                src={ceremonyArt + tableShots[angle] + '.webp'}
+                alt=""
+              />
+              <TableCast cast={seats} voter={voter} nominee={nominee} angle={angle} />
+            </div>
+
             <header className="round-table-ballot__header">
               <span>{round > 1 ? 'Runoff' : 'Round Table'}</span>
               <strong>
                 {visible} / {ballots.length}
               </strong>
             </header>
-            <div className="round-table-ballot__seats" aria-hidden="true">
-              {seats
-                .filter(({ exit }) => !exit)
-                .slice(0, 10)
-                .map((seat) => (
-                  <BallotPortrait key={seat.id} seat={seat} />
-                ))}
-            </div>
             {voter && nominee ? (
-              <div className="round-table-ballot__card" key={shot}>
-                <div aria-hidden="true">
-                  <BallotPortrait seat={voter} />
-                  <span>→</span>
-                  <BallotPortrait seat={nominee} />
-                </div>
+              <div className="round-table-ballot__names" key={shot}>
                 <p aria-live="polite">
-                  <strong>{voter.name}</strong> voted for <strong>{nominee.name}</strong>
+                  <b>{voter.name}</b> voted for <strong>{nominee.name}</strong>
                 </p>
               </div>
             ) : (

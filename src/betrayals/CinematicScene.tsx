@@ -1,9 +1,10 @@
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { appearanceFromAssetUrl } from '../appearance/catalog'
+import { preload } from 'react-dom'
 import FullSizeCutoutImage from '../components/FullSizeCutoutImage/FullSizeCutoutImage'
 import walkManifest from '../cinematic/ceremonies/walk-manifest.json'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
+import { ceremonyArt, ceremonyCharacter, hotelShots, rearArt, seatedArt } from './ceremonyArtwork'
 import './CinematicScene.css'
 import './sleep-mask.css'
 
@@ -70,7 +71,10 @@ const verdictStamps = {
 const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat[] }> = {
   'conclave-arrival': {
     backdrop: chamber,
-    beats: [{ title: 'Behind closed doors', hold: 680, cue: 'door' }, { title: 'The Conclave' }],
+    beats: [
+      { title: 'The private meeting', hold: 680, cue: 'suspense' },
+      { title: 'The Conclave' },
+    ],
   },
   'conclave-seal': {
     backdrop: chamber,
@@ -96,18 +100,20 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
     ],
   },
   shield: {
-    backdrop: chamber,
+    backdrop: ceremonyArt + 'table-close.webp',
     beats: [
-      { title: 'The challenge is over', hold: 860 },
+      { title: 'The immunity shield', hold: 860 },
       { title: 'Full Immunity', cue: 'shield' },
     ],
   },
   'death-letter': {
     backdrop: corridor,
     beats: [
-      { title: 'Footsteps in the corridor', hold: 520, cue: 'door' },
-      { title: 'A sealed letter', hold: 780 },
-      { title: 'The letter of doom', cue: 'impact' },
+      { title: 'A knock at the door', hold: 950, cue: 'door' },
+      { title: 'Inside the room', hold: 820 },
+      { title: 'The door opens', hold: 880 },
+      { title: 'An unexpected letter', hold: 1050 },
+      { title: 'The Night verdict', cue: 'impact' },
     ],
   },
   'round-table': {
@@ -120,8 +126,8 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
   departure: {
     backdrop: corridor,
     beats: [
-      { title: 'The verdict', hold: 670, cue: 'reveal' },
-      { title: 'Banished from the castle', hold: 740 },
+      { title: 'The Round Table has spoken', hold: 1050 },
+      { title: 'The role reveal', hold: 1750, cue: 'reveal' },
       { title: 'The final walk', hold: 2550, cue: 'door' },
       { title: 'The door is closed' },
     ],
@@ -254,12 +260,7 @@ function Walkout({
   closed: boolean
   repeat?: boolean
 }) {
-  const look = subject?.human ? appearanceFromAssetUrl(subject.portrait) : null
-  const key = subject?.human
-    ? look?.kind === 'catalog'
-      ? 'character-' + Number(look.lookId.slice(3))
-      : ''
-    : (subject?.id ?? '')
+  const key = subject ? ceremonyCharacter(subject) : ''
   const walk = walkAssets[key]
   return (
     <div
@@ -323,13 +324,84 @@ function PortraitVerdict({
   )
 }
 
+function StandingGuest({ subject }: { subject: CinematicCastMember }) {
+  const portrait =
+    subject.human && !subject.portrait
+      ? import.meta.env.BASE_URL + 'assets/player_characters/character%205/main.webp'
+      : subject.portrait
+  return (
+    <FullSizeCutoutImage
+      player={{ id: subject.id, name: subject.name, avatar: portrait, isUser: subject.human }}
+      attire="informal"
+      alt=""
+      draggable={false}
+    />
+  )
+}
+
+function RoundTableVerdict({
+  subject,
+  role,
+  reveal,
+}: {
+  subject: CinematicCastMember
+  role?: string
+  reveal: boolean
+}) {
+  return (
+    <figure
+      className="betrayals-verdict-stage"
+      data-role={reveal ? role?.toLowerCase() : undefined}
+    >
+      <div className="betrayals-verdict-stage__figure">
+        <StandingGuest subject={subject} />
+      </div>
+      <figcaption>
+        <strong>{subject.name}</strong>
+        {reveal && (
+          <span key={role ?? 'sealed'} className="betrayals-verdict-stage__role" aria-live="polite">
+            {role ? 'I was a ' + role + '.' : 'Role sealed until the finale'}
+          </span>
+        )}
+      </figcaption>
+    </figure>
+  )
+}
+
+function HotelVerdict({ subject, beat }: { subject?: CinematicCastMember; beat: number }) {
+  return (
+    <div className="betrayals-hotel__foreground">
+      {subject && beat === 1 && <p className="betrayals-hotel__room-name">{subject.name}</p>}
+      {subject && beat === 2 && (
+        <div className="betrayals-hotel__standing" aria-hidden="true">
+          <img src={rearArt(subject)} alt="" />
+        </div>
+      )}
+      {subject && beat >= 3 && (
+        <>
+          <img className="betrayals-hotel__seated" src={seatedArt(subject)} alt="" />
+          <img className="betrayals-hotel__throw" src={ceremonyArt + 'hotel-throw.webp'} alt="" />
+        </>
+      )}
+      {beat === 3 && <WaxLetter sealed />}
+      {beat === 4 && (
+        <div className="betrayals-cine__notice">
+          <small>{subject ? 'For ' + subject.name : 'By order of the Conclave'}</small>
+          <strong>You have been eliminated at Night.</strong>
+          <i aria-hidden="true" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Stage({ scene, beat }: { scene: CinematicSceneData; beat: number }) {
   const { kind, cast, concealed, role } = scene
   const subject = concealed || scene.subject?.concealed ? undefined : scene.subject
 
   switch (kind) {
     case 'conclave-arrival':
-      return beat > 0 && !concealed ? <ConclaveTableau cast={cast} /> : null
+      return !concealed ? <ConclaveTableau cast={cast} /> : null
     case 'conclave-seal':
       return <WaxLetter sealed={beat > 0} />
     case 'sunset':
@@ -351,25 +423,18 @@ function Stage({ scene, beat }: { scene: CinematicSceneData; beat: number }) {
       return (
         <div className="betrayals-cine__shield" data-shown={beat > 0}>
           <div className="betrayals-cine__shield-light" aria-hidden="true" />
+          <div className="betrayals-cine__shield-plinth" aria-hidden="true" />
           <img src={shield} alt="" decoding="async" draggable={false} />
           {subject && beat > 0 && <strong>{subject.name}</strong>}
         </div>
       )
     case 'death-letter':
-      return beat === 0 ? null : beat === 1 ? (
-        <WaxLetter sealed />
-      ) : (
-        <div className="betrayals-cine__notice">
-          <small>{subject ? `For ${subject.name}` : 'By order of the Conclave'}</small>
-          <strong>You have been murdered.</strong>
-          <i aria-hidden="true" />
-        </div>
-      )
+      return <HotelVerdict subject={subject} beat={beat} />
     case 'round-table':
       return <img className="betrayals-cine__ballot-box" src={ballotBox} alt="" draggable={false} />
     case 'departure':
       return beat < 2 && subject ? (
-        <PortraitVerdict subject={subject} role={role} stamp={beat === 1 ? 'evicted' : undefined} />
+        <RoundTableVerdict subject={subject} role={role} reveal={beat === 1} />
       ) : null
     case 'elimination':
       return (
@@ -418,21 +483,23 @@ export function CinematicScene({
   const { backdrop, beats } = direction[scene.kind]
   const beat = motionReduced ? beats.length - 1 : step
   const current = beats[beat]
-  const exterior =
-    scene.kind === 'conclave-arrival' && !scene.cast?.some((member) => !member.concealed)
   const hold =
-    exterior && beat === 0
-      ? 1300
-      : scene.repeat
-        ? scene.kind === 'departure' && beat === 2
-          ? 1920
-          : Math.min(current.hold ?? 0, 480)
-        : current.hold
+    scene.repeat && scene.kind === 'departure' && beat === 2
+      ? 1920
+      : scene.repeat && scene.kind === 'death-letter'
+        ? Math.max(580, (current.hold ?? 0) * 0.78)
+        : scene.repeat && scene.kind !== 'departure'
+          ? Math.min(current.hold ?? 0, 480)
+          : current.hold
   const complete = beat === beats.length - 1
-  const title = (complete && scene.title) || current.title
+  const title =
+    (complete && scene.title) ||
+    (scene.kind === 'departure' && beat === 1 && !scene.role ? 'The sealed verdict' : current.title)
   const caption = complete && scene.subtitle
-  const art =
-    scene.kind === 'conclave-arrival' && beat === 0 ? corridor : (scene.backdrop ?? backdrop)
+  let art = scene.backdrop ?? backdrop
+  if (scene.kind === 'death-letter') art = ceremonyArt + hotelShots[Math.min(beat, 3)] + '.webp'
+  if (scene.kind === 'departure' && beat < 2) art = ceremonyArt + 'table-wide.webp'
+  if (scene.kind === 'round-table') art = ceremonyArt + 'table-wide.webp'
   const stageBeat =
     motionReduced && scene.kind === 'departure'
       ? 1
@@ -460,6 +527,22 @@ export function CinematicScene({
   }, [])
 
   useEffect(() => {
+    if (motionReduced) return
+    if (scene.kind === 'death-letter') {
+      for (const shot of [...hotelShots, 'hotel-throw'])
+        preload(ceremonyArt + shot + '.webp', { as: 'image' })
+      if (scene.subject) {
+        preload(seatedArt(scene.subject), { as: 'image' })
+        preload(rearArt(scene.subject), { as: 'image' })
+      }
+    }
+    if (scene.kind === 'departure') {
+      const walk = scene.subject && walkAssets[ceremonyCharacter(scene.subject)]
+      if (walk) preload(import.meta.env.BASE_URL + walk.src, { as: 'image' })
+    }
+  }, [scene.kind, scene.subject, motionReduced])
+
+  useEffect(() => {
     if (motionReduced || !hold) return
     const timer = window.setTimeout(() => setStep(beat + 1), hold)
     return () => window.clearTimeout(timer)
@@ -474,9 +557,10 @@ export function CinematicScene({
   useEffect(() => {
     if (lastCue.current === beat) return
     lastCue.current = beat
+    if (motionReduced && !complete) return
     if (scene.kind === 'finale' && complete) playEffect?.('tv:finale_winner_stinger', 0.72)
     else if (current.cue) playEffect?.('tv:ceremony_' + current.cue, 0.6)
-  }, [beat, complete, current.cue, playEffect, scene.kind])
+  }, [beat, complete, current.cue, motionReduced, playEffect, scene.kind])
 
   return (
     <dialog
@@ -496,16 +580,13 @@ export function CinematicScene({
     >
       <div className="betrayals-cine__frame">
         <div className="betrayals-cine__camera" aria-hidden="true">
-          <img className="betrayals-cine__backdrop" src={art} alt="" />
+          <img key={art} className="betrayals-cine__backdrop" src={art} alt="" />
           <div className="betrayals-cine__weather" />
           <div className="betrayals-cine__grade" />
         </div>
         <div className="betrayals-cine__stage">
           <Stage scene={scene} beat={stageBeat} />
         </div>
-        {scene.kind === 'conclave-arrival' && !scene.cast?.some((member) => !member.concealed) && (
-          <Walkout closed={stageBeat > 0} repeat />
-        )}
         {scene.kind === 'departure' && stageBeat >= 2 && (
           <Walkout
             subject={scene.concealed || scene.subject?.concealed ? undefined : scene.subject}

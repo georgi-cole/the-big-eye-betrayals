@@ -20,7 +20,10 @@ export function presentationAfter(before: Run, after: Run): PresentationCue[] {
     case 'final-challenge':
       return ['round-table']
     case 'table-reveal':
-      return after.phase === 'night' && after.day === 1
+      return after.phase === 'night' &&
+        after.day === 1 &&
+        after.private.betrayers.includes(after.humanId) &&
+        after.seats.some(({ id, exit }) => id === after.humanId && !exit)
         ? ['departure', 'conclave-arrival']
         : ['departure']
     case 'night': {
@@ -32,7 +35,9 @@ export function presentationAfter(before: Run, after: Run): PresentationCue[] {
         : []
     }
     case 'night-resolved':
-      return ['awakening']
+      return after.lastDawn?.eliminatedId && after.lastDawn.eliminatedId !== after.humanId
+        ? ['death-letter', 'awakening']
+        : ['awakening']
     default:
       return []
   }
@@ -69,7 +74,7 @@ export function cinematicFor(
         backdrop: guestsInRoom.length
           ? undefined
           : import.meta.env.BASE_URL + 'assets/betrayals/night.jpg',
-        title: guestsInRoom.length ? 'The Conclave' : 'Lights out',
+        title: 'The Conclave',
       }
     }
     case 'conclave-seal': {
@@ -98,12 +103,18 @@ export function cinematicFor(
         repeat: !victim,
         weather: castleWeather(run),
         darkSeatId: victim ?? undefined,
-        subtitle: victim ? seat(victim)?.name + ' is missing.' : 'Everyone returned.',
+        subtitle: victim ? seat(victim)?.name + ' was eliminated overnight.' : 'Everyone returned.',
       }
     case 'shield':
       return { ...scene, subject: seat(run.immunityId) }
-    case 'death-letter':
-      return { ...scene, subject: seat(run.phase === 'night-resolved' ? run.humanId : victim) }
+    case 'death-letter': {
+      const subject = seat(run.phase === 'night-resolved' ? run.humanId : victim)
+      return {
+        ...scene,
+        subject: subject ? guests([subject])[0] : undefined,
+        repeat: run.day > 1 && subject?.id !== run.humanId,
+      }
+    }
     case 'elimination':
       return { ...scene, subject: seat(victim) }
     case 'departure': {
