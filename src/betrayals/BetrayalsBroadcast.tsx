@@ -5,7 +5,6 @@ export interface BetrayalsBroadcastProps {
   title: string
   message?: ReactNode
   detail?: ReactNode
-  action?: ReactNode
   cueKey?: string | number
   mode?: 'default' | 'ceremony' | 'night' | 'daybreak' | 'immunity' | 'safety' | 'finale'
   art?: string
@@ -16,7 +15,6 @@ export function BetrayalsBroadcast({
   title,
   message,
   detail,
-  action,
   cueKey,
   mode = 'default',
   art,
@@ -46,7 +44,6 @@ export function BetrayalsBroadcast({
             {detail && <div className="betrayals-broadcast__detail">{detail}</div>}
           </div>
         </div>
-        {action && <div className="betrayals-broadcast__action">{action}</div>}
       </div>
       <div className="betrayals-broadcast__vents" aria-hidden="true" />
     </section>

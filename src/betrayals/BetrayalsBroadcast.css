@@ -82,7 +82,7 @@
   overflow: hidden;
   min-block-size: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   border: 1px solid #0a0c0e;
   border-radius: 7px;
   background: radial-gradient(ellipse at 73% 4%, var(--signal-shade), #0b1018 72%);
@@ -210,13 +210,6 @@
 .betrayals-broadcast__message > p,
 .betrayals-broadcast__detail > p {
   margin-block: 0;
-}
-
-.betrayals-broadcast__action {
-  display: flex;
-  justify-content: center;
-  padding: 0 8px 5px;
-  font-size: 0.76rem;
 }
 
 .betrayals-broadcast__vents {

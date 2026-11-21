@@ -148,6 +148,7 @@ export default function BetrayalsScreen() {
   const [homeOpen, setHomeOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
+  const [voteActionsTarget, setVoteActionsTarget] = useState<HTMLDivElement | null>(null)
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [saveIssue, setSaveIssue] = useState(false)
   const inboxReadsKey = 'big-eye:betrayals:inbox:' + saveId
@@ -421,7 +422,6 @@ export default function BetrayalsScreen() {
 
   let message: ReactNode = null
   let detail: ReactNode = null
-  let broadcastAction: ReactNode = null
   let play: { label: string; onClick: () => void; disabled?: boolean; faceLabel?: string }
   const outcome = run.lastTable
   const tableExit = outcome
@@ -448,6 +448,7 @@ export default function BetrayalsScreen() {
         run={run}
         reducedMotion={utilities.preferences.reducedMotion}
         onCountComplete={() => setCountReady(countKey)}
+        actionsTarget={voteActionsTarget}
       />
     ) : undefined
   switch (stage) {
@@ -598,11 +599,6 @@ export default function BetrayalsScreen() {
           </p>
         </div>
       )
-      broadcastAction = participating && (
-        <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
-          Banish Again
-        </button>
-      )
       play = {
         label: participating ? 'End Season' : 'View decision',
         faceLabel: participating ? 'End' : undefined,
@@ -730,7 +726,6 @@ export default function BetrayalsScreen() {
           title={conclave ? 'The Conclave' : phaseLabel[stage]}
           message={message}
           detail={detail}
-          action={broadcastAction}
           interactive={Boolean(tableFeed || conclave)}
           cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
           mode={broadcastMode}
@@ -796,6 +791,15 @@ export default function BetrayalsScreen() {
 
         <BetrayalsDock
           play={play}
+          utility={
+            !cue && counting ? (
+              <div className="betrayals-dock__vote-slot" ref={setVoteActionsTarget} />
+            ) : stage === 'end-vote' && participating ? (
+              <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
+                Banish Again
+              </button>
+            ) : undefined
+          }
           home={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)

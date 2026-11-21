@@ -14,6 +14,18 @@
   margin-block-end: 6px;
 }
 
+.betrayals-dock__utility:has(.betrayals-dock__vote-slot:empty) {
+  display: none;
+}
+
+.betrayals-dock__vote-slot .round-table-feed__utility {
+  min-height: 36px;
+  padding-inline: 11px;
+  border-radius: 6px;
+  background: #17121cef;
+  font-size: 0.73rem;
+}
+
 .betrayals-dock__shell {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
