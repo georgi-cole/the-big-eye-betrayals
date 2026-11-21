@@ -297,7 +297,8 @@ describe('Betrayals season review', () => {
     saveRun(localStorage, 'edition-local', counted)
     render(<BetrayalsScreen />)
     const feed = within(screen.getByRole('region', { name: 'Round Table vote count' }))
-    fireEvent.click(feed.getByRole('button', { name: 'Show full count' }))
+    fireEvent.click(feed.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to vote totals' }))
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
 
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))

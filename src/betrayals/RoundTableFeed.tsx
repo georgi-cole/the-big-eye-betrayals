@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { Ballot, Run, Seat, TableCount } from './run'
 import { MAX_TABLE_ROUNDS } from './run'
 import { tableLeaderboard, tableSwayResponse } from './table'
+import { RoundTableShot } from './RoundTableShot'
 import './RoundTableFeed.css'
 
 type RoundTableFeedProps = {
@@ -12,16 +12,7 @@ type RoundTableFeedProps = {
   onCountComplete?: () => void
 }
 
-const pageSize = 5
-const council = import.meta.env.BASE_URL + 'assets/betrayals/council.jpg'
-
-function BallotPortrait({ seat }: { seat?: Seat }) {
-  return (
-    <span className="round-table-ballot__portrait" aria-hidden="true">
-      {seat?.portrait ? <img src={seat.portrait} alt="" /> : (seat?.name[0] ?? '?')}
-    </span>
-  )
-}
+const visibleLeaders = 5
 
 function featuredBallot(ballots: readonly Ballot[], start: number, stop: number) {
   const leadersAt = (end: number) => {
@@ -51,38 +42,41 @@ function CountFeed({
   const { ballots, round, tiedIds } = count
   const perShot = Math.ceil(ballots.length / 4)
   const shots = Math.ceil(ballots.length / Math.max(1, perShot))
-  const { visible: shot, revealAll } = usePacedReveal(shots ? shots + 1 : 0, {
-    firstDelay: 500,
-    stepDelay: 620,
-    immediate: reducedMotion,
-  })
-  const complete = shot > shots || !shots
-  const visible = Math.min(shot * perShot, ballots.length)
+  const [shot, setShot] = useState(0)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const complete = Boolean(reducedMotion) || shot > shots || !shots
+  const visible = complete ? ballots.length : Math.min(shot * perShot, ballots.length)
   const notified = useRef(false)
-  const [page, setPage] = useState(0)
   const revealed = ballots.slice(0, visible)
-  const { rows: leaders, hiddenTie } = tableLeaderboard(revealed, pageSize)
-  const remaining = complete ? tableLeaderboard(revealed, Infinity).rows.slice(leaders.length) : []
-  const lastPage = Math.ceil(remaining.length / pageSize)
-  const rows = page === 0 ? leaders : remaining.slice((page - 1) * pageSize, page * pageSize)
-  const lastTarget = visible > 0 && !complete ? ballots[visible - 1].targetId : undefined
+  const { rows: leaders, hiddenTie } = tableLeaderboard(revealed, visibleLeaders)
+  const totals = reviewOpen ? tableLeaderboard(ballots, Infinity).rows : []
 
   const cast = new Map(seats.map((seat) => [seat.id, seat]))
-  const ballot = visible > 0 ? featuredBallot(ballots, (shot - 1) * perShot, visible) : undefined
+  const featured = Array.from({ length: shots }, (_, index) =>
+    featuredBallot(ballots, index * perShot, Math.min((index + 1) * perShot, ballots.length))
+  )
+  const ballot = featured[shot - 1]
+  const featuredIds = featured.map(({ voterId }) => voterId)
   const voter = ballot && cast.get(ballot.voterId)
   const nominee = ballot && cast.get(ballot.targetId)
   const dialog = useRef<HTMLDialogElement>(null)
+  const dialogOpen = !complete || reviewOpen
+
+  function viewAllVotes() {
+    setShot(shots + 1)
+    setReviewOpen(true)
+  }
 
   useEffect(() => {
     const element = dialog.current
-    if (complete || !element) return
+    if (!dialogOpen || !element) return
     element.showModal?.()
     if (!element.open) element.setAttribute('open', '')
     return () => {
       element.close?.()
       element.removeAttribute('open')
     }
-  }, [complete])
+  }, [dialogOpen])
 
   useEffect(() => {
     if (!complete || notified.current) return
@@ -95,23 +89,14 @@ function CountFeed({
       className="round-table-feed round-table-feed--count"
       aria-label="Round Table vote count"
     >
-      <div className="round-table-feed__count-heading">
-        <strong>Round {round}</strong>
-        <span>
-          {visible} / {ballots.length} counted
-        </span>
-      </div>
       <div className="round-table-feed__lineup">
-        {rows.length > 0 && (
-          <ol
-            className="round-table-feed__leaders"
-            aria-label={page === 0 ? 'Current vote leaders' : 'More vote totals'}
-          >
-            {rows.map(({ id, votes }) => {
+        {leaders.length > 0 && (
+          <ol className="round-table-feed__leaders" aria-label="Current vote leaders">
+            {leaders.map(({ id, votes }) => {
               const seat = seats.find((guest) => guest.id === id)
               const name = seat?.name ?? 'Contestant'
               return (
-                <li key={id} data-counted={id === lastTarget || undefined}>
+                <li key={id}>
                   <span className="round-table-feed__portrait" aria-hidden="true">
                     {seat?.portrait ? <img src={seat.portrait} alt="" /> : name.slice(0, 1)}
                   </span>
@@ -126,90 +111,127 @@ function CountFeed({
             })}
           </ol>
         )}
-        {!rows.length && hiddenTie && (
+        {!leaders.length && hiddenTie && (
           <p className="round-table-feed__tie">{hiddenTie.size}-way tie for the lead</p>
         )}
       </div>
       <div className="round-table-feed__footer">
         <p className="round-table-feed__summary" role="status">
-          {complete
-            ? tiedIds.length === 0
-              ? 'The count is complete.'
-              : round >= MAX_TABLE_ROUNDS
-                ? `Draw among ${tiedIds.length} tied guests`
-                : `Runoff among ${tiedIds.length} tied guests`
-            : hiddenTie && rows.length
-              ? `${hiddenTie.size} guests tied below the leaders`
-              : ''}
+          {complete && tiedIds.length > 0
+            ? round >= MAX_TABLE_ROUNDS
+              ? `Draw among ${tiedIds.length} tied guests`
+              : leaders.length
+                ? `Runoff among ${tiedIds.length} tied guests`
+                : 'Runoff'
+            : null}
+          {complete && tiedIds.length === 0 && (
+            <span className="round-table-feed__sr-only">The count is complete.</span>
+          )}
         </p>
-        {lastPage > 0 && (
-          <div className="round-table-feed__pages" role="group" aria-label="Browse vote totals">
-            <button
-              type="button"
-              aria-label="Previous vote totals"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              ‹
-            </button>
-            <span aria-live="polite">
-              {page + 1} / {lastPage + 1}
-            </span>
-            <button
-              type="button"
-              aria-label="Next vote totals"
-              disabled={page === lastPage}
-              onClick={() => setPage(page + 1)}
-            >
-              ›
-            </button>
-          </div>
+        {complete && (
+          <button type="button" className="round-table-feed__utility" onClick={viewAllVotes}>
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M5 3h10v14H5zM8 7h4m-4 3h4m-4 3h4" />
+            </svg>
+            View all votes
+          </button>
         )}
       </div>
-      {!complete && (
+      {dialogOpen && (
         <dialog
           ref={dialog}
           className="round-table-ballot"
-          aria-label="Round Table ballot reveal"
+          aria-label={reviewOpen ? 'All Round Table votes' : 'Round Table ballot reveal'}
           onCancel={(event) => {
             event.preventDefault()
-            revealAll()
+            if (reviewOpen) setReviewOpen(false)
+            else setShot(shots + 1)
           }}
         >
-          <div className="round-table-ballot__frame" data-shot={shot % 3}>
-            <img className="round-table-ballot__room" src={council} alt="" />
-            <header className="round-table-ballot__header">
-              <span>{round > 1 ? 'Runoff' : 'Round Table'}</span>
-              <strong>
-                {visible} / {ballots.length}
-              </strong>
-            </header>
-            <div className="round-table-ballot__seats" aria-hidden="true">
-              {seats
-                .filter(({ exit }) => !exit)
-                .slice(0, 10)
-                .map((seat) => (
-                  <BallotPortrait key={seat.id} seat={seat} />
-                ))}
-            </div>
-            {voter && nominee ? (
-              <div className="round-table-ballot__card" key={shot}>
-                <div aria-hidden="true">
-                  <BallotPortrait seat={voter} />
-                  <span>→</span>
-                  <BallotPortrait seat={nominee} />
-                </div>
-                <p aria-live="polite">
-                  <strong>{voter.name}</strong> voted for <strong>{nominee.name}</strong>
-                </p>
+          {reviewOpen ? (
+            <div className="round-table-ballot__frame round-table-ballot__frame--review">
+              <header className="round-table-ballot__header">
+                <span>Round {round} votes</span>
+                <strong>{ballots.length} counted</strong>
+              </header>
+              <div className="round-table-ballot__ledger" tabIndex={0}>
+                <ul className="round-table-ballot__ranking" aria-label="All vote totals">
+                  {totals.map(({ id, votes }) => (
+                    <li key={id}>
+                      <span>{cast.get(id)?.name ?? 'Contestant'}</span>
+                      <strong aria-label={`${votes} ${votes === 1 ? 'vote' : 'votes'}`}>
+                        {votes}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+                <ol className="round-table-ballot__votes" aria-label="All ballots">
+                  {ballots.map(({ voterId, targetId }) => (
+                    <li key={voterId}>
+                      <strong>{cast.get(voterId)?.name ?? 'Contestant'}</strong>
+                      <span>voted for</span>
+                      <strong>{cast.get(targetId)?.name ?? 'Contestant'}</strong>
+                    </li>
+                  ))}
+                </ol>
               </div>
-            ) : (
-              <p className="round-table-ballot__sealed">The ballots are sealed.</p>
-            )}
-            <button type="button" className="round-table-feed__utility" onClick={revealAll}>
-              Show full count
-            </button>
-          </div>
+              <button
+                type="button"
+                className="round-table-feed__utility"
+                onClick={() => setReviewOpen(false)}
+              >
+                Return to vote totals
+              </button>
+            </div>
+          ) : (
+            <div className="round-table-ballot__frame">
+              <div className="round-table-ballot__camera">
+                <RoundTableShot
+                  cast={seats}
+                  featuredIds={featuredIds}
+                  focusId={voter?.id}
+                  close={Boolean(voter)}
+                />
+              </div>
+              <header className="round-table-ballot__header">
+                <span>{round > 1 ? 'Runoff' : 'Round Table'}</span>
+                <strong>
+                  {visible} / {ballots.length}
+                </strong>
+              </header>
+              <div className="round-table-ballot__lower-third">
+                {voter && nominee ? (
+                  <div className="round-table-ballot__card" key={shot} aria-live="polite">
+                    <p>
+                      <strong>{voter.name}</strong> voted for <strong>{nominee.name}</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="round-table-ballot__sealed">The ballots are sealed.</p>
+                )}
+                <div className="round-table-ballot__actions">
+                  <button
+                    type="button"
+                    className="round-table-feed__utility"
+                    onClick={viewAllVotes}
+                  >
+                    View all votes
+                  </button>
+                  <button
+                    type="button"
+                    className="round-table-ballot__advance"
+                    onClick={() => setShot(shot + 1)}
+                  >
+                    {shot === 0
+                      ? 'Reveal first votes'
+                      : shot < shots
+                        ? 'Next votes'
+                        : 'Show vote totals'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </dialog>
       )}
     </section>

@@ -13,6 +13,8 @@ type Props = {
   interactions: readonly IncomingInteraction[]
   onRespond: (id: string, answer: IncomingAnswer) => void
   onClose: () => void
+  readIds?: ReadonlySet<string>
+  onRead?: (id: string) => void
 }
 
 type ConversationCard = {
@@ -154,13 +156,23 @@ function InboxMessage({
   )
 }
 
-export function BetrayalsIncomingInteractions({ interactions, onRespond, onClose }: Props) {
+export function BetrayalsIncomingInteractions({
+  interactions,
+  onRespond,
+  onClose,
+  readIds,
+  onRead,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [localReadIds, setLocalReadIds] = useState<ReadonlySet<string>>(() => new Set())
   const [recentIds, setRecentIds] = useState<ReadonlySet<string>>(() => new Set())
-  const markRead = useCallback((id: string) => {
-    setReadIds((current) => (current.has(id) ? current : new Set([...current, id])))
-  }, [])
+  const markRead = useCallback(
+    (id: string) => {
+      if (onRead) onRead(id)
+      else setLocalReadIds((current) => (current.has(id) ? current : new Set([...current, id])))
+    },
+    [onRead]
+  )
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -187,7 +199,7 @@ export function BetrayalsIncomingInteractions({ interactions, onRespond, onClose
     <InboxMessage
       key={interaction.id}
       interaction={interaction}
-      read={readIds.has(interaction.id)}
+      read={(readIds ?? localReadIds).has(interaction.id)}
       onRead={markRead}
       onRespond={respond}
     />

@@ -286,6 +286,20 @@ function isRun(value: unknown): value is Run {
               asObject(item.witnessLead)?.promised === true))))) &&
     validSafetyStandings(hidden.safetyStandings, ids, item.day) &&
     validIncomingResponses(item.incomingResponses, item.day) &&
+    (item.activity === undefined ||
+      (Array.isArray(item.activity) &&
+        item.activity.every((value) => {
+          const entry = asObject(value)
+          return (
+            entry &&
+            typeof entry.day === 'number' &&
+            Number.isSafeInteger(entry.day) &&
+            entry.day >= 1 &&
+            entry.day <= Number(item.day) &&
+            typeof entry.text === 'string' &&
+            ['season', 'vote', 'departure', 'conversation'].some((kind) => kind === entry.kind)
+          )
+        }))) &&
     validSocialWallets(item.socialWallets, ids, item.day) &&
     (item.presentation === undefined ||
       (Array.isArray(item.presentation) &&

@@ -142,6 +142,7 @@ export type Run = {
   publicSeed: number
   pot: number
   social: SocialEntry[]
+  activity?: import('./gameLog.ts').GameLogEntry[]
   witnessLead?: import('./intel.ts').WitnessLead
   socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>
