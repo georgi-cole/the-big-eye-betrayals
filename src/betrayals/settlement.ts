@@ -1,6 +1,9 @@
+import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32, seededPickN } from '../store/rng.ts'
 import { hashId, isCurrentCommand } from './run.ts'
+import { getSocialView, relationship } from './perception.ts'
 import type { CommandToken, Role, Run } from './run.ts'
+import { resolutionPerspective, strongestCase } from './strategy.ts'
 
 type Reason = NonNullable<Run['result']>['reason']
 type EndVote = { voterId: string; choice: 'end' | 'banish' }
@@ -12,18 +15,32 @@ export function intendsToEnd(run: Run, voterId: string): boolean {
   if (run.private.betrayers.includes(voterId)) return roll >= 0.1 - danger * 0.08
   const revealed = run.seats.filter(({ exit }) => exit?.revealedRole === 'betrayer').length
   const contenders = run.seats.filter(({ id, exit }) => id !== voterId && !exit)
-  const rivalIds = new Set(contenders.map(({ id }) => id))
-  const privateCase = run.social.some(
+  const rivalIds = contenders.map(({ id }) => id)
+  const perspective = resolutionPerspective(run, voterId, rivalIds)
+  const uncertainty = strongestCase(perspective)
+  const conversations = getSocialView(run, voterId)
+  const personalTrust =
+    contenders.reduce((sum, { id }) => sum + relationship(conversations, voterId, id).bond, 0) /
+    Math.max(1, contenders.length)
+  const riskTolerance = getSocialPersonality(voterId).riskTolerance
+  const privateCase = conversations.some(
     (entry) =>
       entry.recipientId === voterId &&
       entry.day >= run.day - 1 &&
-      rivalIds.has(entry.suspectId ?? '') &&
+      rivalIds.includes(entry.suspectId ?? '') &&
       (entry.kind === 'question' ||
         (entry.kind === 'share-suspicion' && entry.reaction === 'landed'))
   )
   const rivalPressure = Math.max(0, ...contenders.map(({ id }) => tally[id] ?? 0))
   const confidence =
-    0.12 + revealed * 0.16 + danger * 0.18 - rivalPressure * 0.05 - (privateCase ? 0.18 : 0)
+    0.12 +
+    revealed * 0.16 +
+    danger * 0.18 +
+    personalTrust * 0.19 +
+    (riskTolerance - 0.5) * 0.13 -
+    rivalPressure * 0.045 -
+    uncertainty * 0.5 -
+    (privateCase ? 0.09 : 0)
   return roll < Math.max(0.03, Math.min(0.92, confidence))
 }
 

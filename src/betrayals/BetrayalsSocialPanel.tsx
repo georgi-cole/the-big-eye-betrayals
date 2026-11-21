@@ -185,7 +185,7 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
     case 'rapport':
       return `You built trust with ${person}.`
     case 'question':
-      return `${person} suspects ${subject}.`
+      return `${person} wanted to compare notes about ${subject}.`
     case 'alliance':
       if (entry.accepted) return `You formed an alliance with ${person}.`
       return outgoing
@@ -217,7 +217,7 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
     case 'share-suspicion':
       if (entry.reaction === 'landed') return `${person} will take a closer look at ${subject}.`
       if (entry.reaction === 'backfired')
-        return `${person} pushed back on your suspicions about ${subject}. They’re wary of you now.`
+        return `${person} pushed back on your theory about ${subject}. The conversation strained your rapport.`
       return `${person} heard you out and kept their doubts about ${subject} to themselves.`
     case 'defend-guest':
       if (entry.reaction === 'landed')

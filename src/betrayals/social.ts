@@ -2,11 +2,22 @@ import { eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
 import type { Ballot, CommandToken, Phase, Run, SocialEntry, SocialReaction } from './run.ts'
 import { intendsToEnd } from './settlement.ts'
 import {
+  argumentBasis,
+  between,
+  getSocialView,
+  hasAlliance,
+  hearArgument,
+  rapport,
+} from './perception.ts'
+
+import {
   missingSocialResource,
   socialMoveCost,
   socialWalletFor,
   walletAfterSocialMove,
 } from './socialResources.ts'
+
+export { getSocialView, hasAlliance, rapport } from './perception.ts'
 
 export type SocialMove = Omit<SocialEntry, 'day' | 'accepted' | 'reaction' | 'pledgeResult'>
 
@@ -46,26 +57,6 @@ export function choosesSocialSubject(kind: SocialEntry['kind']): boolean {
     kind === 'ask-about' ||
     kind === 'share-suspicion' ||
     kind === 'defend-guest'
-  )
-}
-
-export function getSocialView(run: Run, actorId: string | null): SocialEntry[] {
-  if (actorId === null) return []
-  return run.social
-    .filter((entry) => entry.actorId === actorId || entry.recipientId === actorId)
-    .map((entry) => ({ ...entry }))
-}
-
-function between(entry: SocialEntry, actorId: string, peerId: string): boolean {
-  return (
-    (entry.actorId === actorId && entry.recipientId === peerId) ||
-    (entry.actorId === peerId && entry.recipientId === actorId)
-  )
-}
-
-export function hasAlliance(entries: readonly SocialEntry[], actorId: string, peerId: string) {
-  return entries.some(
-    (entry) => entry.kind === 'alliance' && entry.accepted && between(entry, actorId, peerId)
   )
 }
 
@@ -131,22 +122,6 @@ export function settleVotePacts(run: Run, ballots: readonly Ballot[]): SocialEnt
   })
 }
 
-export function rapport(entries: readonly SocialEntry[], actorId: string, peerId: string): number {
-  let balance = 0
-  for (const entry of entries) {
-    if (!between(entry, actorId, peerId)) continue
-    if (entry.kind === 'rapport') balance += 0.12
-    if (entry.reaction === 'backfired') balance -= 0.12
-    if (entry.reaction === 'repaired') balance += 0.16
-    if (entry.pledgeResult && entry.pledgeResult !== 'void') {
-      const followed =
-        entry.actorId === peerId ? entry.pledgeResult.actor : entry.pledgeResult.recipient
-      balance += followed ? 0.08 : -0.18
-    }
-  }
-  return Math.max(0, Math.min(0.6, balance)) + (hasAlliance(entries, actorId, peerId) ? 0.24 : 0)
-}
-
 export function hasSocialStrain(entries: readonly SocialEntry[], actorId: string, peerId: string) {
   for (let index = entries.length - 1; index >= 0; index--) {
     const entry = entries[index]
@@ -173,7 +148,7 @@ function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined 
     )
   )
     return
-  const trust = rapport(run.social, actorId, recipientId)
+  const trust = rapport(run.social, recipientId, actorId)
   const subjectTrust = suspectId ? rapport(run.social, recipientId, suspectId) : 0
   const previousVote = run.lastTable?.blind === false ? run.lastTable : undefined
   const votes = suspectId ? (previousVote?.tally[suspectId] ?? 0) : 0
@@ -183,11 +158,19 @@ function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined 
       if (subjectTrust >= 0.24) return 'trusts'
       return votes >= 2 ? 'wary' : 'uncertain'
     case 'share-suspicion':
-      if (subjectTrust - trust >= 0.2) return 'backfired'
-      return trust >= 0.12 || votes >= 2 ? 'landed' : 'unmoved'
-    case 'defend-guest':
-      if (votes >= 3 && subjectTrust + trust < 0.24) return 'backfired'
-      return subjectTrust + trust >= 0.12 ? 'landed' : 'unmoved'
+    case 'defend-guest': {
+      if (!suspectId) return 'unmoved'
+      const defending = kind === 'defend-guest'
+      const effect = hearArgument(run, recipientId, {
+        speakerId: actorId,
+        targetId: suspectId,
+        tone: 'careful',
+        stance: defending ? 'defend' : undefined,
+        basis: argumentBasis(run, getSocialView(run, actorId), actorId, suspectId),
+      })
+      if (!defending && subjectTrust - trust >= 0.23 && effect < 0.07) return 'backfired'
+      return Math.abs(effect) >= 0.11 ? 'landed' : 'unmoved'
+    }
     case 'mend-fences':
       return run.social.some(
         (entry) => entry.kind === 'rapport' && between(entry, actorId, recipientId)
@@ -249,7 +232,11 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
     entry.suspectId = suspectId
   }
   if (kind === 'vote-plan' || kind === 'alliance') {
-    entry.accepted = rapport(social, actorId, recipientId) >= 0.12
+    const trust = rapport(social, recipientId, actorId)
+    const protectingAlly = Boolean(
+      kind === 'vote-plan' && suspectId && rapport(social, recipientId, suspectId) > trust + 0.22
+    )
+    entry.accepted = trust >= 0.12 && !protectingAlly
   }
   const reaction = responseToMove(run, move)
   if (reaction) entry.reaction = reaction

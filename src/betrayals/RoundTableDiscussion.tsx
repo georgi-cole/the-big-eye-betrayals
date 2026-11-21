@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import { tableDiscussion, tableTargets } from './table'
@@ -42,7 +42,7 @@ export function RoundTableDiscussion({
   const transcriptRef = useRef<HTMLDivElement>(null)
   const caseHeading = useRef<HTMLHeadingElement>(null)
   const followLatest = useRef(true)
-  const [speeches] = useState(() => tableDiscussion(run))
+  const speeches = useMemo(() => tableDiscussion(run), [run])
   const [caseOpen, setCaseOpen] = useState(false)
   const lead = leadForPlayer(run)
   const [targetId, setTargetId] = useState(() => lead?.suspectId ?? '')
@@ -173,7 +173,7 @@ export function RoundTableDiscussion({
                 <WitnessLeadCard lead={lead} onAsk={onAskWitness} />
               )}
               <h3 ref={caseHeading} tabIndex={-1}>
-                Whose name do you put forward?
+                Who do you want to discuss?
               </h3>
               <ul className="round-table-room__candidates" aria-label="Eligible contestants">
                 {candidates.map((id) => (
@@ -199,8 +199,7 @@ export function RoundTableDiscussion({
               <p>
                 {target ? (
                   <>
-                    You put <strong>{target.name}</strong> forward. Pressing hard can draw suspicion
-                    back to you.
+                    You have the floor. How do you want to handle <strong>{target.name}</strong>?
                   </>
                 ) : (
                   'Choose a guest from the table.'
@@ -227,6 +226,20 @@ export function RoundTableDiscussion({
                     </button>
                   </>
                 )}
+                <button
+                  type="button"
+                  disabled={!target}
+                  onClick={() => onSway({ targetId, tone: 'careful', stance: 'question' })}
+                >
+                  Ask for a reason
+                </button>
+                <button
+                  type="button"
+                  disabled={!target}
+                  onClick={() => onSway({ targetId, tone: 'careful', stance: 'defend' })}
+                >
+                  Defend
+                </button>
                 <button
                   type="button"
                   disabled={!target}

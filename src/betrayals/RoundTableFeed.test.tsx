@@ -42,7 +42,7 @@ describe('Round Table broadcast', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read all' }))
 
     const chat = screen.getByRole('log', { name: 'Round Table conversation' })
-    expect(within(chat).getAllByRole('article')).toHaveLength(24)
+    expect(within(chat).getAllByRole('article')).toHaveLength(4)
     const candidate = run.seats[1]
     fireEvent.click(screen.getByRole('button', { name: 'Take the floor' }))
     fireEvent.click(screen.getByRole('button', { name: candidate.name }))
@@ -50,6 +50,18 @@ describe('Round Table broadcast', () => {
       'aria-pressed',
       'true'
     )
+    fireEvent.click(screen.getByRole('button', { name: 'Ask for a reason' }))
+    expect(onSway).toHaveBeenLastCalledWith({
+      targetId: candidate.id,
+      tone: 'careful',
+      stance: 'question',
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Defend' }))
+    expect(onSway).toHaveBeenLastCalledWith({
+      targetId: candidate.id,
+      tone: 'careful',
+      stance: 'defend',
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Make a case' }))
     expect(onSway).toHaveBeenCalledWith({ targetId: candidate.id, tone: 'careful' })
   })

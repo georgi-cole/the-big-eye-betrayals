@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { advanceDayBeat } from '../src/betrayals/daySocial.ts'
 import { resolveChallenge } from '../src/betrayals/challenges.ts'
 import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
 import {
@@ -211,7 +212,7 @@ test('accusing a close ally backfires and mending fences can restore trust', () 
   run = { ...run, socialWallets: recordSocialWallet(run, actor, { info: 50 }) }
   const accused = exchange(run, actor, peer, 'share-suspicion', subject)
   assert.equal(getSocialView(accused, actor).at(-1).reaction, 'backfired')
-  assert.equal(rapport(accused.social, actor, peer), 0)
+  assert.ok(rapport(accused.social, peer, actor) < rapport(run.social, peer, actor))
   assert.ok(hasSocialStrain(accused.social, actor, peer))
   assert.equal(socialWalletFor(accused, actor).info, 25)
   const patched = exchange({ ...accused, phase: 'night' }, actor, peer, 'mend-fences')
@@ -301,4 +302,33 @@ test('only a voter’s latest private pact can influence a regular table ballot'
   assert.equal(ballot([allied, promised, promised, replaced]), baseline)
   assert.equal(ballot([allied, promised], { phase: 'final-banishment' }), baseline)
   assert.equal(ballot([allied, promised], { day: 5 }), ballot([], { day: 5 }))
+})
+
+test('NPCs build trust, carry suspicions, and make private vote commitments', () => {
+  const original = createRun()
+  const actors = original.seats.filter(({ id }) => id !== original.humanId)
+  const moves = new Set()
+  for (let seed = 1; seed <= 24; seed++) {
+    let run = { ...original, publicSeed: seed }
+    for (const [index, { id }] of actors.entries()) {
+      if (index % 3 === 0) continue
+      const partner = actors[(index + 1) % actors.length].id
+      run = exchange(run, id, partner, 'rapport')
+      if (index % 3 === 1) run = exchange(run, id, partner, 'alliance')
+      run = {
+        ...run,
+        socialWallets: recordSocialWallet(run, id, { influence: 60, info: 80 }),
+      }
+    }
+    const advanced = advanceDayBeat(run)
+    assert.equal(advanced.phase, 'immunity')
+    assert.deepEqual(advanceDayBeat(run), advanced)
+    assert.deepEqual(getSocialView(advanced, run.humanId), [])
+    for (const move of advanced.social.slice(run.social.length)) {
+      if (move.kind !== 'vote-plan' || move.accepted) moves.add(move.kind)
+    }
+  }
+  for (const expected of ['rapport', 'question', 'share-suspicion', 'vote-plan']) {
+    assert.ok(moves.has(expected), 'NPCs should choose ' + expected)
+  }
 })
