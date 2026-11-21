@@ -1,5 +1,5 @@
 import { eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
-import type { CommandToken, Phase, Run, SocialEntry, SocialReaction } from './run.ts'
+import type { Ballot, CommandToken, Phase, Run, SocialEntry, SocialReaction } from './run.ts'
 import { intendsToEnd } from './settlement.ts'
 import {
   missingSocialResource,
@@ -8,7 +8,7 @@ import {
   walletAfterSocialMove,
 } from './socialResources.ts'
 
-export type SocialMove = Omit<SocialEntry, 'day' | 'accepted' | 'reaction'>
+export type SocialMove = Omit<SocialEntry, 'day' | 'accepted' | 'reaction' | 'pledgeResult'>
 
 const checkIn = ['rapport'] as const
 const makePeace = ['rapport', 'mend-fences'] as const
@@ -103,6 +103,34 @@ export function latestPact(
   }
 }
 
+export function settleVotePacts(run: Run, ballots: readonly Ballot[]): SocialEntry[] {
+  const received = new Map(ballots.map(({ voterId, targetId }) => [voterId, targetId]))
+  const openTable: Run = { ...run, phase: 'round-table', runoffIds: undefined }
+  return run.social.map((entry) => {
+    const { actorId, recipientId, suspectId } = entry
+    if (
+      entry.kind !== 'vote-plan' ||
+      !entry.accepted ||
+      entry.day !== run.day ||
+      entry.pledgeResult ||
+      entry !== latestPact(run.social, actorId, recipientId, run.day)
+    )
+      return entry
+    const valid = (id: string) =>
+      received.has(id) && eligibleBanishmentTargets(openTable, id).includes(suspectId ?? '')
+    return {
+      ...entry,
+      pledgeResult:
+        valid(actorId) && valid(recipientId)
+          ? {
+              actor: received.get(actorId) === suspectId,
+              recipient: received.get(recipientId) === suspectId,
+            }
+          : 'void',
+    }
+  })
+}
+
 export function rapport(entries: readonly SocialEntry[], actorId: string, peerId: string): number {
   let balance = 0
   for (const entry of entries) {
@@ -110,6 +138,11 @@ export function rapport(entries: readonly SocialEntry[], actorId: string, peerId
     if (entry.kind === 'rapport') balance += 0.12
     if (entry.reaction === 'backfired') balance -= 0.12
     if (entry.reaction === 'repaired') balance += 0.16
+    if (entry.pledgeResult && entry.pledgeResult !== 'void') {
+      const followed =
+        entry.actorId === peerId ? entry.pledgeResult.actor : entry.pledgeResult.recipient
+      balance += followed ? 0.08 : -0.18
+    }
   }
   return Math.max(0, Math.min(0.6, balance)) + (hasAlliance(entries, actorId, peerId) ? 0.24 : 0)
 }
@@ -118,6 +151,13 @@ export function hasSocialStrain(entries: readonly SocialEntry[], actorId: string
   for (let index = entries.length - 1; index >= 0; index--) {
     const entry = entries[index]
     if (!between(entry, actorId, peerId)) continue
+    const result = entry.pledgeResult
+    if (
+      result &&
+      result !== 'void' &&
+      !(entry.actorId === peerId ? result.actor : result.recipient)
+    )
+      return true
     if (entry.reaction === 'backfired' || entry.reaction === 'repaired') {
       return entry.reaction === 'backfired'
     }

@@ -150,6 +150,25 @@ function validSocialWallets(value: unknown, ids: Set<string>, day: number): bool
   })
 }
 
+function validWitnessLead(value: unknown, ids: Set<string>, day: number): boolean {
+  if (value === undefined) return true
+  const lead = asObject(value)
+  return Boolean(
+    lead &&
+    typeof lead.day === 'number' &&
+    Number.isSafeInteger(lead.day) &&
+    lead.day >= 1 &&
+    lead.day <= day &&
+    validIds(
+      [lead.suspectId, lead.pitchId, lead.sourceId, lead.witnessId, lead.relayId],
+      ids,
+      5,
+      5
+    ) &&
+    (lead.promised === undefined || lead.promised === true)
+  )
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
@@ -181,6 +200,7 @@ function isRun(value: unknown): value is Run {
   const shield = asObject(item.publicShield)
   const pendingTable = asObject(hidden?.pendingTable)
   const pendingNight = asObject(hidden?.pendingNight)
+  const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
   return Boolean(
     ids.size === CAST_SIZE &&
@@ -197,11 +217,21 @@ function isRun(value: unknown): value is Run {
     (item.runoffIds === undefined || validIds(item.runoffIds, ids, 2, CAST_SIZE)) &&
     (item.tableRound === undefined || validTableRound(item.tableRound)) &&
     validTableCount(item.tableCount, ids) &&
+    (lastTable?.revealedBallots === undefined ||
+      (Array.isArray(lastTable.revealedBallots) &&
+        validTableCount({ round: 1, ballots: lastTable.revealedBallots, tiedIds: [] }, ids))) &&
+    validWitnessLead(item.witnessLead, ids, item.day) &&
     (item.tableSway == null ||
       (sway &&
         typeof sway.targetId === 'string' &&
         ids.has(sway.targetId) &&
-        (sway.tone === 'careful' || sway.tone === 'forceful'))) &&
+        (sway.tone === 'careful' || sway.tone === 'forceful') &&
+        (sway.evidence === undefined ||
+          ((sway.evidence === 'call-witness' || sway.evidence === 'name-source') &&
+            asObject(item.witnessLead)?.day === item.day &&
+            asObject(item.witnessLead)?.suspectId === sway.targetId &&
+            (sway.evidence !== 'call-witness' ||
+              asObject(item.witnessLead)?.promised === true))))) &&
     validSafetyStandings(hidden.safetyStandings, ids, item.day) &&
     validIncomingResponses(item.incomingResponses, item.day) &&
     validSocialWallets(item.socialWallets, ids, item.day) &&

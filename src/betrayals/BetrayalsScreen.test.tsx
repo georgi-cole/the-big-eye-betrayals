@@ -241,6 +241,42 @@ describe('Betrayals season review', () => {
     expect(screen.getByRole('button', { name: 'Lock vote' })).toBeDisabled()
   })
 
+  it('lets the player verify a lead privately and call the witness before voting', async () => {
+    const start = startRun(
+      { id: 'human', name: 'Player' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'witness-ui', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, suspect, pitch, source, witness, relay] = start.seats
+    const run = {
+      ...start,
+      phase: 'round-table' as const,
+      witnessLead: {
+        day: start.day,
+        suspectId: suspect.id,
+        pitchId: pitch.id,
+        sourceId: source.id,
+        witnessId: witness.id,
+        relayId: relay.id,
+      },
+    }
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    const room = within(screen.getByRole('dialog', { name: 'Round Table' }))
+    fireEvent.click(room.getByRole('button', { name: 'Take the floor' }))
+    expect(room.queryByRole('button', { name: 'Call ' + witness.name })).not.toBeInTheDocument()
+    await clickAndSave(
+      room.getByRole('button', { name: 'Ask ' + witness.name + ' privately \u00b7 1 energy' })
+    )
+    expect(room.getByRole('status')).toHaveTextContent(witness.name + ' will confirm')
+    await clickAndSave(room.getByRole('button', { name: 'Call ' + witness.name }))
+    expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Faux TV' })).getByRole('status')
+    ).toHaveTextContent('I was there.')
+  })
+
   it('keeps a completed vote count visible after a private check-in', async () => {
     const start = startRun(
       { id: 'human', name: 'Georgi' },

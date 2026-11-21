@@ -3,6 +3,8 @@ import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import { tableDiscussion, tableTargets } from './table'
 import type { Run, Seat, TableSway } from './run'
+import { leadForPlayer } from './intel'
+import { WitnessLeadCard } from './WitnessLeadCard'
 import './RoundTableDiscussion.css'
 
 type Props = {
@@ -12,6 +14,7 @@ type Props = {
   shieldName?: string
   reducedMotion?: boolean
   onBack: () => void
+  onAskWitness: () => void
   onSway: (choice: TableSway | null) => void
 }
 
@@ -32,6 +35,7 @@ export function RoundTableDiscussion({
   shieldName,
   reducedMotion,
   onBack,
+  onAskWitness,
   onSway,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -40,7 +44,8 @@ export function RoundTableDiscussion({
   const followLatest = useRef(true)
   const [speeches] = useState(() => tableDiscussion(run))
   const [caseOpen, setCaseOpen] = useState(false)
-  const [targetId, setTargetId] = useState('')
+  const lead = leadForPlayer(run)
+  const [targetId, setTargetId] = useState(() => lead?.suspectId ?? '')
   const [behind, setBehind] = useState(false)
   const prefersReducedMotion = usePresentationReducedMotion()
   const motionReduced = reducedMotion || prefersReducedMotion
@@ -138,13 +143,19 @@ export function RoundTableDiscussion({
           >
             {speeches
               .slice(0, visible)
-              .map(({ speakerId, targetId: nomination, argument }, index) => (
-                <article key={speakerId} data-current={index === visible - 1 || undefined}>
+              .map(({ speakerId, targetId: nomination, argument, verb }, index) => (
+                <article
+                  key={speakerId + ':' + index}
+                  data-current={index === visible - 1 || undefined}
+                >
                   <Portrait guest={seats.get(speakerId)} />
                   <div>
                     <header>
                       <strong>{seats.get(speakerId)?.name}</strong>
-                      <span> names {seats.get(nomination)?.name}</span>
+                      <span>
+                        {' '}
+                        {verb ?? 'names'} {seats.get(nomination)?.name}
+                      </span>
                     </header>
                     <p>{argument}</p>
                   </div>
@@ -158,6 +169,9 @@ export function RoundTableDiscussion({
 
           {caseOpen && (
             <div className="round-table-room__case">
+              {lead && candidates.includes(lead.suspectId) && (
+                <WitnessLeadCard lead={lead} onAsk={onAskWitness} />
+              )}
               <h3 ref={caseHeading} tabIndex={-1}>
                 Whose name do you put forward?
               </h3>
@@ -193,6 +207,26 @@ export function RoundTableDiscussion({
                 )}
               </p>
               <div className="round-table-room__stances">
+                {lead && targetId === lead.suspectId && target && (
+                  <>
+                    {lead.promised && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSway({ targetId, tone: 'careful', evidence: 'call-witness' })
+                        }
+                      >
+                        Call {lead.witness}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onSway({ targetId, tone: 'careful', evidence: 'name-source' })}
+                    >
+                      Name {lead.source} as your source
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   disabled={!target}

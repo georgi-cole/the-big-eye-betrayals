@@ -1,7 +1,6 @@
 import { lazy, Suspense, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { REALITY_MODE_PRESETS, REALITY_PRESET_TUNING } from '../modes/realityMode'
-import { mulberry32 } from '../store/rng'
+import { REALITY_MODE_PRESETS } from '../modes/realityMode'
 import {
   flushDurablePersistence,
   getDurableItem,
@@ -17,14 +16,7 @@ import { BetrayalsSocialPanel } from './BetrayalsSocialPanel'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
 import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferences'
 import type { Run, Phase, RealityPreset } from './run'
-import {
-  acknowledgeRole,
-  advancePreparation,
-  commandToken,
-  eligibleBanishmentTargets,
-  startRun,
-  viewFor,
-} from './run'
+import { acknowledgeRole, commandToken, eligibleBanishmentTargets, startRun, viewFor } from './run'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
 import { challengeBriefing, challengeGame, challengeSeed, scoreField } from './challengeRotation'
@@ -32,7 +24,10 @@ import { CinematicScene } from './CinematicScene'
 import { getIncomingInteractions, respondToIncomingInteraction } from './incoming'
 import { getConclaveView, resolveConclave, revealDawn } from './night'
 import { cinematicFor, presentationAfter } from './presentation'
-import { chooseTarget } from './strategy'
+import { chooseTarget, resolutionPerspective } from './strategy'
+import { advanceDayBeat } from './daySocial'
+import { askWitness, leadForPlayer } from './intel'
+import { WitnessLeadCard } from './WitnessLeadCard'
 import {
   advanceTableRound,
   buildTableBallots,
@@ -105,49 +100,6 @@ function begin(
 function restore(): Run | null {
   const snapshot = restoreRun(saveStorage, profile)
   return snapshot.status === 'ready' ? snapshot.run : null
-}
-
-function resolutionPerspective(run: Run, actorId: string, eligibleIds: string[]) {
-  const view = viewFor(run, actorId)
-  return {
-    actorId,
-    role: view.role ?? 'loyal',
-    teammates: view.teammateIds,
-    day: run.day,
-    phase: run.phase,
-    seed: run.publicSeed,
-    eligibleIds,
-    ownConversations: getSocialView(run, actorId),
-    publicTally: run.lastTable?.tally ?? {},
-  }
-}
-
-function advanceDayBeat(run: Run): Run {
-  let active = run
-  if (active.phase === 'social' && active.options.realityMode !== 'off') {
-    const tuning = REALITY_PRESET_TUNING[active.options.realityMode]
-    const rng = mulberry32(active.publicSeed ^ (active.day * 917))
-    const seats = active.seats.filter(({ exit }) => !exit)
-    const actors = seats.filter(({ id }) => id !== active.humanId)
-    const count = Math.min(actors.length, Math.round(3 * tuning.arcIntensityMultiplier))
-    for (let index = 0; index < count; index++) {
-      const actor = actors[Math.floor(rng() * actors.length)]
-      const audience = actors.filter(({ id }) => id !== actor.id)
-      if (!audience.length) break
-      const recipient = audience[Math.floor(rng() * audience.length)]
-      const targets = seats
-        .filter(({ id }) => id !== actor.id && id !== recipient.id)
-        .map(({ id }) => id)
-      const suspectId = chooseTarget(resolutionPerspective(active, actor.id, targets), 'table')
-      active = applySocialMove(active, commandToken(active), {
-        actorId: actor.id,
-        recipientId: recipient.id,
-        kind: 'question',
-        suspectId,
-      })
-    }
-  }
-  return advancePreparation(active, commandToken(active))
 }
 
 export default function BetrayalsScreen() {
@@ -323,6 +275,7 @@ export default function BetrayalsScreen() {
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
   const conversation = participating ? getSocialView(run, run.humanId) : []
+  const lead = leadForPlayer(run)
   const recent = conversation
     .filter((entry) => entry.day === run.day && entry.actorId === run.humanId)
     .at(-1)
@@ -460,11 +413,20 @@ export default function BetrayalsScreen() {
           ? pendingIncoming[0].speaker.name + ' wants a word with you.'
           : 'Speak privately before the challenge.'
         : 'The survivors trade suspicions.'
-      broadcastAction = pendingIncoming.length ? (
-        <button type="button" className="betrayals-inline-action" onClick={openIncoming}>
-          Hear them out
-        </button>
-      ) : undefined
+      broadcastAction =
+        lead && !lead.promised ? (
+          <button
+            type="button"
+            className="betrayals-inline-action"
+            onClick={() => setSocialOpen(true)}
+          >
+            Review private lead
+          </button>
+        ) : pendingIncoming.length ? (
+          <button type="button" className="betrayals-inline-action" onClick={openIncoming}>
+            Hear them out
+          </button>
+        ) : undefined
       play = { label: 'Play: begin Immunity Challenge', onClick: () => apply(advanceDayBeat) }
       break
     case 'immunity':
@@ -806,6 +768,15 @@ export default function BetrayalsScreen() {
             day={run.day}
             conversation={conversation}
             recent={recent}
+            intel={
+              lead &&
+              stage === 'social' && (
+                <WitnessLeadCard
+                  lead={lead}
+                  onAsk={() => apply((active) => askWitness(active, token))}
+                />
+              )
+            }
             onClose={() => setSocialOpen(false)}
             onMove={(kind, suspectId, recipientId) =>
               apply((active) => {
@@ -858,6 +829,7 @@ export default function BetrayalsScreen() {
             utilities.playEffect('ui:navigate', 0.45)
             setClosedDiscussion(discussionKey)
           }}
+          onAskWitness={() => apply((active) => askWitness(active, token))}
           onSway={(choice) => {
             utilities.playEffect('tv:ceremony_transition', 0.45)
             apply((active) => recordTableSway(active, token, choice))

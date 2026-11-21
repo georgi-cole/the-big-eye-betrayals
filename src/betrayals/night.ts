@@ -95,6 +95,7 @@ function chooseNominee(run: Run, actorId: string, eligibleIds: string[]) {
       eligibleIds,
       ownConversations: getSocialView(run, actorId),
       publicTally: run.lastTable?.tally ?? {},
+      revealedBallots: run.lastTable?.revealedBallots,
     },
     'night'
   )
@@ -114,6 +115,13 @@ function nominate(run: Run, humanTargetId?: string): Ballot[] {
 
 function caseFor(run: Run, voterId: string, targetId: string) {
   const ownConversations = getSocialView(run, voterId)
+  const castAgainst = run.lastTable?.revealedBallots?.find(
+    ({ voterId }) => voterId === targetId
+  )?.targetId
+  if (castAgainst === voterId)
+    return 'They already voted for me. They could bring others next time.'
+  if (castAgainst && knownTeammateIds(run, voterId).includes(castAgainst))
+    return 'They voted for one of us. That is a campaign we cannot let grow.'
   if (rapport(ownConversations, voterId, targetId) > 0.12) {
     return 'They trust me. Their absence could throw tomorrow’s alliances off balance.'
   }

@@ -170,6 +170,7 @@ type Props = {
   canAct?: boolean
   conversation?: readonly SocialEntry[]
   recent?: SocialEntry
+  intel?: React.ReactNode
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
 }
@@ -191,6 +192,18 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
         ? `${person} needs more trust to form an alliance.`
         : `You declined an alliance with ${person}.`
     case 'vote-plan':
+      if (entry.pledgeResult === 'void') return `The pact with ${person} no longer applied.`
+      if (entry.pledgeResult) {
+        const { actor, recipient } = entry.pledgeResult
+        const yourVote = outgoing ? actor : recipient
+        const theirVote = outgoing ? recipient : actor
+        if (yourVote && theirVote) return `You and ${person} kept your pact to vote for ${subject}.`
+        if (!yourVote && !theirVote)
+          return `You and ${person} both broke your pact to vote for ${subject}.`
+        return yourVote
+          ? `${person} broke the pact to vote for ${subject}.`
+          : `You broke your pact with ${person} to vote for ${subject}.`
+      }
       if (entry.accepted) return `You and ${person} pledged to vote for ${subject}.`
       return outgoing
         ? `${person} declined your plan. Build trust to make a pact.`
@@ -344,6 +357,7 @@ export function BetrayalsSocialPanel({
   canAct = moveKinds.length > 0,
   conversation = [],
   recent,
+  intel,
   onClose,
   onMove,
 }: Props) {
@@ -523,6 +537,7 @@ export function BetrayalsSocialPanel({
           id="betrayals-social-body"
           className={'sp2-body' + (peer && canAct ? ' sp2-body--focused-target' : '')}
         >
+          {!peer && intel}
           {!peer && contacts.length > 0 && (
             <section className="sp2-hubmates" aria-label="Player roster">
               <div className="sp2-section-heading">
