@@ -169,6 +169,54 @@ function validWitnessLead(value: unknown, ids: Set<string>, day: number): boolea
   )
 }
 
+function validTableArguments(value: unknown, ids: Set<string>): boolean {
+  if (value === undefined) return true
+  if (!Array.isArray(value) || value.length > 5) return false
+  const speakers = new Set<string>()
+  return value.every((entry: unknown) => {
+    const argument = asObject(entry)
+    if (
+      !argument ||
+      typeof argument.speakerId !== 'string' ||
+      speakers.has(argument.speakerId) ||
+      !validIds([argument.speakerId, argument.targetId], ids, 2, 2) ||
+      (argument.tone !== 'careful' && argument.tone !== 'forceful') ||
+      (argument.stance !== undefined &&
+        argument.stance !== 'question' &&
+        argument.stance !== 'defend') ||
+      (argument.basis !== 'impression' &&
+        argument.basis !== 'conversation' &&
+        argument.basis !== 'record') ||
+      (argument.evidence !== undefined &&
+        argument.evidence !== 'call-witness' &&
+        argument.evidence !== 'name-source')
+    )
+      return false
+    speakers.add(argument.speakerId)
+    return true
+  })
+}
+
+function validCaseReviews(value: unknown, ids: Set<string>, day: number): boolean {
+  if (value === undefined) return true
+  return (
+    Array.isArray(value) &&
+    value.length <= 25 &&
+    value.every((entry: unknown) => {
+      const review = asObject(entry)
+      return (
+        review &&
+        typeof review.day === 'number' &&
+        Number.isSafeInteger(review.day) &&
+        review.day >= 1 &&
+        review.day <= day &&
+        validIds([review.speakerId, review.targetId], ids, 2, 2) &&
+        (review.result === 'caught' || review.result === 'missed')
+      )
+    })
+  )
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
@@ -220,12 +268,16 @@ function isRun(value: unknown): value is Run {
     (lastTable?.revealedBallots === undefined ||
       (Array.isArray(lastTable.revealedBallots) &&
         validTableCount({ round: 1, ballots: lastTable.revealedBallots, tiedIds: [] }, ids))) &&
+    validTableArguments(item.tableArguments, ids) &&
+    validTableArguments(lastTable?.campaigns, ids) &&
+    validCaseReviews(item.caseReviews, ids, item.day) &&
     validWitnessLead(item.witnessLead, ids, item.day) &&
     (item.tableSway == null ||
       (sway &&
         typeof sway.targetId === 'string' &&
         ids.has(sway.targetId) &&
         (sway.tone === 'careful' || sway.tone === 'forceful') &&
+        (sway.stance === undefined || sway.stance === 'question' || sway.stance === 'defend') &&
         (sway.evidence === undefined ||
           ((sway.evidence === 'call-witness' || sway.evidence === 'name-source') &&
             asObject(item.witnessLead)?.day === item.day &&

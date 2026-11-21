@@ -77,6 +77,7 @@ export type TableReceipt = {
   tally: Record<string, number>
   tiedByDraw: boolean
   revealedBallots?: Ballot[]
+  campaigns?: TableArgument[]
 }
 
 export const PRESENTATION_CUES = [
@@ -105,6 +106,19 @@ export type TableSway = {
   targetId: string
   tone: 'careful' | 'forceful'
   evidence?: import('./intel.ts').TableEvidence
+  stance?: 'question' | 'defend'
+}
+
+export type TableArgument = TableSway & {
+  speakerId: string
+  basis: 'impression' | 'conversation' | 'record'
+}
+
+export type CaseReview = {
+  day: number
+  speakerId: string
+  targetId: string
+  result: 'caught' | 'missed'
 }
 
 export type Run = {
@@ -140,6 +154,8 @@ export type Run = {
   tableRound?: number
   tableCount?: TableCount
   tableSway?: TableSway | null
+  tableArguments?: TableArgument[]
+  caseReviews?: CaseReview[]
   lastTable?: TableReceipt
   lastDawn?: { day: number; eliminatedId: string | null }
   result?: {

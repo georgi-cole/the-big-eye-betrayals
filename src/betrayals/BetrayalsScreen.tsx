@@ -403,10 +403,18 @@ export default function BetrayalsScreen() {
         onClick: () => apply((active) => acknowledgeRole(active, token)),
       }
       break
-    case 'dawn':
+    case 'dawn': {
       message = dawn
+      const reviewedCase = run.caseReviews?.find(
+        ({ day, speakerId, result }) =>
+          day === run.day - 1 && speakerId === run.humanId && result === 'missed'
+      )
+      if (participating && reviewedCase) {
+        detail = `After your case against ${label(reviewedCase.targetId)}, guests may ask for stronger proof next time.`
+      }
       play = { label: 'Play: enter Social', onClick: () => apply(advanceDayBeat) }
       break
+    }
     case 'social':
       message = canSocialize
         ? pendingIncoming.length

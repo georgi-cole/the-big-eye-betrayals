@@ -233,9 +233,19 @@ export function RoundTableFeed(props: RoundTableFeedProps) {
   }
   const response = tableSwayResponse(run)
   const challenged = run.seats.find(({ id }) => id === run.tableSway?.targetId)
+  const action =
+    run.tableSway?.stance === 'defend'
+      ? 'defended'
+      : run.tableSway?.stance === 'question'
+        ? 'asked about'
+        : 'challenged'
   return response ? (
     <p className="round-table-feed__call" role="status">
-      {challenged && <strong>You challenged {challenged.name}. </strong>}
+      {challenged && (
+        <strong>
+          You {action} {challenged.name}.{' '}
+        </strong>
+      )}
       {response}
     </p>
   ) : null

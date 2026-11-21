@@ -14,6 +14,7 @@ import {
   recordTableSway,
   resolveTable,
   revealTable,
+  tableArgumentPressure,
   tableDiscussion,
   tableLeaderboard,
   tableRoundNumber,
@@ -21,6 +22,7 @@ import {
 } from '../src/betrayals/table.ts'
 import { nightTargets, resolveNight, revealDawn } from '../src/betrayals/night.ts'
 import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
+import { relationship, trackRecord } from '../src/betrayals/perception.ts'
 
 function createRun() {
   return startRun(
@@ -186,17 +188,25 @@ test('a large tie never cuts through an equal group of leaders', () => {
   })
 })
 
-test('persuasion can move votes onto the requested candidate and back onto the speaker', () => {
+test('a credible public case can move votes onto the candidate', () => {
   const base = createRun()
   const run = {
     ...base,
     phase: 'round-table',
     options: { publicMode: false, realityMode: 'off' },
     immunityId: base.seats[1].id,
+    social: base.seats.slice(3, 12).flatMap(({ id }) =>
+      Array.from({ length: 3 }, () => ({
+        day: 1,
+        actorId: id,
+        recipientId: base.humanId,
+        kind: 'rapport',
+      }))
+    ),
   }
   const candidate = run.seats[2].id
   const speeches = tableDiscussion(run)
-  assert.equal(speeches.length, 24)
+  assert.equal(speeches.length, 4)
   assert.ok(speeches.every(({ targetId }) => targetId !== run.immunityId))
   const baseline = buildTableBallots(run, candidate)
   assert.strictEqual(
@@ -210,7 +220,7 @@ test('persuasion can move votes onto the requested candidate and back onto the s
   const afterSway = buildTableBallots(reload(committed), candidate)
   const count = (ballots, target) => ballots.filter(({ targetId }) => targetId === target).length
   assert.ok(count(afterSway, candidate) > count(baseline, candidate))
-  assert.ok(count(afterSway, run.humanId) > count(baseline, run.humanId))
+  assert.ok(count(afterSway, run.humanId) <= count(baseline, run.humanId))
   assert.strictEqual(recordTableSway(committed, commandToken(committed), null), committed)
 })
 
@@ -254,4 +264,86 @@ test('the regular ballot at six enters the finale after its public role reveal',
   const revealed = revealTable(pending, commandToken(pending))
   assert.equal(revealed.phase, 'final-challenge')
   assert.equal(revealed.seats.find(({ id }) => id === loyals[0].id).exit.revealedRole, 'loyal')
+})
+
+test('sway belongs to the argument, and repeating an unverified case cannot stack pressure', () => {
+  const run = createRun()
+  const [speaker, echo, listener, target] = run.seats
+  const argument = {
+    speakerId: speaker.id,
+    targetId: target.id,
+    tone: 'careful',
+    basis: 'conversation',
+  }
+  const original = tableArgumentPressure(run, listener.id, [argument])
+  assert.ok(original.get(target.id) > 0)
+  assert.equal(original.has(speaker.id), false)
+
+  const swapped = { ...run, humanId: echo.id }
+  const repeated = { ...argument, speakerId: echo.id }
+  assert.deepEqual(tableArgumentPressure(swapped, listener.id, [argument]), original)
+  assert.deepEqual(tableArgumentPressure(swapped, listener.id, [argument, repeated]), original)
+
+  const defense = { ...repeated, stance: 'defend' }
+  assert.ok(
+    tableArgumentPressure(run, listener.id, [argument, defense]).get(target.id) <
+      original.get(target.id)
+  )
+})
+
+test('Noa’s public reveal reviews the campaign and credits the alliance follower separately', () => {
+  const base = createRun()
+  const [follower, leader, observer] = base.seats
+  const target = base.seats.slice(3).find(({ id }) => !base.private.betrayers.includes(id))
+  const pact = {
+    actorId: leader.id,
+    recipientId: follower.id,
+    suspectId: target.id,
+    day: base.day,
+    kind: 'vote-plan',
+    accepted: true,
+  }
+  const statements = [
+    { speakerId: leader.id, targetId: target.id, tone: 'forceful', basis: 'impression' },
+    {
+      speakerId: follower.id,
+      targetId: target.id,
+      tone: 'careful',
+      basis: 'impression',
+      stance: 'question',
+    },
+  ]
+  const run = {
+    ...base,
+    phase: 'round-table',
+    tableArguments: statements,
+    tableSway: null,
+    social: [pact],
+  }
+  const reveal = (round) => {
+    const counted = resolveTable(round, commandToken(round), voteAll(round, target.id))
+    return reload(revealTable(reload(counted), commandToken(counted)))
+  }
+  for (const participant of [follower, leader]) {
+    const revealed = reveal({ ...run, humanId: participant.id })
+    assert.equal(relationship(revealed.social, leader.id, follower.id).reliability, 0.08)
+    assert.equal(trackRecord(revealed, follower.id), 0)
+    assert.ok(trackRecord(revealed, leader.id) < 0)
+    assert.ok(
+      trackRecord({ ...revealed, day: revealed.day + 3 }, leader.id) >
+        trackRecord(revealed, leader.id)
+    )
+    assert.deepEqual(
+      revealed.caseReviews.map(({ speakerId }) => speakerId),
+      [leader.id]
+    )
+    assert.equal(relationship(revealed.social, observer.id, follower.id).reliability, 0)
+  }
+
+  const careful = { ...run, tableArguments: [{ ...statements[0], tone: 'careful' }] }
+  assert.equal(trackRecord(reveal(careful), leader.id), 0)
+
+  const secret = reveal({ ...run, phase: 'final-banishment' })
+  assert.equal(secret.seats.find(({ id }) => id === target.id).exit.revealedRole, undefined)
+  assert.equal(trackRecord(secret, leader.id), 0)
 })

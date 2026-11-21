@@ -2,7 +2,7 @@ import { mulberry32, seededPick } from '../store/rng.ts'
 import { isCurrentCommand, knownTeammateIds } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { getSocialView, rapport } from './social.ts'
-import { chooseTarget } from './strategy.ts'
+import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 
 type ConclaveProposal = {
@@ -84,21 +84,7 @@ export function resolveNight(
 }
 
 function chooseNominee(run: Run, actorId: string, eligibleIds: string[]) {
-  return chooseTarget(
-    {
-      actorId,
-      role: 'betrayer',
-      teammates: knownTeammateIds(run, actorId),
-      day: run.day,
-      phase: run.phase,
-      seed: run.publicSeed,
-      eligibleIds,
-      ownConversations: getSocialView(run, actorId),
-      publicTally: run.lastTable?.tally ?? {},
-      revealedBallots: run.lastTable?.revealedBallots,
-    },
-    'night'
-  )
+  return chooseTarget(resolutionPerspective(run, actorId, eligibleIds), 'night')
 }
 
 function nominate(run: Run, humanTargetId?: string): Ballot[] {
@@ -115,6 +101,14 @@ function nominate(run: Run, humanTargetId?: string): Ballot[] {
 
 function caseFor(run: Run, voterId: string, targetId: string) {
   const ownConversations = getSocialView(run, voterId)
+  const threats = new Set([voterId, ...knownTeammateIds(run, voterId)])
+  if (
+    run.lastTable?.campaigns?.some(
+      (claim) => claim.speakerId === targetId && threats.has(claim.targetId)
+    )
+  ) {
+    return 'They were building a case against us at the table. By morning they could have more people behind it.'
+  }
   const castAgainst = run.lastTable?.revealedBallots?.find(
     ({ voterId }) => voterId === targetId
   )?.targetId
