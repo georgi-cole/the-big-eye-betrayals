@@ -1,13 +1,14 @@
 import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
-import { MAX_TABLE_ROUNDS, eligibleBanishmentTargets, isCurrentCommand, viewFor } from './run.ts'
+import { MAX_TABLE_ROUNDS, eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
 import type { Ballot, CommandToken, Run, TableReceipt, TableSway } from './run.ts'
 import { settleRun } from './settlement.ts'
-import { getSocialView, rapport } from './social.ts'
-import { chooseTarget } from './strategy.ts'
+import { getSocialView, rapport, settleVotePacts } from './social.ts'
+import { chooseTarget, resolutionPerspective } from './strategy.ts'
+import { activeLead, canPresentEvidence, evidenceSpeech } from './intel.ts'
 
 export type { Ballot } from './run.ts'
 
-type TableSpeech = { speakerId: string; targetId: string; argument: string }
+type TableSpeech = { speakerId: string; targetId: string; argument: string; verb?: string }
 
 const argumentsAtTable = [
   'I keep coming back to the way they listen before they commit. I want to know where they stand.',
@@ -58,16 +59,32 @@ export function recordTableSway(run: Run, token: CommandToken, choice: TableSway
   if (
     choice &&
     (!tableTargets(run, run.humanId).includes(choice.targetId) ||
-      (choice.tone !== 'careful' && choice.tone !== 'forceful'))
+      (choice.tone !== 'careful' && choice.tone !== 'forceful') ||
+      (choice.evidence !== undefined && !canPresentEvidence(run, choice.targetId, choice.evidence)))
   ) {
     return run
   }
-  return { ...run, revision: run.revision + 1, tableSway: choice ? { ...choice } : null }
+  const lead = activeLead(run)
+  const social =
+    choice?.evidence === 'name-source' && lead
+      ? [
+          ...run.social,
+          {
+            day: run.day,
+            actorId: run.humanId,
+            recipientId: lead.sourceId,
+            kind: 'share-suspicion' as const,
+            suspectId: lead.suspectId,
+            reaction: 'backfired' as const,
+          },
+        ]
+      : run.social
+  return { ...run, revision: run.revision + 1, social, tableSway: choice ? { ...choice } : null }
 }
 
 function reactionToSway(run: Run, voterId: string, index: number): number {
   const sway = run.tableSway
-  if (!sway || voterId === run.humanId) return 0
+  if (!sway || sway.evidence || voterId === run.humanId) return 0
   if (voterId === sway.targetId) return sway.tone === 'forceful' ? -0.62 : -0.3
 
   const conversations = getSocialView(run, voterId)
@@ -82,7 +99,6 @@ function reactionToSway(run: Run, voterId: string, index: number): number {
 }
 
 function strategyTarget(run: Run, voterId: string, eligibleIds: string[], reaction = 0) {
-  const view = viewFor(run, voterId)
   const sway = run.tableSway
   let tablePressure: ReadonlyMap<string, number> | undefined
   if (sway && reaction) {
@@ -91,15 +107,7 @@ function strategyTarget(run: Run, voterId: string, eligibleIds: string[], reacti
   }
   return chooseTarget(
     {
-      actorId: voterId,
-      role: view.role ?? 'loyal',
-      teammates: view.teammateIds,
-      day: run.day,
-      phase: run.phase,
-      seed: run.publicSeed,
-      eligibleIds,
-      ownConversations: getSocialView(run, voterId),
-      publicTally: run.lastTable?.tally ?? {},
+      ...resolutionPerspective(run, voterId, eligibleIds),
       tableRound: run.runoffIds ? tableRoundNumber(run) : undefined,
       tablePressure,
     },
@@ -112,7 +120,7 @@ export function tableDiscussion(run: Run): TableSpeech[] {
   const speakers = run.seats.filter(({ id, exit }) => !exit && id !== run.humanId)
   const order = seededPickN(random, speakers, speakers.length)
   const argumentsInOrder = seededPickN(random, argumentsAtTable, argumentsAtTable.length)
-  return order.flatMap(({ id: speakerId }, index) => {
+  const pitches = order.flatMap(({ id: speakerId }, index) => {
     const targets = tableTargets(run, speakerId)
     const targetId = strategyTarget(run, speakerId, targets)
     if (!targetId) return []
@@ -135,10 +143,12 @@ export function tableDiscussion(run: Run): TableSpeech[] {
       },
     ]
   })
+  return [...evidenceSpeech(run), ...pitches]
 }
 
 export function tableSwayResponse(run: Run): string | undefined {
   if (!run.tableSway) return
+  if (run.tableSway.evidence) return evidenceSpeech(run).at(-1)?.argument
   const responses = run.seats
     .map(({ id, exit }, index) => (exit ? 0 : reactionToSway(run, id, index)))
     .filter(Boolean)
@@ -247,6 +257,10 @@ export function advanceTableRound(run: Run, token: CommandToken): Run {
     ...run,
     revision: run.revision + 1,
     tableRound: count.round + 1,
+    social:
+      count.round === 1 && run.phase === 'round-table'
+        ? settleVotePacts(run, count.ballots)
+        : run.social,
     tableCount: undefined,
   }
 }
@@ -281,7 +295,11 @@ export function revealTable(run: Run, token: CommandToken): Run {
     phase,
     revision: run.revision + 1,
     seats,
-    lastTable: outcome,
+    lastTable: { ...outcome, revealedBallots: run.tableCount?.ballots },
+    social:
+      !outcome.blind && run.tableCount?.round === 1
+        ? settleVotePacts(run, run.tableCount.ballots)
+        : run.social,
     tableRound: undefined,
     tableCount: undefined,
     tableSway: undefined,

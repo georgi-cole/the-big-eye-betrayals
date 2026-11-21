@@ -6,7 +6,7 @@ import { INCOMING_ANSWERS, isCurrentCommand } from './run.ts'
 import type { CommandToken, Contestant, IncomingAnswer, Run, SocialEntry } from './run.ts'
 import { getSocialView, hasAlliance, rapport } from './social.ts'
 import { recordSocialWallet } from './socialResources.ts'
-import { chooseTarget } from './strategy.ts'
+import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { tableDiscussionOpen, tableTargets } from './table.ts'
 
 type EncounterKind = 'confidence' | 'alliance' | 'vote-plan'
@@ -145,15 +145,12 @@ export function getIncomingInteractions(run: Run): IncomingInteraction[] {
       kind === 'vote-plan' &&
       chooseTarget(
         {
-          actorId: speaker.id,
-          role: 'loyal',
-          teammates: [],
-          day: run.day,
-          phase: run.phase,
-          seed: run.publicSeed,
-          eligibleIds: candidates.map(({ id }) => id),
+          ...resolutionPerspective(
+            earlierRun,
+            speaker.id,
+            candidates.map(({ id }) => id)
+          ),
           ownConversations: prior,
-          publicTally: run.lastTable?.tally ?? {},
         },
         'table'
       )

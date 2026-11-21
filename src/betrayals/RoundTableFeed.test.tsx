@@ -29,7 +29,14 @@ describe('Round Table broadcast', () => {
     const run = createRound()
     const onSway = vi.fn()
     render(
-      <RoundTableDiscussion run={run} open art="/council.jpg" onBack={vi.fn()} onSway={onSway} />
+      <RoundTableDiscussion
+        run={run}
+        open
+        art="/council.jpg"
+        onBack={vi.fn()}
+        onAskWitness={vi.fn()}
+        onSway={onSway}
+      />
     )
     expect(screen.getByRole('button', { name: 'Take the floor' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Read all' }))

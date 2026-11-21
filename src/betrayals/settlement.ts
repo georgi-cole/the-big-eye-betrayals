@@ -7,11 +7,24 @@ type EndVote = { voterId: string; choice: 'end' | 'banish' }
 
 export function intendsToEnd(run: Run, voterId: string): boolean {
   const roll = mulberry32(run.publicSeed ^ hashId(voterId) ^ (run.day * 97))()
-  if (run.private.betrayers.includes(voterId)) return roll >= 0.18
-  const revealedBetrayers = run.seats.filter(({ exit }) => exit?.revealedRole === 'betrayer').length
-  const pressure = Math.max(0, ...Object.values(run.lastTable?.tally ?? {}))
-  const confidence = Math.min(0.9, 0.13 + revealedBetrayers * 0.16 - pressure * 0.035)
-  return roll < confidence
+  const tally = run.lastTable?.tally ?? {}
+  const danger = Math.min(1, (tally[voterId] ?? 0) / 4)
+  if (run.private.betrayers.includes(voterId)) return roll >= 0.1 - danger * 0.08
+  const revealed = run.seats.filter(({ exit }) => exit?.revealedRole === 'betrayer').length
+  const contenders = run.seats.filter(({ id, exit }) => id !== voterId && !exit)
+  const rivalIds = new Set(contenders.map(({ id }) => id))
+  const privateCase = run.social.some(
+    (entry) =>
+      entry.recipientId === voterId &&
+      entry.day >= run.day - 1 &&
+      rivalIds.has(entry.suspectId ?? '') &&
+      (entry.kind === 'question' ||
+        (entry.kind === 'share-suspicion' && entry.reaction === 'landed'))
+  )
+  const rivalPressure = Math.max(0, ...contenders.map(({ id }) => tally[id] ?? 0))
+  const confidence =
+    0.12 + revealed * 0.16 + danger * 0.18 - rivalPressure * 0.05 - (privateCase ? 0.18 : 0)
+  return roll < Math.max(0.03, Math.min(0.92, confidence))
 }
 
 export function settleRun(run: Run, reason: Reason): Run {

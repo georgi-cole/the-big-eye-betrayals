@@ -1,7 +1,9 @@
 import { mulberry32 } from '../store/rng.ts'
-import { hashId } from './run.ts'
-import type { Phase, Role, SocialEntry } from './run.ts'
-import { hasAlliance, rapport } from './social.ts'
+import { hashId, viewFor } from './run.ts'
+import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
+import { incidentPressure } from './intel.ts'
+import type { Ballot, Phase, Role, Run, SocialEntry } from './run.ts'
+import { getSocialView, hasAlliance, rapport } from './social.ts'
 
 type Perspective = {
   actorId: string
@@ -12,9 +14,32 @@ type Perspective = {
   seed: number
   ownConversations: readonly SocialEntry[]
   publicTally: Readonly<Record<string, number>>
+  revealedBallots?: readonly Ballot[]
   eligibleIds: readonly string[]
+  evidence?: ReadonlyMap<string, number>
   tableRound?: number
   tablePressure?: ReadonlyMap<string, number>
+}
+
+export function resolutionPerspective(
+  run: Run,
+  actorId: string,
+  eligibleIds: readonly string[]
+): Perspective {
+  const view = viewFor(run, actorId)
+  return {
+    actorId,
+    role: view.role ?? 'loyal',
+    teammates: view.teammateIds,
+    day: run.day,
+    phase: run.phase,
+    seed: run.publicSeed,
+    eligibleIds,
+    ownConversations: getSocialView(run, actorId),
+    publicTally: run.lastTable?.tally ?? {},
+    revealedBallots: run.lastTable?.revealedBallots,
+    evidence: incidentPressure(run, actorId),
+  }
 }
 
 function socialPressure({ actorId, day, ownConversations }: Perspective) {
@@ -27,7 +52,7 @@ function socialPressure({ actorId, day, ownConversations }: Perspective) {
     const incoming = entry.recipientId === actorId
     if (!incoming && entry.actorId !== actorId) continue
 
-    if (entry.kind === 'vote-plan' && entry.accepted)
+    if (entry.kind === 'vote-plan' && entry.accepted && !entry.pledgeResult)
       pledges.set(incoming ? entry.actorId : entry.recipientId, entry.suspectId)
     if (entry.kind === 'question' && incoming) suspicions.set(entry.actorId, entry.suspectId)
     if (incoming && (entry.kind === 'share-suspicion' || entry.kind === 'defend-guest')) {
@@ -67,9 +92,24 @@ function scoreChoice(
   const uncertainty = random() * 0.8
   const trust = rapport(ownConversations, actorId, id)
   const targetPressure = (publicTally[id] ?? 0) / 12
-  if (night) return uncertainty - trust * 0.6 - targetPressure * 0.2
-  const teammateCost = role === 'betrayer' && teammates.includes(id) ? 0.75 : 0
-  return uncertainty - trust - teammateCost + targetPressure + pressure
+  const personality = getSocialPersonality(actorId)
+  if (night) {
+    const rivalVote = perspective.revealedBallots?.find(({ voterId }) => voterId === id)?.targetId
+    const threat =
+      rivalVote === actorId ? 0.5 : rivalVote && teammates.includes(rivalVote) ? 0.32 : 0
+    return uncertainty - trust * 0.65 - targetPressure * 0.55 + threat
+  }
+  const evidence =
+    (perspective.evidence?.get(id) ?? 0) * (0.8 + 0.4 * personality.strategicCalculation)
+  const teammateCost =
+    role === 'betrayer' && teammates.includes(id)
+      ? Math.max(0.2, 0.75 - (targetPressure + evidence) * 0.45)
+      : 0
+  // A contested voter has more to gain by joining a plausible alternative.
+  const danger = Math.min(1, (publicTally[actorId] ?? 0) / 4)
+  const viability = Math.min(1, targetPressure + Math.max(0, pressure) + Math.max(0, evidence))
+  const defensiveVote = viability * danger * (0.18 + 0.24 * personality.riskTolerance)
+  return uncertainty - trust - teammateCost + targetPressure + pressure + evidence + defensiveVote
 }
 
 export function chooseTarget(

@@ -68,6 +68,7 @@ export type SocialEntry = {
   suspectId?: string
   accepted?: boolean
   reaction?: SocialReaction
+  pledgeResult?: { actor: boolean; recipient: boolean } | 'void'
 }
 
 export type TableReceipt = {
@@ -75,6 +76,7 @@ export type TableReceipt = {
   blind: boolean
   tally: Record<string, number>
   tiedByDraw: boolean
+  revealedBallots?: Ballot[]
 }
 
 export const PRESENTATION_CUES = [
@@ -99,7 +101,11 @@ export type SafetyStanding = { contestantId: string; score: number; forfeited?: 
 
 export type Ballot = { voterId: string; targetId: string }
 export type TableCount = { round: number; ballots: Ballot[]; tiedIds: string[] }
-export type TableSway = { targetId: string; tone: 'careful' | 'forceful' }
+export type TableSway = {
+  targetId: string
+  tone: 'careful' | 'forceful'
+  evidence?: import('./intel.ts').TableEvidence
+}
 
 export type Run = {
   edition: 'betrayals'
@@ -122,6 +128,7 @@ export type Run = {
   publicSeed: number
   pot: number
   social: SocialEntry[]
+  witnessLead?: import('./intel.ts').WitnessLead
   socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>
   presentation?: PresentationCue[]

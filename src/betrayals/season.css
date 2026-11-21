@@ -473,3 +473,35 @@
     transition: none;
   }
 }
+
+.betrayals-witness-lead {
+  margin-block: 0.45rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgb(214 176 109 / 28%);
+  border-radius: 0.65rem;
+  background: rgb(34 25 15 / 85%);
+  color: #f8ead6;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.betrayals-witness-lead p {
+  margin-block: 0.35rem;
+}
+
+.betrayals-witness-lead button {
+  min-height: 44px;
+  padding-inline: 0.65rem;
+  border: 1px solid rgb(214 176 109 / 48%);
+  border-radius: 0.4rem;
+  background: #392b18;
+  color: inherit;
+}
+
+.betrayals-witness-lead button:disabled {
+  opacity: 0.55;
+}
+
+.betrayals-witness-lead button span {
+  opacity: 0.8;
+}
