@@ -82,10 +82,19 @@ const phaseLabel: Record<Phase, string> = {
   settled: 'Season result',
 }
 const phaseGroupLabel: Record<Phase, string> = {
-  'role-reveal': 'Opening', dawn: 'Day', social: 'Day', immunity: 'Day', safety: 'Day',
-  'final-challenge': 'Finale', 'round-table': 'Round Table', 'table-reveal': 'Round Table',
-  night: 'Night', 'night-resolved': 'Night', 'final-banishment': 'Finale',
-  'end-vote': 'Finale', settled: 'Finale',
+  'role-reveal': 'Opening',
+  dawn: 'Day',
+  social: 'Day',
+  immunity: 'Day',
+  safety: 'Day',
+  'final-challenge': 'Finale',
+  'round-table': 'Round Table',
+  'table-reveal': 'Round Table',
+  night: 'Night',
+  'night-resolved': 'Night',
+  'final-banishment': 'Finale',
+  'end-vote': 'Finale',
+  settled: 'Finale',
 }
 
 function begin(
@@ -285,7 +294,16 @@ export default function BetrayalsScreen() {
     { day: run.day, text: 'Current phase · ' + phaseLabel[stage] },
     ...run.seats.flatMap((seat) =>
       seat.exit
-        ? [{ day: seat.exit.day, text: seat.name + (seat.exit.cause === 'night' ? ' was lost during the night.' : ' was banished at the Round Table.') }]
+        ? [
+            {
+              day: seat.exit.day,
+              text:
+                seat.name +
+                (seat.exit.cause === 'night'
+                  ? ' was lost during the night.'
+                  : ' was banished at the Round Table.'),
+            },
+          ]
         : []
     ),
     ...run.social.map((entry) => ({
@@ -672,9 +690,14 @@ export default function BetrayalsScreen() {
               Betrayals
             </div>
           </div>
-          <div className="betrayals-phase-strip" aria-label={phaseGroupLabel[stage] + ' phase, ' + phaseLabel[stage]}>
+          <div
+            className="betrayals-phase-strip"
+            aria-label={phaseGroupLabel[stage] + ' phase, ' + phaseLabel[stage]}
+          >
             <span className="betrayals-phase-strip__group">{phaseGroupLabel[stage]}</span>
-            <span className="betrayals-phase-strip__divider" aria-hidden="true">/</span>
+            <span className="betrayals-phase-strip__divider" aria-hidden="true">
+              /
+            </span>
             <span className="betrayals-phase-strip__subphase">{phaseLabel[stage]}</span>
             <button
               className="betrayals-phase-strip__log"
@@ -713,12 +736,17 @@ export default function BetrayalsScreen() {
           art={artBase + scene + '.jpg'}
         />
         <div className="betrayals-status" aria-label="Season status">
-          <span className="betrayals-status__day">Day <strong>{String(run.day).padStart(2, '0')}</strong></span>
+          <span className="betrayals-status__day">
+            Day <strong>{String(run.day).padStart(2, '0')}</strong>
+          </span>
           <span aria-label={activeCast.length + ' contestants remaining'}>
             <strong>{activeCast.length}</strong>
             <span className="betrayals-status__denominator">/{view.seats.length} alive</span>
           </span>
-          <span className="betrayals-status__pot" aria-label={run.pot.toLocaleString() + ' in the pot'}>
+          <span
+            className="betrayals-status__pot"
+            aria-label={run.pot.toLocaleString() + ' in the pot'}
+          >
             {run.pot.toLocaleString()} <span>pot</span>
           </span>
         </div>
@@ -753,21 +781,38 @@ export default function BetrayalsScreen() {
         )}
 
         {logOpen && (
-          <div className="betrayals-log-backdrop" onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setLogOpen(false)
-          }}>
-            <section className="betrayals-log" role="dialog" aria-modal="true" aria-labelledby="betrayals-log-title">
+          <div
+            className="betrayals-log-backdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setLogOpen(false)
+            }}
+          >
+            <section
+              className="betrayals-log"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="betrayals-log-title"
+            >
               <header className="betrayals-log__header">
                 <div>
                   <span className="betrayals-log__eyebrow">Observatory record</span>
                   <h2 id="betrayals-log-title">Game Log</h2>
                 </div>
-                <button type="button" className="betrayals-log__close" aria-label="Close game log" onClick={() => setLogOpen(false)}>×</button>
+                <button
+                  type="button"
+                  className="betrayals-log__close"
+                  aria-label="Close game log"
+                  onClick={() => setLogOpen(false)}
+                >
+                  ×
+                </button>
               </header>
               <ol className="betrayals-log__entries">
                 {gameLogEntries.map((entry, index) => (
                   <li key={entry.day + ':' + index}>
-                    <span className="betrayals-log__day">DAY {String(entry.day).padStart(2, '0')}</span>
+                    <span className="betrayals-log__day">
+                      DAY {String(entry.day).padStart(2, '0')}
+                    </span>
                     <p>{entry.text}</p>
                   </li>
                 ))}
