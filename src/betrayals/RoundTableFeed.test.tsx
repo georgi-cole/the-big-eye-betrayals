@@ -54,6 +54,20 @@ describe('Round Table broadcast', () => {
     expect(onSway).toHaveBeenCalledWith({ targetId: candidate.id, tone: 'careful' })
   })
 
+  it('fills the cinematic with active contestants only', () => {
+    const run = createRound()
+    const [voter, previousExit, nominee] = run.seats
+    previousExit.exit = { cause: 'banished', day: 1 }
+    run.tableCount = {
+      round: 1,
+      ballots: [{ voterId: voter.id, targetId: nominee.id }],
+      tiedIds: [],
+    }
+    const { container } = render(<RoundTableFeed run={run} />)
+    expect(container.querySelector('[data-contestant="' + previousExit.id + '"]')).toBeNull()
+    expect(container.querySelector('[data-contestant="' + nominee.id + '"]')).not.toBeNull()
+  })
+
   it('holds the revote until the count is shown and summarizes a large tie', () => {
     const run = createRound()
     const nominees = run.seats.slice(1, 11)

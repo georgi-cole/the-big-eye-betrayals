@@ -17,7 +17,7 @@ describe('Betrayals cinematic scenes', () => {
         onComplete={onComplete}
       />
     )
-    expect(screen.queryByText(known.name)).not.toBeInTheDocument()
+    expect(screen.getByText(known.name)).toBeInTheDocument()
     act(() => vi.advanceTimersByTime(680))
     expect(screen.getByText(known.name)).toBeInTheDocument()
     expect(container.querySelector('.betrayals-cine__guest img')).toHaveAttribute(
@@ -65,22 +65,40 @@ describe('Betrayals cinematic scenes', () => {
     ).toBeInTheDocument()
   })
 
-  it.each([
-    ['elimination', 'Murdered'],
-    ['departure', 'Evicted'],
-  ] as const)('uses the correct verdict stamp for %s with reduced motion', (kind, name) => {
-    const { container } = render(
+  it('reveals the role on a full-figure verdict and keeps a blind ballot sealed', () => {
+    const { container, rerender } = render(
       <CinematicScene
-        scene={{ id: kind, kind, subject: known }}
+        scene={{ id: 'verdict', kind: 'departure', subject: known, role: 'Loyal' }}
         reducedMotion
         onComplete={vi.fn()}
       />
     )
-    expect(screen.getByRole('img', { name })).toHaveAttribute(
+    expect(screen.getByText('I was a Loyal.')).toBeVisible()
+    expect(container.querySelector('.betrayals-verdict-stage__figure img')).toHaveAttribute(
       'src',
-      expect.stringContaining('verdict-' + name.toLowerCase() + '.png')
+      expect.stringContaining('Ash_informal.webp')
     )
-    expect(container.querySelector('[src*="cracked_glass"]')).not.toBeInTheDocument()
+    rerender(
+      <CinematicScene
+        scene={{ id: 'sealed', kind: 'departure', subject: known }}
+        reducedMotion
+        onComplete={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Role sealed until the finale')).toBeVisible()
+  })
+
+  it('shows the Night letter as the accessible outcome without a walk', () => {
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: 'night', kind: 'death-letter', subject: known }}
+        reducedMotion
+        onComplete={vi.fn()}
+      />
+    )
+    expect(screen.getByText('For Ash')).toBeVisible()
+    expect(screen.getByText('You have been eliminated at Night.')).toBeVisible()
+    expect(container.querySelector('[data-walk]')).not.toBeInTheDocument()
   })
 
   it('walks backstage in the saved casual look and then closes the door', () => {
@@ -101,8 +119,8 @@ describe('Betrayals cinematic scenes', () => {
         onComplete={vi.fn()}
       />
     )
-    act(() => vi.advanceTimersByTime(670))
-    act(() => vi.advanceTimersByTime(740))
+    act(() => vi.advanceTimersByTime(1050))
+    act(() => vi.advanceTimersByTime(1750))
     expect(container.querySelector('[data-walk="character-15"]')).toBeInTheDocument()
     expect(container.querySelector('.betrayals-cine__corridor-plane')).toHaveAttribute(
       'data-closed',

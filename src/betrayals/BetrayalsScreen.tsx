@@ -696,6 +696,9 @@ export default function BetrayalsScreen() {
             selectedId={selected}
             humanId={run.humanId}
             sleeping={stage === 'night-resolved' || cue === 'awakening'}
+            nightRevealId={
+              stage === 'dawn' && !cue ? (run.lastDawn?.eliminatedId ?? undefined) : undefined
+            }
             selectableIds={targets.length ? targets : undefined}
             onSelect={setSelected}
           />

@@ -10,11 +10,20 @@ type Props = {
   selectedId?: string
   humanId: string
   sleeping?: boolean
+  nightRevealId?: string
   selectableIds?: readonly string[]
   onSelect: (id: string) => void
 }
 
-export function Roster({ view, selectedId, humanId, sleeping, selectableIds, onSelect }: Props) {
+export function Roster({
+  view,
+  selectedId,
+  humanId,
+  sleeping,
+  nightRevealId,
+  selectableIds,
+  onSelect,
+}: Props) {
   return (
     <ul className="betrayals-roster" aria-label="Contestant roster">
       {view.seats.map((seat) => {
@@ -47,6 +56,7 @@ export function Roster({ view, selectedId, humanId, sleeping, selectableIds, onS
               data-exit={seat.exit?.cause}
               data-role={confirmedRole}
               data-asleep={asleep || undefined}
+              data-night-reveal={seat.id === nightRevealId || undefined}
               onClick={selectable ? () => onSelect(seat.id) : undefined}
             >
               <span className="betrayals-roster__portrait" aria-hidden="true">
