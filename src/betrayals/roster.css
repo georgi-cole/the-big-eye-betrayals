@@ -194,16 +194,31 @@
   left: 4px;
   display: grid;
   place-items: center;
-  width: 1.25em;
-  aspect-ratio: 1;
-  border: 1px solid #7aa1a9;
-  border-radius: 50%;
-  background: radial-gradient(circle at 45% 20%, #263e42, #0b1522);
-  color: #c0e2e5;
+  box-sizing: border-box;
+  width: clamp(18px, 5.4vw, 23px);
+  height: 18px;
+  padding: 1px;
+  overflow: hidden;
+  border: 1px solid #8d9c89;
+  border-radius: 6px 6px 50% 50%;
+  background: radial-gradient(circle at 45% 20%, #27302a, #0b0b10);
+  color: #d8d5b8;
   box-shadow: 0 2px 5px #050609;
-  font:
-    700 0.63rem / 1 Georgia,
-    serif;
+}
+.betrayals-roster__role svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.betrayals-roster__seat[data-role='betrayer'] .betrayals-roster__role {
+  border-color: #a95448;
+  border-radius: 8px 8px 45% 45%;
+  background: radial-gradient(circle at 45% 15%, #532522, #170c11);
+  color: #e88d7b;
 }
 
 .betrayals-roster__seat[data-role='betrayer'] .betrayals-roster__role {
