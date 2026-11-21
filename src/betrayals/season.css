@@ -81,7 +81,7 @@
 
 .betrayals-layout--game {
   display: grid;
-  grid-template-rows: auto clamp(110px, 25dvh, 164px) minmax(0, 1fr) auto;
+  grid-template-rows: auto clamp(100px, 23dvh, 156px) auto minmax(0, 1fr) auto;
   block-size: 100dvh;
   min-block-size: 0;
   gap: clamp(5px, 0.9dvh, 8px);
@@ -150,12 +150,84 @@
   background: radial-gradient(circle at 38% 38%, #ffe6c4 16%, #bd8052 23% 37%, #3c252c 45%);
 }
 
+.betrayals-phase-strip {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  min-width: 0;
+  gap: 7px;
+  padding: 5px 7px 5px 10px;
+  border: 1px solid #8065488c;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 15% 0%, #9b70412b, transparent 72%),
+    linear-gradient(180deg, #211a21ed, #100d13f5);
+  box-shadow:
+    inset 0 1px #f0d4a322,
+    0 3px 10px #05030755;
+}
+.betrayals-phase-strip__group {
+  color: #e7c69a;
+  font:
+    700 0.68rem/1 Georgia,
+    serif;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.betrayals-phase-strip__divider {
+  color: #80694e;
+}
+.betrayals-phase-strip__subphase {
+  min-width: 0;
+  overflow: hidden;
+  color: #eee5dc;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.betrayals-phase-strip__log {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  gap: 1px;
+  min-width: 39px;
+  min-height: 36px;
+  padding: 1px 3px;
+  border: 1px solid #96755059;
+  border-radius: 6px;
+  background: linear-gradient(160deg, #2b2021, #120f15);
+  color: #dfc59f;
+  font:
+    600 0.52rem/1 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+.betrayals-phase-strip__log svg {
+  width: 19px;
+  height: 19px;
+  fill: #d6b187;
+  stroke: #d6b187;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px #bd875255);
+}
+.betrayals-phase-strip__log:hover {
+  border-color: #d0aa76;
+  color: #fff0d4;
+}
+.betrayals-phase-strip__log:focus-visible,
+.betrayals-log__close:focus-visible {
+  outline: 2px solid #f0c58d;
+  outline-offset: 2px;
+}
+
 .betrayals-status {
   display: grid;
-  grid-auto-flow: column;
-  align-items: stretch;
-  justify-self: end;
-  max-width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-self: stretch;
   min-width: 0;
   border: 1px solid #82675978;
   border-radius: 7px;
@@ -166,33 +238,121 @@
   font-size: 0.7rem;
   font-weight: 640;
 }
-
 .betrayals-status > span {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
+  min-height: 29px;
   min-width: 0;
-  padding: 4px clamp(5px, 1.7vw, 9px);
+  padding: 4px 6px;
   text-align: center;
   line-height: 1.15;
+  white-space: nowrap;
 }
-
 .betrayals-status > span + span {
   border-inline-start: 1px solid #b6967c38;
 }
-
 .betrayals-status__day,
 .betrayals-status__pot {
   gap: 4px;
   color: var(--betrayals-focus);
-  white-space: nowrap;
 }
-
 .betrayals-status__denominator,
 .betrayals-status__pot span {
   color: var(--betrayals-secondary);
+}
+.betrayals-status strong {
+  color: #f4e9d8;
+}
+
+.betrayals-log-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #050408c9;
+  backdrop-filter: blur(7px);
+}
+.betrayals-log {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 430px);
+  max-height: min(76dvh, 620px);
+  overflow: hidden;
+  border: 1px solid #9a7957;
+  border-radius: 13px;
+  background:
+    radial-gradient(ellipse at 50% 0%, #68473438, transparent 55%),
+    linear-gradient(155deg, #1d171d, #0b0a10 75%);
+  box-shadow:
+    0 18px 50px #000c,
+    inset 0 1px #f5d4a526;
+  color: #eee3d7;
+}
+.betrayals-log__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 11px;
+  border-bottom: 1px solid #9678594a;
+}
+.betrayals-log__eyebrow {
+  color: #c69c6d;
+  font:
+    650 0.58rem/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.betrayals-log__header h2 {
+  margin: 4px 0 0;
+  color: #f2e5d5;
+  font:
+    500 1.35rem/1.1 Georgia,
+    serif;
+}
+.betrayals-log__close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #80674d;
+  border-radius: 50%;
+  background: #120e14;
+  color: #ead6bd;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.betrayals-log__entries {
+  display: grid;
+  gap: 0;
+  overflow: auto;
+  margin: 0;
+  padding: 4px 16px 12px;
+  list-style: none;
+}
+.betrayals-log__entries li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid #8c73522c;
+}
+.betrayals-log__day {
+  padding-top: 2px;
+  color: #b58a5e;
+  font:
+    700 0.56rem/1.2 system-ui,
+    sans-serif;
+  letter-spacing: 0.08em;
+}
+.betrayals-log__entries p {
+  margin: 0;
+  color: #e7ddd3;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .betrayals-cast {

@@ -81,6 +81,21 @@ const phaseLabel: Record<Phase, string> = {
   'end-vote': 'End Season',
   settled: 'Season result',
 }
+const phaseGroupLabel: Record<Phase, string> = {
+  'role-reveal': 'Opening',
+  dawn: 'Day',
+  social: 'Day',
+  immunity: 'Day',
+  safety: 'Day',
+  'final-challenge': 'Finale',
+  'round-table': 'Round Table',
+  'table-reveal': 'Round Table',
+  night: 'Night',
+  'night-resolved': 'Night',
+  'final-banishment': 'Finale',
+  'end-vote': 'Finale',
+  settled: 'Finale',
+}
 
 function begin(
   name: string,
@@ -111,6 +126,7 @@ export default function BetrayalsScreen() {
   const [selected, setSelected] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
   const [incomingOpen, setIncomingOpen] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
   const [homeOpen, setHomeOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
@@ -274,6 +290,27 @@ export default function BetrayalsScreen() {
   const countKey = [run.id, run.day, stage, activeCast.length, run.tableCount?.round].join(':')
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
+  const gameLogEntries = [
+    { day: run.day, text: 'Current phase · ' + phaseLabel[stage] },
+    ...run.seats.flatMap((seat) =>
+      seat.exit
+        ? [
+            {
+              day: seat.exit.day,
+              text:
+                seat.name +
+                (seat.exit.cause === 'night'
+                  ? ' was lost during the night.'
+                  : ' was banished at the Round Table.'),
+            },
+          ]
+        : []
+    ),
+    ...run.social.map((entry) => ({
+      day: entry.day,
+      text: label(entry.actorId) + ' spoke privately with ' + label(entry.recipientId) + '.',
+    })),
+  ].sort((a, b) => b.day - a.day)
   const conversation = participating ? getSocialView(run, run.humanId) : []
   const lead = leadForPlayer(run)
   const recent = conversation
@@ -661,20 +698,29 @@ export default function BetrayalsScreen() {
               Betrayals
             </div>
           </div>
-          <div className="betrayals-status" aria-label="Season status">
-            <span className="betrayals-status__day">
-              Day <strong>{String(run.day).padStart(2, '0')}</strong>
+          <div
+            className="betrayals-phase-strip"
+            aria-label={phaseGroupLabel[stage] + ' phase, ' + phaseLabel[stage]}
+          >
+            <span className="betrayals-phase-strip__group">{phaseGroupLabel[stage]}</span>
+            <span className="betrayals-phase-strip__divider" aria-hidden="true">
+              /
             </span>
-            <span aria-label={activeCast.length + ' contestants remaining'}>
-              {activeCast.length}
-              <span className="betrayals-status__denominator">/{view.seats.length}</span>
-            </span>
-            <span
-              className="betrayals-status__pot"
-              aria-label={run.pot.toLocaleString() + ' in the pot'}
+            <span className="betrayals-phase-strip__subphase">{phaseLabel[stage]}</span>
+            <button
+              className="betrayals-phase-strip__log"
+              type="button"
+              aria-label="Open game log"
+              title="Game log"
+              data-onboarding-target="game-log"
+              onClick={() => setLogOpen(true)}
             >
-              {run.pot.toLocaleString()} <span>pot</span>
-            </span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.25a6 6 0 0 0-6 6v3.4c0 .7-.25 1.38-.72 1.8L4 15.55v1.2h16v-1.2l-1.28-1.1a2.4 2.4 0 0 1-.72-1.8v-3.4a6 6 0 0 0-6-6Z" />
+                <path d="M9.5 19a2.65 2.65 0 0 0 5 0M12 1.5v1.7M19 5l1.3-1.2" />
+              </svg>
+              <span>Log</span>
+            </button>
           </div>
         </header>
 
@@ -697,6 +743,21 @@ export default function BetrayalsScreen() {
           mode={broadcastMode}
           art={artBase + scene + '.jpg'}
         />
+        <div className="betrayals-status" aria-label="Season status">
+          <span className="betrayals-status__day">
+            Day <strong>{String(run.day).padStart(2, '0')}</strong>
+          </span>
+          <span aria-label={activeCast.length + ' contestants remaining'}>
+            <strong>{activeCast.length}</strong>
+            <span className="betrayals-status__denominator">/{view.seats.length} alive</span>
+          </span>
+          <span
+            className="betrayals-status__pot"
+            aria-label={run.pot.toLocaleString() + ' in the pot'}
+          >
+            {run.pot.toLocaleString()} <span>pot</span>
+          </span>
+        </div>
 
         <section className="betrayals-cast" aria-label="Cast seats">
           <Roster
@@ -727,6 +788,46 @@ export default function BetrayalsScreen() {
           </p>
         )}
 
+        {logOpen && (
+          <div
+            className="betrayals-log-backdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setLogOpen(false)
+            }}
+          >
+            <section
+              className="betrayals-log"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="betrayals-log-title"
+            >
+              <header className="betrayals-log__header">
+                <div>
+                  <span className="betrayals-log__eyebrow">Observatory record</span>
+                  <h2 id="betrayals-log-title">Game Log</h2>
+                </div>
+                <button
+                  type="button"
+                  className="betrayals-log__close"
+                  aria-label="Close game log"
+                  onClick={() => setLogOpen(false)}
+                >
+                  ×
+                </button>
+              </header>
+              <ol className="betrayals-log__entries">
+                {gameLogEntries.map((entry, index) => (
+                  <li key={entry.day + ':' + index}>
+                    <span className="betrayals-log__day">
+                      DAY {String(entry.day).padStart(2, '0')}
+                    </span>
+                    <p>{entry.text}</p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </div>
+        )}
         <BetrayalsDock
           play={play}
           home={{
