@@ -58,7 +58,7 @@ export function settleRun(run: Run, reason: Reason): Run {
     ...run,
     phase: 'settled',
     immunityId: undefined,
-    private: { ...run.private, nightShieldIds: [] },
+    private: { ...run.private, nightShieldIds: [], nightShieldAwardIds: undefined },
     result: { reason, winningRole, payouts },
   }
 }

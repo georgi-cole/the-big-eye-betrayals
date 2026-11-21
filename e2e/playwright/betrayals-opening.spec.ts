@@ -147,7 +147,7 @@ for (const viewport of [
     await expect(social.getByRole('button', { name: /Plan a vote/ })).toBeDisabled()
     await expect(social.getByLabel('Influence cost: 20')).toBeVisible()
     await expect(social.getByLabel('Info cost: 50')).toBeVisible()
-    await expect(social.getByRole('button', { name: /Propose an alliance/ })).toHaveCount(0)
+    await expect(social.getByRole('button', { name: /Propose Personal Pact/ })).toBeVisible()
     await social.getByRole('button', { name: /Talk about the challenge/ }).click()
     await social.getByRole('button', { name: 'Execute' }).click()
     await expect(social.getByLabel('Energy: 2')).toBeVisible()

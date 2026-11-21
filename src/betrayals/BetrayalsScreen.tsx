@@ -15,6 +15,11 @@ import { BetrayalsGameLog } from './BetrayalsGameLog'
 import { gameLogFor, recordGameActivity } from './gameLog'
 import { BetrayalsIncomingInteractions } from './BetrayalsIncomingInteractions'
 import { BetrayalsSocialPanel } from './BetrayalsSocialPanel'
+import {
+  applyCastleAllianceChange,
+  applyGeneralSocialMove,
+  generalSocialOpen,
+} from './generalSocial'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
 import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferences'
 import type { Run, Phase, RealityPreset } from './run'
@@ -466,7 +471,10 @@ export default function BetrayalsScreen() {
         ({ day, speakerId, result }) =>
           day === run.day - 1 && speakerId === run.humanId && result === 'missed'
       )
-      if (participating && reviewedCase) {
+      const shieldSave = run.private.lastShieldSave
+      if (participating && shieldSave?.day === run.day && shieldSave.id === viewerId) {
+        detail = 'Your Night Shield stopped the Conclave’s attempt.'
+      } else if (participating && reviewedCase) {
         detail = `After your case against ${label(reviewedCase.targetId)}, guests may ask for stronger proof next time.`
       }
       play = { label: 'Play: enter Social', onClick: () => apply(advanceDayBeat) }
@@ -844,6 +852,7 @@ export default function BetrayalsScreen() {
             realityMode={run.options.realityMode}
             canAct={canSocialize}
             phase={stage}
+            nightShieldCount={view.nightShieldCount}
             moveKinds={moveKinds}
             voteTargetIds={eligibleBanishmentTargets(run, run.humanId)}
             day={run.day}
@@ -859,6 +868,15 @@ export default function BetrayalsScreen() {
               )
             }
             onClose={() => setSocialOpen(false)}
+            onGeneralMove={
+              generalSocialOpen(run)
+                ? (kind, guests, details) =>
+                    apply((active) => applyGeneralSocialMove(active, token, kind, guests, details))
+                : undefined
+            }
+            onAllianceChange={(id, change, value) =>
+              apply((active) => applyCastleAllianceChange(active, token, id, change, value))
+            }
             onMove={(kind, suspectId, recipientId) =>
               apply((active) => {
                 if (!canSocialize) return active

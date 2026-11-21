@@ -27,6 +27,50 @@ describe('Betrayals private conversations', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
+  it('shows general moves and alliance shortcuts without a guest selected', () => {
+    const onGeneralMove = vi.fn()
+    render(
+      <BetrayalsSocialPanel
+        actorId="human"
+        prospects={prospects}
+        resources={resources}
+        phase="social"
+        onClose={vi.fn()}
+        onMove={vi.fn()}
+        onGeneralMove={onGeneralMove}
+        conversation={[
+          { actorId: 'human', recipientId: 'opal', kind: 'alliance', day: 1, accepted: true },
+        ]}
+      />
+    )
+    const general = within(screen.getByRole('region', { name: 'General actions' }))
+    const roster = screen.getByRole('region', { name: 'Player roster' })
+    expect(
+      roster.compareDocumentPosition(screen.getByRole('region', { name: 'General actions' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(general.getByRole('button', { name: /Lay Low/ })).toBeVisible()
+    expect(general.getByRole('button', { name: /Explore the Castle/ })).toBeVisible()
+    expect(general.getByRole('button', { name: /Eavesdrop/ })).toBeVisible()
+    expect(general.getByRole('button', { name: /Found an alliance/ })).toBeVisible()
+    fireEvent.click(general.getByRole('button', { name: /Group Chat/ }))
+    const picker = within(general.getByRole('group', { name: 'Group Chat guests' }))
+    const execute = general.getByRole('button', { name: 'Execute general action' })
+    fireEvent.click(picker.getByRole('button', { name: /Ren/ }))
+    expect(execute).toBeDisabled()
+    fireEvent.click(picker.getByRole('button', { name: /Sable/ }))
+    fireEvent.click(execute)
+    expect(onGeneralMove).toHaveBeenCalledWith('group-chat', ['ren', 'sable'])
+    const alliances = within(screen.getByRole('region', { name: 'Your alliances' }))
+    fireEvent.click(alliances.getByRole('button', { name: /Opal/ }))
+    expect(screen.queryByRole('region', { name: 'General actions' })).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Opal' })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Propose Personal Pact/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  })
+
   it('chooses a contact independently and sends a vote plan to that contact', () => {
     const onMove = vi.fn()
     render(

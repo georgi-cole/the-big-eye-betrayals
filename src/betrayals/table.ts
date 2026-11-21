@@ -13,6 +13,7 @@ import type {
 import { settleRun } from './settlement.ts'
 import { argumentBasis, hearArgument, relationship, trackRecord } from './perception.ts'
 import { getSocialView, settleVotePacts } from './social.ts'
+import { finishShieldConversations } from './shieldSocial.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { activeLead, canPresentEvidence, evidenceSpeech, voluntaryWitness } from './intel.ts'
 
@@ -332,8 +333,9 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
   const tied = [...tallied.keys()].filter((id) => tallied.get(id) === topCount).sort()
   if (tied.length === 0) return run
 
-  const revision = run.revision + 1
   const tableArguments = argumentsAtTable(run)
+  const withShieldTalk = finishShieldConversations(run)
+  const revision = withShieldTalk.revision + 1
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 547) ^ revision)
   const round = tableRoundNumber(run)
   const tableCount = {
@@ -342,7 +344,7 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     tiedIds: tied.length > 1 ? tied : [],
   }
   if (tied.length > 1 && round < MAX_TABLE_ROUNDS) {
-    return { ...run, revision, runoffIds: tied, tableCount, tableArguments }
+    return { ...withShieldTalk, revision, runoffIds: tied, tableCount, tableArguments }
   }
 
   const receipt: TableReceipt = {
@@ -352,13 +354,13 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     tiedByDraw: tied.length > 1,
   }
   return {
-    ...run,
+    ...withShieldTalk,
     phase: 'table-reveal',
     revision,
     runoffIds: undefined,
     tableCount,
     tableArguments,
-    private: { ...run.private, pendingTable: receipt },
+    private: { ...withShieldTalk.private, pendingTable: receipt },
   }
 }
 
@@ -436,7 +438,11 @@ export function revealTable(run: Run, token: CommandToken): Run {
     private: {
       ...run.private,
       pendingTable: undefined,
-      nightShieldIds: phase === 'night' ? run.private.nightShieldIds : [],
+      nightShieldIds:
+        phase === 'night'
+          ? run.private.nightShieldIds.filter((id) => id !== outcome.banishedId)
+          : [],
+      nightShieldAwardIds: phase === 'night' ? run.private.nightShieldAwardIds : undefined,
     },
   }
   if (lastBetrayer) return settleRun(revealed, 'last-betrayer')

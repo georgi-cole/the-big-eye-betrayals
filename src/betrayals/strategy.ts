@@ -1,6 +1,7 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32 } from '../store/rng.ts'
 import { incidentPressure } from './intel.ts'
+import { nightShieldReads } from './nightShields.ts'
 import { getSocialView, hasAlliance, relationship } from './perception.ts'
 import { hashId, viewFor } from './run.ts'
 import type { Ballot, Phase, Role, Run, SocialEntry, TableArgument } from './run.ts'
@@ -21,6 +22,7 @@ type Perspective = {
   evidence?: ReadonlyMap<string, number>
   tableRound?: number
   tablePressure?: ReadonlyMap<string, number>
+  shieldReads?: ReturnType<typeof nightShieldReads>
 }
 
 export function resolutionPerspective(
@@ -46,6 +48,7 @@ export function resolutionPerspective(
       ? run.lastTable?.revealedBallots?.find(({ voterId }) => voterId === morningExit)?.targetId
       : undefined,
     evidence: incidentPressure(run, actorId),
+    shieldReads: run.phase === 'night' ? nightShieldReads(run, actorId) : undefined,
   }
 }
 
@@ -118,7 +121,18 @@ function scoreChoice(
     )
     const threat = ledCase ? 0.56 : againstUs(rivalVote) ? 0.34 : 0
     const obvious = ledCase ? threat * personality.strategicCalculation * 0.24 : 0
-    return uncertainty - bond * 0.62 - publicHeat * 0.6 + threat - obvious
+    const read = perspective.shieldReads?.get(id)
+    const confidence = read?.conflicting ? 0.5 : 1
+    const shieldRisk = read ? Math.max(0, read.protected - read.exposed * 0.65) : 0
+    const opportunity = read ? Math.max(0, read.exposed - read.protected) : 0
+    return (
+      uncertainty -
+      bond * 0.62 -
+      publicHeat * 0.6 +
+      threat -
+      obvious +
+      confidence * (opportunity * 0.22 - shieldRisk * (1.07 - personality.riskTolerance * 0.38))
+    )
   }
 
   const publicArgument = perspective.tablePressure?.get(id) ?? 0
