@@ -29,7 +29,14 @@ export function Roster({
       {view.seats.map((seat) => {
         const cause = seat.exit?.cause
         const asleep = sleeping && !cause
-        const hasNightShield = !seat.exit && view.knownNightShieldIds.includes(seat.id)
+        const nightShield =
+          !seat.exit &&
+          view.knownNightShieldIds.includes(seat.id) &&
+          (seat.id !== humanId
+            ? 'Won a Night Shield'
+            : view.nightShieldCount > 1
+              ? '2 Night Shields'
+              : 'Night Shield')
         const selectable = !selectableIds || selectableIds.includes(seat.id)
         const tied = runoffIds?.includes(seat.id)
         const confirmedRole = seat.exit?.revealedRole ?? seat.finaleRole
@@ -39,7 +46,7 @@ export function Roster({
           tied && 'Tied in the runoff',
           seat.fullImmunity && 'Full Immunity',
           seat.publicShield && 'Public Shield',
-          hasNightShield && 'Night Shield',
+          nightShield,
           asleep && 'Asleep',
           exitLabel,
           roleLabel,
@@ -99,7 +106,7 @@ export function Roster({
                   <CastSigil kind={confirmedRole === 'betrayer' ? 'betrayer' : 'loyal'} />
                 </span>
               )}
-              {(seat.fullImmunity || seat.publicShield || hasNightShield) && (
+              {(seat.fullImmunity || seat.publicShield || nightShield) && (
                 <span className="betrayals-roster__protections" aria-hidden="true">
                   {seat.fullImmunity && (
                     <span title="Full Immunity" data-protection="immunity">
@@ -111,8 +118,8 @@ export function Roster({
                       <CastSigil kind="public" />
                     </span>
                   )}
-                  {hasNightShield && (
-                    <span title="Night Shield" data-protection="night">
+                  {nightShield && (
+                    <span title={nightShield} data-protection="night">
                       <CastSigil kind="shield-night" />
                     </span>
                   )}

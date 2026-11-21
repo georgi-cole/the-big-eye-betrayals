@@ -48,18 +48,13 @@ test('an accepted confidence updates private rapport without using a move or all
   assert.equal(respondToIncomingInteraction(next, commandToken(run), encounter.id, 'dismiss'), next)
 })
 
-test('table approaches exclude protected targets and stop once debate closes', () => {
-  const initial = season('round-table')
-  const guess = getIncomingInteractions(initial)[0].target.id
-  const run = { ...initial, immunityId: guess }
+test('Round Table approaches become neutral check-ins and stop once debate closes', () => {
+  const run = season('round-table')
   const [encounter] = getIncomingInteractions(run)
-  assert.equal(encounter.kind, 'vote-plan')
-  assert.notEqual(encounter.target.id, guess)
-
-  const listened = respondToIncomingInteraction(run, commandToken(run), encounter.id, 'listen')
-  assert.equal(getSocialView(listened, run.humanId)[0].kind, 'question')
-  const pledged = respondToIncomingInteraction(run, commandToken(run), encounter.id, 'engage')
-  assert.equal(getSocialView(pledged, run.humanId)[0].accepted, true)
+  assert.equal(encounter.kind, 'confidence')
+  assert.equal(encounter.target, undefined)
+  const checkedIn = respondToIncomingInteraction(run, commandToken(run), encounter.id, 'engage')
+  assert.equal(getSocialView(checkedIn, run.humanId)[0].kind, 'rapport')
 
   const closed = recordTableSway(run, commandToken(run), null)
   assert.deepEqual(getIncomingInteractions(closed), [])

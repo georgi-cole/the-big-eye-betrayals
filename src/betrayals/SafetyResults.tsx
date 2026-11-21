@@ -34,7 +34,7 @@ export function SafetyResults({
     >
       <header>
         <h2 id="betrayals-safety-results-title">Safety Challenge results</h2>
-        <p>Scores and placements are public. Most contestant names are hidden.</p>
+        <p>Night Shields can be passed on in Social before the first vote.</p>
       </header>
       <div className="betrayals-safety-results__scores" tabIndex={0}>
         <table>

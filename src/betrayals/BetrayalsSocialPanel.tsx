@@ -8,7 +8,20 @@ import ActionCard from '../components/SocialPanelV2/ActionCard'
 import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
 import PlayerList from '../components/SocialPanelV2/PlayerList'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
+import { BetrayalsGeneralActions } from './BetrayalsGeneralActions'
+import { generalActionCards } from './generalSocialCards'
+import { alliancePlanningOpen, CASTLE_EXPLORATION_INFO, EAVESDROP_INFO } from './generalSocial'
+import type { AllianceMoveDetails, GeneralSocialMove } from './generalSocial'
+import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
+import { hasPersonalAlliance } from './perception'
+import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
+import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
+import {
+  firsthandShieldReports,
+  isNightShieldMove,
+  shieldTalkBlockedAfterGift,
+} from './nightShields'
 import {
   choosesSocialSubject,
   discussedToday,
@@ -83,10 +96,17 @@ const actions = [
   },
   {
     id: 'alliance',
-    title: 'Propose an alliance',
+    title: 'Propose Personal Pact',
     category: 'alliance',
     description: 'Ask this guest to work with you.',
     icon: '🛡️',
+  },
+  {
+    id: 'end-pact',
+    title: 'End Personal Pact',
+    category: 'alliance',
+    description: 'End your agreement with this guest. Any shared group membership continues.',
+    icon: '🤝',
   },
   {
     id: 'vote-plan',
@@ -95,6 +115,41 @@ const actions = [
     description: 'Propose voting together at the Round Table.',
     icon: '🗳️',
   },
+  {
+    id: 'shield-gift',
+    title: 'Gift a Night Shield',
+    category: 'strategic',
+    description: 'Privately give this guest one of your shields. They can pass it on.',
+    icon: '🛡️',
+  },
+  {
+    id: 'shield-claim',
+    title: 'Say you have a shield',
+    category: 'strategic',
+    description: 'Confide in this guest or bluff to make them think you’re protected.',
+    icon: '🛡️',
+  },
+  {
+    id: 'shield-deny',
+    title: 'Say you have no shield',
+    category: 'strategic',
+    description: 'You can say you have no Night Shield even while holding one.',
+    icon: '🎭',
+  },
+  {
+    id: 'ask-shield',
+    title: 'Ask about their shield',
+    category: 'strategic',
+    description: 'Ask whether this guest has a Night Shield. They decide what to tell you.',
+    icon: '💬',
+  },
+  {
+    id: 'shield-tip',
+    title: 'Pass on a shield tip',
+    category: 'strategic',
+    description: 'Tell this guest what someone said or what you saw during a handoff.',
+    icon: '👂',
+  },
 ] satisfies (Omit<SocialActionDefinition, 'baseCost'> & { id: SocialEntry['kind'] })[]
 
 const filters = [
@@ -102,6 +157,7 @@ const filters = [
   { id: 'friendly', label: 'Friendly' },
   { id: 'strategic', label: 'Strategic' },
   { id: 'alliance', label: 'Alliances' },
+  { id: 'shields', label: 'Shields' },
 ] as const
 type Filter = (typeof filters)[number]['id']
 const seasonEndedHint = 'The season has ended. You can still browse your relationships.'
@@ -165,6 +221,7 @@ type Props = {
   realityMode?: RealityPreset
   day?: number
   phase?: Phase
+  nightShieldCount?: number
   moveKinds?: readonly SocialEntry['kind'][]
   voteTargetIds?: readonly string[]
   canAct?: boolean
@@ -173,6 +230,12 @@ type Props = {
   intel?: React.ReactNode
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
+  onGeneralMove?: (
+    kind: GeneralSocialMove,
+    guestIds: readonly string[],
+    details?: AllianceMoveDetails
+  ) => void
+  onAllianceChange?: (id: string, change: AllianceGroupChange, value?: string) => void
 }
 
 type NameLookup = (id: string | undefined) => string
@@ -182,6 +245,55 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
   const person = label(outgoing ? entry.recipientId : entry.actorId)
   const subject = label(entry.suspectId)
   switch (entry.kind) {
+    case 'end-pact':
+      return outgoing
+        ? `You ended your pact with ${person}.`
+        : `${person} ended their pact with you.`
+    case 'eavesdrop':
+      return entry.suspectId
+        ? `You caught part of a private conversation. ${subject}'s name came up. +${EAVESDROP_INFO} Info.`
+        : `You heard fragments, but no clear lead. +${CASTLE_EXPLORATION_INFO} Info.`
+    case 'found-alliance':
+      return entry.accepted
+        ? `The group agreed to form ${entry.alliance?.name}.`
+        : `${entry.declinedIds?.map(label).join(', ') || 'An invitee'} declined. The alliance did not form.`
+    case 'consult-alliance':
+      return entry.reaction === 'trusts'
+        ? `${person} says they trust ${subject}.`
+        : entry.reaction === 'wary'
+          ? `${person} is wary of ${subject} after the last vote.`
+          : entry.reaction === 'held-back'
+            ? `${person} was reluctant to give you a read.`
+            : `${person} is still undecided about ${subject}.`
+    case 'alliance-update': {
+      const name = entry.alliance?.name ?? 'the alliance'
+      switch (entry.allianceChange) {
+        case 'invite':
+          return entry.accepted
+            ? `${subject} joined ${name}.`
+            : `${subject}'s invitation to ${name} fell through.`
+        case 'leave':
+          return `${outgoing ? 'You' : label(entry.actorId)} left ${name}.`
+        case 'remove':
+          return `${label(entry.recipientId)} was removed from ${name}.`
+        case 'rename':
+          return `The alliance is now called ${name}.`
+        case 'dissolve':
+          return `${name} was dissolved.`
+        default:
+          return `The membership of ${name} changed.`
+      }
+    }
+    case 'group-chat':
+      return outgoing
+        ? `You caught up with ${person} in a group chat.`
+        : `${person} included you in a group chat.`
+    case 'lay-low':
+      return 'You kept to yourself and saved your Energy.'
+    case 'explore-castle':
+      return entry.suspectId
+        ? `You overheard guests still talking about ${subject} after the last vote. +${CASTLE_EXPLORATION_INFO} Info.`
+        : `You listened around the castle. +${CASTLE_EXPLORATION_INFO} Info.`
     case 'rapport':
       return `You built trust with ${person}.`
     case 'question':
@@ -239,6 +351,38 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
       if (entry.reaction === 'end') return `${person} says they’re leaning toward ending the game.`
       if (entry.reaction === 'banish') return `${person} says they want another banishment.`
       return `${person} kept their plans for the final vote to themselves.`
+    case 'shield-gift':
+      if (entry.reaction === 'uncertain' || entry.reaction === 'backfired') {
+        if (!outgoing) return `${person} gave you a Night Shield after saying they didn't have one.`
+        const reaction =
+          entry.reaction === 'uncertain'
+            ? `“Wait, I thought you didn't have one. Did something change?”`
+            : `“I'll take it. But why did you tell me you didn't have one?”`
+        return `You gave ${person} a Night Shield. ${reaction}`
+      }
+      return outgoing ? `You gave ${person} a Night Shield.` : `${person} gave you a Night Shield.`
+    case 'shield-claim':
+    case 'shield-deny': {
+      const claim = entry.kind === 'shield-claim' ? 'a Night Shield' : 'no Night Shield'
+      if (!outgoing) return `${person} told you they have ${claim}.`
+      const said = `You told ${person} you have ${claim}.`
+      return entry.reaction === 'backfired'
+        ? `${said} They questioned why your story changed.`
+        : said
+    }
+    case 'ask-shield':
+      if (entry.shieldReply === 'private') {
+        return outgoing
+          ? `${person} kept their shield status private.`
+          : `You kept your shield status private with ${person}.`
+      }
+      return outgoing
+        ? `${person} told you they have ${entry.shieldReply === 'has' ? 'a' : 'no'} Night Shield.`
+        : `You told ${person} you have ${entry.shieldReply === 'has' ? 'a' : 'no'} Night Shield.`
+    case 'shield-tip': {
+      const claim = `${subject} might ${entry.shieldReply === 'has' ? 'have' : 'be without'} a Night Shield.`
+      return outgoing ? `You told ${person} that ${claim}` : `${person} told you that ${claim}`
+    }
   }
 }
 
@@ -299,7 +443,18 @@ function CastleWire({
         {entries.length > 0 ? (
           <ul className="ra-list">
             {entries.map((entry, index) => {
-              const action = actions.find(({ id }) => id === entry.kind)
+              const action = [...actions, ...generalActionCards].find(({ id }) => id === entry.kind)
+              const group =
+                !showHistory && entry.kind === 'group-chat' && entry.actorId === actorId
+                  ? notes
+                      .filter(
+                        (note) =>
+                          note.kind === 'group-chat' &&
+                          note.actorId === actorId &&
+                          note.day === entry.day
+                      )
+                      .map((note) => label(note.recipientId))
+                  : []
               return (
                 <li className="ra-entry" key={entries.length - index}>
                   <span
@@ -316,7 +471,9 @@ function CastleWire({
                   <span className="ra-entry__body">
                     <span className="ra-entry__action-tag">{action?.title}</span>
                     <span className="ra-entry__narrative">
-                      {exchangeText(entry, actorId, label)}
+                      {group.length
+                        ? `You hosted a group chat with ${group.join(', ')}.`
+                        : exchangeText(entry, actorId, label)}
                     </span>
                   </span>
                   <span className="ra-entry__time">Day {entry.day}</span>
@@ -352,6 +509,7 @@ export function BetrayalsSocialPanel({
   realityMode = 'off',
   day = 1,
   phase = 'social',
+  nightShieldCount = 0,
   moveKinds = socialMoveKinds({ phase }),
   voteTargetIds,
   canAct = moveKinds.length > 0,
@@ -360,6 +518,8 @@ export function BetrayalsSocialPanel({
   intel,
   onClose,
   onMove,
+  onGeneralMove,
+  onAllianceChange,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [contactId, setContactId] = useState<string>()
@@ -376,9 +536,10 @@ export function BetrayalsSocialPanel({
     }))
   const peer = contacts.find(({ id }) => id === contactId)
   const eligible = contacts.filter(({ id }) => id !== peer?.id)
-  const isPrivate = (entry: SocialEntry) =>
-    entry.actorId === actorId || entry.recipientId === actorId
+  const isPrivate = (entry: SocialEntry) => socialEntryVisibleTo(entry, actorId)
   const notes = conversation.filter(isPrivate)
+  const shieldReports = firsthandShieldReports(notes, actorId, day)
+  const peerShieldReport = peer && shieldReports.get(peer.id)
   const latest = recent && isPrivate(recent) ? recent : notes.at(-1)
   const pact = peer && latestPact(notes, actorId, peer.id, day)
   const names = new Map(cast.map(({ id, name }) => [id, name]))
@@ -393,11 +554,19 @@ export function BetrayalsSocialPanel({
   }
   const affinity = peer && relationships[actorId][peer.id].affinity
   const allied = peer && hasAlliance(notes, actorId, peer.id)
+  const personalPact = peer && hasPersonalAlliance(notes, actorId, peer.id)
+  const allies = contacts.filter(({ id }) => hasPersonalAlliance(notes, actorId, id))
+  const groups = castleAlliances(notes).filter(({ memberIds }) => memberIds.includes(actorId))
+  const planningOpen = alliancePlanningOpen({ phase }) && moveKinds.includes('alliance')
   const phaseActions = actions
     .filter(({ id }) => moveKinds.includes(id))
+    .filter(({ id }) => id !== 'end-pact' || personalPact)
     .map((action) => (action.id === 'rapport' ? { ...action, ...checkInCopy[phase] } : action))
+  const inFilter = (action: (typeof phaseActions)[number], category: Filter) =>
+    category === 'all' ||
+    (isNightShieldMove(action.id) ? category === 'shields' : action.category === category)
   const phaseFilters = filters.filter(({ id }) =>
-    id === 'all' ? phaseActions.length > 1 : phaseActions.some(({ category }) => category === id)
+    id === 'all' ? phaseActions.length > 1 : phaseActions.some((action) => inFilter(action, id))
   )
   const activeFilter = phaseFilters.some(({ id }) => id === filter) ? filter : 'all'
 
@@ -430,16 +599,22 @@ export function BetrayalsSocialPanel({
   }
 
   function subjectsFor(kind: SocialEntry['kind']) {
-    return eligible.filter(({ id }) =>
-      kind === 'vote-plan'
-        ? id !== pact?.suspectId && (!voteTargetIds || voteTargetIds.includes(id))
-        : !discussed(kind, id)
-    )
+    return eligible.filter(({ id }) => {
+      if (kind === 'vote-plan')
+        return id !== pact?.suspectId && (!voteTargetIds || voteTargetIds.includes(id))
+      if (kind === 'shield-tip' && !shieldReports.has(id)) return false
+      return !discussed(kind, id)
+    })
   }
 
   function unavailable(kind: SocialEntry['kind']) {
     if (!peer) return 'Choose a guest first.'
-    if (kind === 'alliance' && allied) return 'You already have an alliance.'
+    if (shieldTalkBlockedAfterGift(notes, { actorId, recipientId: peer.id, kind }, day))
+      return 'You already gave this guest a Night Shield today.'
+    if (kind === 'shield-gift' && !nightShieldCount) return 'You have no Night Shield to give.'
+    if (kind === 'shield-tip' && subjectsFor(kind).length === 0)
+      return 'No new shield reports to share.'
+    if (kind === 'alliance' && personalPact) return 'You already have a personal pact.'
     if (kind === 'mend-fences' && !hasSocialStrain(notes, actorId, peer.id))
       return 'There’s no tension to resolve.'
     if (!choosesSocialSubject(kind) && discussed(kind)) return 'You’ve already asked today.'
@@ -537,7 +712,6 @@ export function BetrayalsSocialPanel({
           id="betrayals-social-body"
           className={'sp2-body' + (peer && canAct ? ' sp2-body--focused-target' : '')}
         >
-          {!peer && intel}
           {!peer && contacts.length > 0 && (
             <section className="sp2-hubmates" aria-label="Player roster">
               <div className="sp2-section-heading">
@@ -554,6 +728,34 @@ export function BetrayalsSocialPanel({
                   chooseContact(primaryTargetId ?? undefined)
                 }
               />
+            </section>
+          )}
+          {!peer && (allies.length > 0 || groups.length > 0) && (
+            <section className="sp2-hubmates" aria-label="Your alliances">
+              <div className="sp2-section-heading">
+                <span className="sp2-section-heading__title">Your alliances</span>
+              </div>
+              {groups.map((group) => (
+                <BetrayalsAllianceGroup
+                  key={group.id}
+                  group={group}
+                  actorId={actorId}
+                  contacts={contacts}
+                  onChange={planningOpen ? onAllianceChange : undefined}
+                />
+              ))}
+              {allies.length > 0 && (
+                <div className="sp2-consult-alliance-picker__chips">
+                  {allies.map((ally) => (
+                    <HubmateChoiceChip
+                      key={ally.id}
+                      player={ally}
+                      selected={false}
+                      onClick={() => chooseContact(ally.id)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           )}
           <section className={'sp2-focus' + (peer ? ' sp2-focus--active' : '')}>
@@ -601,6 +803,19 @@ export function BetrayalsSocialPanel({
                       <span>Vote pact · {label(pact.suspectId)}</span>
                     </div>
                   )}
+                  {peerShieldReport && moveKinds.includes('ask-shield') && (
+                    <div className="sp2-focus__commitments" aria-label="Night Shield report">
+                      <span>
+                        {peerShieldReport.changedStory
+                          ? 'Mixed messages about their shield'
+                          : peerShieldReport.witnessedGift
+                            ? 'You gave them a Night Shield'
+                            : peerShieldReport.claim === 'has'
+                              ? 'Says they have a Night Shield'
+                              : 'Says they have no Night Shield'}
+                      </span>
+                    </div>
+                  )}
                   <div
                     className="sp2-focus__meter"
                     aria-label="Trust"
@@ -636,7 +851,21 @@ export function BetrayalsSocialPanel({
             )}
           </section>
 
-          {canAct && contacts.length > 0 && (
+          {!peer && intel}
+          {!peer && canAct && onGeneralMove && (
+            <BetrayalsGeneralActions
+              contacts={contacts}
+              energy={resources.energy}
+              realityMode={realityMode}
+              day={day}
+              actorId={actorId}
+              notes={notes}
+              planningOpen={planningOpen}
+              onMove={onGeneralMove}
+            />
+          )}
+
+          {canAct && peer && (
             <section className="sp2-moves" aria-label="Social actions">
               <div className="sp2-moves__top">
                 <div className="sp2-moves__heading">
@@ -650,9 +879,15 @@ export function BetrayalsSocialPanel({
                     disabled={!canExecute}
                     onClick={execute}
                   >
-                    Execute
+                    {selectedAction === 'shield-gift' ? 'Give shield' : 'Execute'}
                   </button>
                 </div>
+                {nightShieldCount > 0 && moveKinds.includes('shield-gift') && (
+                  <p className="betrayals-shield-count">
+                    You hold {nightShieldCount === 1 ? '1 Night Shield' : '2 Night Shields'}. You
+                    can give a shield away before voting.
+                  </p>
+                )}
                 {phaseFilters.length > 1 && (
                   <div className="sp2-move-filters" role="tablist" aria-label="Action categories">
                     {phaseFilters.map(({ id, label: title }) => (
@@ -677,7 +912,13 @@ export function BetrayalsSocialPanel({
                   <div
                     className="sp2-consult-alliance-picker"
                     role="group"
-                    aria-label={selectedAction === 'vote-plan' ? 'Vote target' : 'Guest to discuss'}
+                    aria-label={
+                      targetKind === 'vote-plan'
+                        ? 'Vote target'
+                        : targetKind === 'shield-tip'
+                          ? 'Whose shield to discuss'
+                          : 'Guest to discuss'
+                    }
                   >
                     <div className="sp2-consult-alliance-picker__chips">
                       {availableTargets.map((player) => (
@@ -694,7 +935,7 @@ export function BetrayalsSocialPanel({
               </div>
               <div className="sp2-action-grid" role="tabpanel" aria-label="Available actions">
                 {phaseActions
-                  .filter(({ category }) => activeFilter === 'all' || category === activeFilter)
+                  .filter((action) => inFilter(action, activeFilter))
                   .map((action) => {
                     const cost = socialMoveCost(action.id, realityMode)
                     const reason = unavailable(action.id)

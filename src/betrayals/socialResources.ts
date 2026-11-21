@@ -10,9 +10,10 @@ import type { RealityPreset, Run, SocialEntry } from './run.ts'
 export type SocialResources = { energy: number; influence: number; info: number }
 export type SocialWallet = SocialResources & { day: number; energySpent: number }
 
+const shieldConversationCost = { energy: 1, influence: 0, info: 0 }
 const actionEconomy: Record<
   SocialEntry['kind'],
-  { resourceAction: Pick<SocialActionDefinition, 'id' | 'kind'>; cost: SocialResources }
+  { resourceAction?: Pick<SocialActionDefinition, 'id' | 'kind'>; cost: SocialResources }
 > = {
   rapport: {
     resourceAction: { id: 'rapport', kind: 'rapport' },
@@ -26,6 +27,7 @@ const actionEconomy: Record<
     resourceAction: { id: 'proposeAlliance', kind: 'intel_spend' },
     cost: { energy: 2, influence: 0, info: 0 },
   },
+  'end-pact': { cost: { energy: 0, influence: 0, info: 0 } },
   'vote-plan': {
     resourceAction: { id: 'rally_votes_against', kind: 'political_spend' },
     cost: { energy: 2, influence: 20, info: 50 },
@@ -54,6 +56,18 @@ const actionEconomy: Record<
     resourceAction: { id: 'ask_loh_target', kind: 'intel_gain' },
     cost: { energy: 1, influence: 3, info: 0 },
   },
+  'shield-gift': { cost: { energy: 0, influence: 0, info: 0 } },
+  'shield-claim': { cost: shieldConversationCost },
+  'shield-deny': { cost: shieldConversationCost },
+  'ask-shield': { cost: shieldConversationCost },
+  'shield-tip': { cost: shieldConversationCost },
+  'group-chat': { cost: { energy: 2, influence: 0, info: 0 } },
+  'lay-low': { cost: { energy: 0, influence: 0, info: 0 } },
+  'explore-castle': { cost: { energy: 1, influence: 0, info: 0 } },
+  eavesdrop: { cost: { energy: 2, influence: 0, info: 0 } },
+  'found-alliance': { cost: { energy: 2, influence: 0, info: 0 } },
+  'consult-alliance': { cost: { energy: 1, influence: 0, info: 0 } },
+  'alliance-update': { cost: { energy: 0, influence: 0, info: 0 } },
 }
 
 const calibrationMode = (reality: RealityPreset) => (reality === 'off' ? 'normal' : 'drama')
@@ -76,8 +90,13 @@ export function initializeSocialWallets(
   return Object.fromEntries(seats.map(({ id }) => [id, startingSocialWallet(day, reality)]))
 }
 
-export function socialMoveCost(kind: SocialEntry['kind'], reality: RealityPreset): SocialResources {
+export function socialMoveCost(
+  kind: SocialEntry['kind'],
+  reality: RealityPreset,
+  guestCount = 2
+): SocialResources {
   const { cost } = actionEconomy[kind]
+  if (kind === 'group-chat') return { ...cost, energy: guestCount }
   return reality !== 'off' && (kind === 'question' || kind === 'vote-plan')
     ? { ...cost, energy: cost.energy + 1 }
     : cost
@@ -129,6 +148,9 @@ export function recordSocialWallet(
 
 export function walletAfterSocialMove(run: Run, entry: SocialEntry, cost: SocialResources) {
   const { resourceAction } = actionEconomy[entry.kind]
+  if (!resourceAction) {
+    return recordSocialWallet(run, entry.actorId, { energy: -cost.energy }, cost.energy)
+  }
   const outcome =
     entry.reaction === 'backfired'
       ? 'backfire'

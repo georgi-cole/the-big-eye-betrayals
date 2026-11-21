@@ -2,6 +2,13 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { advanceDayBeat } from '../src/betrayals/daySocial.ts'
 import { resolveChallenge } from '../src/betrayals/challenges.ts'
+import {
+  applyCastleAllianceChange,
+  applyGeneralSocialMove,
+  CASTLE_EXPLORATION_INFO,
+  EAVESDROP_INFO,
+} from '../src/betrayals/generalSocial.ts'
+import { castleAlliances } from '../src/betrayals/allianceRecords.ts'
 import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
 import {
   acknowledgeRole,
@@ -36,6 +43,126 @@ function createRun() {
 function exchange(run, actorId, recipientId, kind, suspectId) {
   return applySocialMove(run, commandToken(run), { actorId, recipientId, kind, suspectId })
 }
+
+test('the castle actions spend or conserve Energy, improve group rapport, and save with the run', () => {
+  const run = createRun()
+  const [actor, first, second, outsider] = run.seats.map(({ id }) => id)
+  const token = commandToken(run)
+  assert.strictEqual(applyGeneralSocialMove(run, token, 'group-chat', [first, first]), run)
+  assert.strictEqual(applyGeneralSocialMove(run, token, 'group-chat', [first]), run)
+  const group = applyGeneralSocialMove(run, token, 'group-chat', [first, second])
+  assert.equal(socialWalletFor(group, actor).energy, socialWalletFor(run, actor).energy - 2)
+  assert.ok(rapport(group.social, actor, first) > 0 && rapport(group.social, second, actor) > 0)
+  assert.equal(getSocialView(group, outsider).length, 0)
+  assert.strictEqual(
+    applyGeneralSocialMove(group, commandToken(group), 'group-chat', [first, outsider]),
+    group
+  )
+  assert.strictEqual(applyGeneralSocialMove(group, token, 'lay-low'), group)
+  const quiet = applyGeneralSocialMove(group, commandToken(group), 'lay-low')
+  assert.deepEqual(socialWalletFor(quiet, actor), socialWalletFor(group, actor))
+  const explored = applyGeneralSocialMove(quiet, commandToken(quiet), 'explore-castle')
+  assert.equal(socialWalletFor(explored, actor).info, CASTLE_EXPLORATION_INFO)
+  assert.equal(socialWalletFor(explored, actor).energy, socialWalletFor(quiet, actor).energy - 1)
+  const sealed = { ...explored, phase: 'table-reveal' }
+  assert.strictEqual(applyGeneralSocialMove(sealed, commandToken(sealed), 'lay-low'), sealed)
+  let raw = ''
+  const storage = {
+    setItem: (_key, value) => {
+      raw = value
+    },
+    getItem: () => raw,
+  }
+  saveRun(storage, 'test', explored)
+  assert.deepEqual(restoreRun(storage, 'test'), { status: 'ready', run: JSON.parse(raw) })
+})
+
+test('trusted guests can agree to a personal pact during preparation', () => {
+  const run = createRun()
+  const [actor, peer] = run.seats.map(({ id }) => id)
+  const bonded = exchange(run, actor, peer, 'rapport')
+  const allied = exchange(bonded, actor, peer, 'alliance')
+  assert.ok(hasAlliance(allied.social, actor, peer))
+  const sealed = { ...bonded, phase: 'round-table' }
+  assert.strictEqual(exchange(sealed, actor, peer, 'alliance'), sealed)
+})
+
+test('alliance groups require consent, keep advice private, and let the leader manage membership', () => {
+  const run = createRun()
+  const [actor, first, second, prospect, outsider] = run.seats.map(({ id }) => id)
+  const startGroup = (state) =>
+    applyGeneralSocialMove(state, commandToken(state), 'found-alliance', [first, second])
+  const refused = startGroup(run)
+  assert.deepEqual(refused.social.at(-1).declinedIds, [first, second])
+  assert.equal(castleAlliances(refused.social).length, 0)
+  assert.equal(getSocialView(refused, first).length, 0)
+  let ready = [first, second, prospect].reduce(
+    (state, guest) => exchange(state, actor, guest, 'rapport'),
+    run
+  )
+  ready = exchange(ready, first, prospect, 'rapport')
+  const group = startGroup(ready)
+  const [{ id }] = castleAlliances(group.social)
+  assert.ok(hasAlliance(getSocialView(group, second), first, second))
+  assert.ok(!getSocialView(group, outsider).some((entry) => entry.alliance))
+  const consult = (state) =>
+    applyGeneralSocialMove(state, commandToken(state), 'consult-alliance', [], {
+      allianceId: id,
+      subjectId: outsider,
+    })
+  const advice = consult(group)
+  assert.equal(advice.social.filter(({ kind }) => kind === 'consult-alliance').length, 2)
+  assert.ok(!getSocialView(advice, outsider).length)
+  const table = { ...group, phase: 'round-table' }
+  assert.strictEqual(consult(table), table)
+  assert.strictEqual(startGroup({ ...table }).social, table.social)
+  const renamed = applyCastleAllianceChange(
+    advice,
+    commandToken(advice),
+    id,
+    'rename',
+    'The Gallery'
+  )
+  assert.equal(castleAlliances(renamed.social)[0].name, 'The Gallery')
+  const joined = applyCastleAllianceChange(renamed, commandToken(renamed), id, 'invite', prospect)
+  assert.ok(hasAlliance(getSocialView(joined, prospect), prospect, second))
+  const removed = applyCastleAllianceChange(joined, commandToken(joined), id, 'remove', second)
+  assert.ok(!hasAlliance(getSocialView(removed, second), actor, second))
+  assert.ok(hasAlliance(removed.social, actor, first))
+  const dissolved = applyCastleAllianceChange(removed, commandToken(removed), id, 'dissolve')
+  assert.equal(castleAlliances(getSocialView(dissolved, first)).length, 0)
+})
+
+test('Eavesdrop records uncertain intel and never exposes a private shield handoff', () => {
+  const run = createRun()
+  const [actor, first, second, subject] = run.seats.map(({ id }) => id)
+  const sealed = { ...run, phase: 'round-table' }
+  assert.strictEqual(applyGeneralSocialMove(sealed, commandToken(sealed), 'eavesdrop'), sealed)
+  const onlyShield = {
+    ...run,
+    social: [{ day: run.day, actorId: first, recipientId: second, kind: 'shield-gift' }],
+  }
+  const quiet = applyGeneralSocialMove(onlyShield, commandToken(onlyShield), 'eavesdrop')
+  assert.equal(quiet.social.at(-1).suspectId, undefined)
+  const whisper = {
+    day: run.day,
+    actorId: first,
+    recipientId: second,
+    kind: 'question',
+    suspectId: subject,
+  }
+  const outcomes = Array.from({ length: 20 }, (_, publicSeed) => {
+    const pending = { ...run, publicSeed, social: [whisper] }
+    return applyGeneralSocialMove(pending, commandToken(pending), 'eavesdrop')
+  })
+  assert.ok(
+    outcomes.some(
+      (outcome) =>
+        outcome.social.at(-1).suspectId === subject &&
+        socialWalletFor(outcome, actor).info === EAVESDROP_INFO
+    )
+  )
+})
 
 test('private questions can be asked once per direction per day with current commands', () => {
   const original = createRun()
@@ -91,13 +218,13 @@ test('every live phase offers a check-in paid from the same Energy balance', () 
   assert.equal(socialWalletFor({ ...original, day: 2 }, actor).energy, 14)
 })
 
-test('private vote plans close after voting and only target publicly eligible guests', () => {
+test('private vote plans close at the Round Table and only target publicly eligible guests', () => {
   const original = createRun()
   const [actor, peer, immune, shielded, hiddenShield, other] = original.seats.map(({ id }) => id)
   const first = exchange(original, actor, peer, 'rapport')
   const table = {
     ...first,
-    phase: 'round-table',
+    phase: 'safety',
     immunityId: immune,
     publicShield: { id: shielded, day: first.day },
     private: { ...first.private, nightShieldIds: [hiddenShield] },
@@ -110,6 +237,8 @@ test('private vote plans close after voting and only target publicly eligible gu
   assert.equal(latestPact(planned.social, actor, peer, table.day)?.suspectId, hiddenShield)
   assert.equal(socialWalletFor(planned, actor).influence, 23)
   assert.equal(socialWalletFor(planned, actor).info, 50)
+  const atTable = { ...planned, phase: 'round-table' }
+  assert.strictEqual(exchange(atTable, actor, peer, 'vote-plan', other), atTable)
 
   const runoff = { ...planned, runoffIds: [hiddenShield, other] }
   assert.strictEqual(exchange(runoff, actor, peer, 'vote-plan', other), runoff)
@@ -122,7 +251,7 @@ test('private vote plans close after voting and only target publicly eligible gu
 
   const night = { ...first, phase: 'night' }
   assert.strictEqual(exchange(night, actor, peer, 'question', other), night)
-  assert.ok(hasAlliance(exchange(night, actor, peer, 'alliance').social, actor, peer))
+  assert.strictEqual(exchange(night, actor, peer, 'alliance'), night)
   const finale = { ...first, phase: 'final-banishment' }
   assert.strictEqual(exchange(finale, actor, peer, 'vote-plan', other), finale)
   assert.notStrictEqual(exchange(finale, actor, peer, 'question', other), finale)

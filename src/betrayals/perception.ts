@@ -1,12 +1,13 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import type { Run, SocialEntry, TableArgument } from './run.ts'
+import { castleAlliances, socialEntryVisibleTo } from './allianceRecords.ts'
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value))
 
 export function getSocialView(run: Run, actorId: string | null): SocialEntry[] {
   if (actorId === null) return []
   return run.social
-    .filter((entry) => entry.actorId === actorId || entry.recipientId === actorId)
+    .filter((entry) => socialEntryVisibleTo(entry, actorId))
     .map((entry) => ({ ...entry }))
 }
 
@@ -17,9 +18,28 @@ export function between(entry: SocialEntry, actorId: string, peerId: string): bo
   )
 }
 
+export function hasPersonalAlliance(
+  entries: readonly SocialEntry[],
+  actorId: string,
+  peerId: string
+) {
+  if (actorId === peerId) return false
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index]
+    if (!between(entry, actorId, peerId)) continue
+    if (entry.kind === 'end-pact') return false
+    if (entry.kind === 'alliance' && entry.accepted) return true
+  }
+  return false
+}
+
 export function hasAlliance(entries: readonly SocialEntry[], actorId: string, peerId: string) {
-  return entries.some(
-    (entry) => entry.kind === 'alliance' && entry.accepted && between(entry, actorId, peerId)
+  return (
+    actorId !== peerId &&
+    (hasPersonalAlliance(entries, actorId, peerId) ||
+      castleAlliances(entries).some(
+        ({ memberIds }) => memberIds.includes(actorId) && memberIds.includes(peerId)
+      ))
   )
 }
 
@@ -27,10 +47,20 @@ export function hasAlliance(entries: readonly SocialEntry[], actorId: string, pe
 export function relationship(entries: readonly SocialEntry[], observerId: string, peerId: string) {
   let connection = 0
   let reliability = 0
+  let receivedShield = false
   for (const entry of entries) {
     if (!between(entry, observerId, peerId)) continue
     if (entry.kind === 'rapport') connection += 0.12
-    if (entry.reaction === 'backfired' && entry.recipientId === observerId) connection -= 0.08
+    if (entry.kind === 'group-chat') connection += 0.08
+    if (entry.kind === 'shield-gift' && entry.recipientId === observerId) receivedShield = true
+    if (
+      entry.kind === 'shield-gift' &&
+      entry.reaction === 'backfired' &&
+      entry.recipientId === observerId
+    )
+      reliability = clamp(reliability - 0.1, -0.36, 0.24)
+    const heardClaim = entry.kind === 'ask-shield' ? entry.actorId : entry.recipientId
+    if (entry.reaction === 'backfired' && heardClaim === observerId) connection -= 0.08
     if (entry.reaction === 'repaired') connection += 0.16
     if (entry.pledgeResult && entry.pledgeResult !== 'void') {
       const followed =
@@ -38,7 +68,9 @@ export function relationship(entries: readonly SocialEntry[], observerId: string
       reliability = clamp(reliability + (followed ? 0.08 : -0.18), -0.36, 0.24)
     }
   }
-  const bond = clamp(connection, 0, 0.6) + (hasAlliance(entries, observerId, peerId) ? 0.24 : 0)
+  const bond =
+    clamp(connection + (receivedShield ? 0.14 : 0), 0, 0.6) +
+    (hasAlliance(entries, observerId, peerId) ? 0.24 : 0)
   return { bond, reliability }
 }
 

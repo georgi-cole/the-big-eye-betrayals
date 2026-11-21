@@ -2,6 +2,7 @@ import {
   CAST_SIZE,
   INCOMING_ANSWERS,
   MAX_TABLE_ROUNDS,
+  NIGHT_SHIELD_MOVES,
   PHASES,
   PRESENTATION_CUES,
   RULES_VERSION,
@@ -41,12 +42,18 @@ function validSeat(seat: unknown): seat is Seat {
   )
 }
 
-function validIds(value: unknown, seats: Set<string>, min: number, max: number): boolean {
+function validIds(
+  value: unknown,
+  seats: Set<string>,
+  min: number,
+  max: number,
+  distinct = true
+): boolean {
   return (
     Array.isArray(value) &&
     value.length >= min &&
     value.length <= max &&
-    new Set(value).size === value.length &&
+    (!distinct || new Set(value).size === value.length) &&
     value.every((id) => typeof id === 'string' && seats.has(id))
   )
 }
@@ -123,10 +130,64 @@ function validIncomingResponses(value: unknown, day: number): boolean {
   return Boolean(
     responses &&
     Object.entries(responses).every(([id, answer]) => {
-      const match = /^([1-9]\d*):(social:[12]|round-table:1)$/.exec(id)
+      const match =
+        /^([1-9]\d*):(social:[12]|round-table:1|shield-question|shield-note:[1-9]\d*)$/.exec(id)
       return match && Number(match[1]) <= day && INCOMING_ANSWERS.some((valid) => answer === valid)
     })
   )
+}
+
+function validShieldConversations(entries: unknown[], ids: Set<string>, day: number) {
+  return entries.every((value) => {
+    const entry = asObject(value)
+    if (entry?.kind === 'found-alliance' || entry?.kind === 'alliance-update') {
+      const group = asObject(entry.alliance)
+      return Boolean(
+        group &&
+        typeof group.id === 'string' &&
+        group.id &&
+        typeof group.name === 'string' &&
+        group.name &&
+        typeof group.leaderId === 'string' &&
+        ids.has(group.leaderId) &&
+        validIds(group.memberIds, ids, group.closed === true ? 0 : 2, 6) &&
+        (group.closed === undefined || typeof group.closed === 'boolean') &&
+        typeof entry.accepted === 'boolean' &&
+        typeof entry.day === 'number' &&
+        Number.isSafeInteger(entry.day) &&
+        entry.day >= 1 &&
+        entry.day <= day &&
+        typeof entry.actorId === 'string' &&
+        ids.has(entry.actorId) &&
+        typeof entry.recipientId === 'string' &&
+        ids.has(entry.recipientId) &&
+        (entry.declinedIds === undefined || validIds(entry.declinedIds, ids, 0, 5))
+      )
+    }
+    if (!entry || !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
+    if (
+      typeof entry.day !== 'number' ||
+      !Number.isSafeInteger(entry.day) ||
+      entry.day < 1 ||
+      entry.day > day ||
+      !validIds([entry.actorId, entry.recipientId], ids, 2, 2)
+    )
+      return false
+    if (entry.kind === 'shield-tip') {
+      return (
+        validIds([entry.actorId, entry.recipientId, entry.suspectId], ids, 3, 3) &&
+        (entry.shieldReply === 'has' || entry.shieldReply === 'none')
+      )
+    }
+    if (entry.kind === 'ask-shield') {
+      return (
+        entry.shieldReply === 'has' ||
+        entry.shieldReply === 'none' ||
+        entry.shieldReply === 'private'
+      )
+    }
+    return entry.shieldReply === undefined && entry.suspectId === undefined
+  })
 }
 
 function validSocialWallets(value: unknown, ids: Set<string>, day: number): boolean {
@@ -248,6 +309,7 @@ function isRun(value: unknown): value is Run {
   const shield = asObject(item.publicShield)
   const pendingTable = asObject(hidden?.pendingTable)
   const pendingNight = asObject(hidden?.pendingNight)
+  const lastShieldSave = asObject(hidden?.lastShieldSave)
   const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
   return Boolean(
@@ -261,7 +323,17 @@ function isRun(value: unknown): value is Run {
     validIds(hidden.betrayers, ids, 3, 4) &&
     (hidden.hiddenBetrayerIds === undefined ||
       validIds(hidden.hiddenBetrayerIds, new Set(hidden.betrayers as string[]), 0, 4)) &&
-    validIds(hidden.nightShieldIds, ids, 0, 2) &&
+    validIds(hidden.nightShieldIds, ids, 0, 2, false) &&
+    (hidden.nightShieldAwardIds === undefined || validIds(hidden.nightShieldAwardIds, ids, 1, 2)) &&
+    (hidden.lastShieldSave === undefined ||
+      (lastShieldSave &&
+        typeof lastShieldSave.id === 'string' &&
+        ids.has(lastShieldSave.id) &&
+        typeof lastShieldSave.day === 'number' &&
+        Number.isSafeInteger(lastShieldSave.day) &&
+        lastShieldSave.day >= 2 &&
+        lastShieldSave.day <= item.day)) &&
+    validShieldConversations(item.social, ids, item.day) &&
     (item.runoffIds === undefined || validIds(item.runoffIds, ids, 2, CAST_SIZE)) &&
     (item.tableRound === undefined || validTableRound(item.tableRound)) &&
     validTableCount(item.tableCount, ids) &&

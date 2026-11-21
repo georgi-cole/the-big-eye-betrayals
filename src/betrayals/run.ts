@@ -37,6 +37,14 @@ export type Seat = Contestant & {
 export type RunOptions = { publicMode: boolean; realityMode: RealityPreset }
 export const INCOMING_ANSWERS = ['engage', 'listen', 'dismiss'] as const
 export type IncomingAnswer = (typeof INCOMING_ANSWERS)[number]
+export const NIGHT_SHIELD_MOVES = [
+  'shield-gift',
+  'shield-claim',
+  'shield-deny',
+  'ask-shield',
+  'shield-tip',
+] as const
+export type NightShieldClaim = 'has' | 'none'
 
 export type SocialReaction =
   | 'wary'
@@ -50,6 +58,14 @@ export type SocialReaction =
   | 'end'
   | 'banish'
 
+export type CastleAlliance = {
+  id: string
+  name: string
+  leaderId: string
+  memberIds: string[]
+  closed?: boolean
+}
+
 export type SocialEntry = {
   day: number
   actorId: string
@@ -58,6 +74,7 @@ export type SocialEntry = {
     | 'rapport'
     | 'question'
     | 'alliance'
+    | 'end-pact'
     | 'vote-plan'
     | 'ask-about'
     | 'share-suspicion'
@@ -65,8 +82,20 @@ export type SocialEntry = {
     | 'mend-fences'
     | 'debrief'
     | 'ask-end'
+    | 'group-chat'
+    | 'lay-low'
+    | 'explore-castle'
+    | 'eavesdrop'
+    | 'found-alliance'
+    | 'consult-alliance'
+    | 'alliance-update'
+    | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
+  shieldReply?: NightShieldClaim | 'private'
   accepted?: boolean
+  alliance?: CastleAlliance
+  allianceChange?: 'invite' | 'leave' | 'rename' | 'remove' | 'dissolve'
+  declinedIds?: string[]
   reaction?: SocialReaction
   pledgeResult?: { actor: boolean; recipient: boolean } | 'void'
 }
@@ -134,7 +163,10 @@ export type Run = {
   private: {
     betrayers: string[]
     hiddenBetrayerIds?: string[]
+    // One owner per awarded shield. Two shields may be held by the same guest.
     nightShieldIds: string[]
+    nightShieldAwardIds?: string[]
+    lastShieldSave?: { day: number; id: string }
     safetyStandings?: { day: number; rows: SafetyStanding[] }
     pendingTable?: TableReceipt
     pendingNight?: { targetId: string | null; blocked: boolean; byDraw?: boolean }
@@ -273,6 +305,13 @@ export function knownTeammateIds(run: Run, actorId: string | null): string[] {
     .map(({ id }) => id)
 }
 
+export function nightShieldWinners(run: Run): readonly string[] {
+  const standings = run.private.safetyStandings
+  return standings?.day === run.day
+    ? standings.rows.slice(0, 2).map(({ contestantId }) => contestantId)
+    : (run.private.nightShieldAwardIds ?? run.private.nightShieldIds)
+}
+
 export function viewFor(run: Run, actorId: string | null) {
   const actor = actorId ? run.seats.find(({ id }) => id === actorId) : undefined
   const role: Role | null = actor
@@ -282,9 +321,20 @@ export function viewFor(run: Run, actorId: string | null) {
     : null
   const activeActor = actor && !actor.exit
   const teammateIds = knownTeammateIds(run, actorId)
-  const knownNightShieldIds = activeActor
-    ? run.private.nightShieldIds.filter((id) => id === actor.id || teammateIds.includes(id))
+  const nightShieldCount = activeActor
+    ? run.private.nightShieldIds.filter((id) => id === actor.id).length
+    : 0
+  // Teammates see who won at Safety, but don't get updates about private handoffs.
+  const shieldCycle =
+    run.phase === 'round-table' ||
+    (run.phase === 'table-reveal' && !run.private.pendingTable?.blind) ||
+    run.phase === 'night' ||
+    run.phase === 'night-resolved'
+  const knownNightShieldIds = shieldCycle
+    ? nightShieldWinners(run).filter((id) => teammateIds.includes(id))
     : []
+
+  if (activeActor && nightShieldCount) knownNightShieldIds.push(actor.id)
 
   return {
     phase: run.phase,
@@ -292,7 +342,8 @@ export function viewFor(run: Run, actorId: string | null) {
     role,
     teammateIds,
     knownNightShieldIds,
-    hasNightShield: Boolean(activeActor && knownNightShieldIds.includes(actor.id)),
+    hasNightShield: nightShieldCount > 0,
+    nightShieldCount,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,

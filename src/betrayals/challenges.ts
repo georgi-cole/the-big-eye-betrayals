@@ -1,6 +1,7 @@
 import { mulberry32 } from '../store/rng.ts'
 import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
+import { prepareShieldConversations } from './shieldSocial.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
 
 export type RankedScore = {
@@ -78,12 +79,13 @@ export function resolveChallenge(
   }
   if (run.phase === 'safety') {
     const nightShieldIds = standings.slice(0, 2).map(({ contestantId }) => contestantId)
-    return {
+    return prepareShieldConversations({
       ...afterChallenge,
       phase: 'round-table',
       private: {
         ...run.private,
         nightShieldIds,
+        nightShieldAwardIds: undefined,
         safetyStandings: {
           day: run.day,
           rows: standings.map(({ contestantId, score, forfeited }) => ({
@@ -93,7 +95,7 @@ export function resolveChallenge(
           })),
         },
       },
-    }
+    })
   }
   return { ...afterChallenge, phase: 'final-banishment' }
 }
@@ -106,14 +108,15 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
   const names = new Map(view.seats.map(({ id, name }) => [id, name]))
   return standings.rows.map(({ contestantId, score, forfeited }, index) => {
     const own = activeViewer && contestantId === actorId
-    const revealName = own || view.knownNightShieldIds.includes(contestantId)
+    const shield = index < 2
+    const revealName = own || (shield && view.teammateIds.includes(contestantId))
     return {
       name: revealName ? (names.get(contestantId) ?? null) : null,
       own,
       score,
       place: index + 1,
       forfeited: Boolean(forfeited),
-      shield: run.private.nightShieldIds.includes(contestantId),
+      shield,
     }
   })
 }
