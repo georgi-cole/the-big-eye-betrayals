@@ -77,6 +77,7 @@ interface Props {
   seed?: number
   attemptNumber?: number
   premiumPresentation?: boolean
+  parallelBoards?: boolean
   previewStage?: 'final'
   onComplete?: (completion?: ReactMinigameCompletion) => void
 }
@@ -239,6 +240,7 @@ export default function HouseOfCardsComp({
   seed,
   attemptNumber = 0,
   premiumPresentation = false,
+  parallelBoards = false,
   previewStage,
   onComplete,
 }: Props) {
@@ -615,8 +617,9 @@ export default function HouseOfCardsComp({
         roundScores[a].timeMs - roundScores[b].timeMs
       )
     })
-    const nextActiveIds =
-      round === 4
+    const nextActiveIds = parallelBoards
+      ? rankedIds
+      : round === 4
         ? rankedIds.slice(0, 2)
         : round <= 2
           ? rankedIds
@@ -642,6 +645,7 @@ export default function HouseOfCardsComp({
     cumulativeScores,
     humanId,
     mistakes,
+    parallelBoards,
     round,
     roundTool,
     sessionSeed,
@@ -700,10 +704,35 @@ export default function HouseOfCardsComp({
     [aiProfiles, attemptNumber, sessionSeed, startFinal]
   )
 
+  const showStandings = useCallback(
+    (
+      orderedIds: string[],
+      scores: Record<string, number>,
+      finalPairs: Record<string, number> = {}
+    ) => {
+      const standings: Array<Omit<PlayerOutcome, 'finalRank'>> = orderedIds.map((id) => ({
+        playerId: id,
+        matchedPairs: finalPairs[id] ?? 0,
+        mistakes: 0,
+        turnsTaken: 0,
+        didFinish: true,
+        completionTimeMs: id in finalPairs ? Date.now() - roundStartedAtRef.current : null,
+        streakBest: 0,
+        clashScore: (scores[id] ?? 0) + (finalPairs[id] ?? 0) * 10_000,
+      }))
+      setFinalStandings(standings.map((outcome, index) => ({ ...outcome, finalRank: index + 1 })))
+      dispatch(completeHouseOfCardsTournament({ standings }))
+      playComplete()
+      setPhase('results')
+    },
+    [dispatch, playComplete]
+  )
+
   const continueRound = useCallback(() => {
     if (!roundSummary) return
     if (roundSummary.round === 4) {
-      startFinal(roundSummary.nextActiveIds, roundSummary.cumulativeScores)
+      if (parallelBoards) showStandings(roundSummary.rankedIds, roundSummary.cumulativeScores)
+      else startFinal(roundSummary.nextActiveIds, roundSummary.cumulativeScores)
       return
     }
     if (humanId && roundSummary.nextActiveIds.includes(humanId)) {
@@ -716,7 +745,15 @@ export default function HouseOfCardsComp({
       roundSummary.nextActiveIds,
       roundSummary.cumulativeScores
     )
-  }, [humanId, resetBoardForRound, roundSummary, simulateRemainingPreliminaryRounds, startFinal])
+  }, [
+    humanId,
+    parallelBoards,
+    resetBoardForRound,
+    roundSummary,
+    showStandings,
+    simulateRemainingPreliminaryRounds,
+    startFinal,
+  ])
 
   const skipToResults = useCallback(() => {
     if (!roundSummary) return
@@ -1209,33 +1246,15 @@ export default function HouseOfCardsComp({
         .filter((id) => !finalists.includes(id))
         .sort((a, b) => (cumulativeScores[b] ?? 0) - (cumulativeScores[a] ?? 0)),
     ]
-    const standingsWithoutRank: Array<Omit<PlayerOutcome, 'finalRank'>> = orderedIds.map((id) => ({
-      playerId: id,
-      matchedPairs: finalists.includes(id) ? (finalPoints[id] ?? 0) : 0,
-      mistakes: 0,
-      turnsTaken: 0,
-      didFinish: true,
-      completionTimeMs: finalists.includes(id) ? Date.now() - roundStartedAtRef.current : null,
-      streakBest: 0,
-      clashScore: (cumulativeScores[id] ?? 0) + (finalPoints[id] ?? 0) * 10_000,
-    }))
-    const ranked = standingsWithoutRank.map((outcome, index) => ({
-      ...outcome,
-      finalRank: index + 1,
-    }))
-    setFinalStandings(ranked)
-    dispatch(completeHouseOfCardsTournament({ standings: standingsWithoutRank }))
-    playComplete()
-    setPhase('results')
+    showStandings(orderedIds, cumulativeScores, finalPoints)
   }, [
     cumulativeScores,
-    dispatch,
     finalPoints,
     finalists,
     matchedPairs,
     participantIds,
     phase,
-    playComplete,
+    showStandings,
     targetPairs,
   ])
 
@@ -1254,6 +1273,7 @@ export default function HouseOfCardsComp({
       rawResults,
       authoritativeWinnerId: finalStandings[0].playerId,
       authoritativeLastPlaceId: finalStandings[finalStandings.length - 1].playerId,
+      authoritativeRankedIds: finalStandings.map((entry) => entry.playerId),
     })
   }, [finalStandings, humanId, onComplete])
 
@@ -1446,9 +1466,11 @@ export default function HouseOfCardsComp({
         panelClassName="hoc-round-results-panel"
         onContinue={continueRound}
         continueLabel={
-          humanId && roundSummary.nextActiveIds.includes(humanId)
-            ? 'Next round'
-            : 'Watch the finalists'
+          parallelBoards && roundSummary.round === 4
+            ? 'See results'
+            : humanId && roundSummary.nextActiveIds.includes(humanId)
+              ? 'Next round'
+              : 'Watch the finalists'
         }
         continueButtonClassName="hoc-complete-continue"
         footerNode={
@@ -1496,7 +1518,9 @@ export default function HouseOfCardsComp({
             : ''}
           {roundSummary.eliminatedIds.length > 0
             ? `${roundSummary.eliminatedIds.map(nameFor).join(', ')} eliminated.`
-            : 'The field advances.'}
+            : parallelBoards && roundSummary.round === 4
+              ? 'All four boards are complete.'
+              : 'The field advances.'}
         </p>
       </MinigameCompleteWrapper>
     )
@@ -1537,9 +1561,11 @@ export default function HouseOfCardsComp({
                     {outcome.playerId === humanId ? ' (You)' : ''}
                   </strong>
                   <span>
-                    {finalists.includes(outcome.playerId)
-                      ? `${finalPoints[outcome.playerId] ?? 0} final pairs`
-                      : 'Eliminated in preliminaries'}
+                    {parallelBoards
+                      ? 'Four-board total'
+                      : finalists.includes(outcome.playerId)
+                        ? `${finalPoints[outcome.playerId] ?? 0} final pairs`
+                        : 'Eliminated in preliminaries'}
                   </span>
                 </div>
                 <strong>{outcome.clashScore}</strong>
@@ -1549,7 +1575,9 @@ export default function HouseOfCardsComp({
         }
       >
         <h2 className="hoc-complete-title">🏆 {nameFor(winner.playerId)} wins Deck of Light</h2>
-        <p className="hoc-round-summary">Five rounds complete</p>
+        <p className="hoc-round-summary">
+          {parallelBoards ? 'Four boards complete' : 'Five rounds complete'}
+        </p>
       </MinigameCompleteWrapper>
     )
   }
@@ -1578,7 +1606,9 @@ export default function HouseOfCardsComp({
       </header>
       <div className="hoc-hud">
         <div className="hoc-hud-stat">
-          <strong>Round {round}/5</strong>
+          <strong>
+            Round {round}/{parallelBoards ? 4 : 5}
+          </strong>
           <span>{tileCount} tiles</span>
         </div>
         <div className="hoc-hud-stat">

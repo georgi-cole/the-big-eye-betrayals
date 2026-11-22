@@ -13,6 +13,7 @@ import { renderEffects } from './renderEffects';
 import { renderIndicators } from './renderIndicators';
 import { renderVault } from './renderVault';
 import { isInteractivePhase, setPhase } from './stateMachine';
+import { minigameCanvasPaint, type MinigameCanvasPaint } from '../../minigameCanvasPaint';
 import type {
   Particle,
   PointerState,
@@ -93,6 +94,8 @@ export class VaultCrackerCanvasEngine {
 
   private readonly options: VaultCrackerEngineOptions;
 
+  private readonly paint: MinigameCanvasPaint;
+
   private readonly state: VaultCrackerRuntimeState;
 
   private layout: VaultCrackerLayout;
@@ -120,6 +123,7 @@ export class VaultCrackerCanvasEngine {
     this.canvas = canvas;
     this.ctx = context;
     this.options = options;
+    this.paint = minigameCanvasPaint(canvas);
     this.state = makeInitialState(options.seed, options.timeLimitMs);
     this.layout = createVaultCrackerLayout(canvas.clientWidth || 320, canvas.clientHeight || 560, 1);
   }
@@ -327,9 +331,9 @@ export class VaultCrackerCanvasEngine {
 
   private render(): void {
     this.ctx.clearRect(0, 0, this.layout.width, this.layout.height);
-    renderBackground(this.ctx, this.state, this.layout);
-    renderVault(this.ctx, this.state, this.layout);
-    renderIndicators(this.ctx, this.state, this.layout);
+    renderBackground(this.ctx, this.state, this.layout, this.paint);
+    renderVault(this.ctx, this.state, this.layout, this.paint);
+    renderIndicators(this.ctx, this.state, this.layout, this.paint);
     renderEffects(this.ctx, this.state, this.layout);
   }
 

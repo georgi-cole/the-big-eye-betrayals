@@ -7,7 +7,7 @@ import {
   nightShieldWindowOpen,
   reactionToShieldClaim,
 } from './nightShields.ts'
-import { INCOMING_ANSWERS, isCurrentCommand } from './run.ts'
+import { INCOMING_ANSWERS, isCurrentCommand, publicNightShieldWinners } from './run.ts'
 import type { CommandToken, Contestant, IncomingAnswer, Run, SocialEntry } from './run.ts'
 import { getSocialView, hasAlliance, rapport } from './social.ts'
 import { recordSocialWallet } from './socialResources.ts'
@@ -35,7 +35,10 @@ function family(
   return { id, voiceTags, variants: texts.map((text) => ({ text, voiceTags })), isFollowUp }
 }
 
-const lines: Record<OrdinaryEncounter | 'shield-question', VariantFamily[]> = {
+const lines: Record<
+  OrdinaryEncounter | 'shield-question' | 'public-shield-question',
+  VariantFamily[]
+> = {
   confidence: [
     family(
       'confidence-direct',
@@ -126,6 +129,24 @@ const lines: Record<OrdinaryEncounter | 'shield-question', VariantFamily[]> = {
       ]
     ),
   ],
+  'public-shield-question': [
+    family(
+      'public-shield-direct',
+      ['direct', 'strategic'],
+      [
+        'I saw you win a Night Shield. Are you keeping it for tonight?',
+        'You won a shield out there. Do you still have it?',
+      ]
+    ),
+    family(
+      'public-shield-private',
+      ['sincere', 'indirect'],
+      [
+        'Can I ask you something in private? Did you keep the Night Shield you won?',
+        'I saw you win a shield. Between us, are you still covered tonight?',
+      ]
+    ),
+  ],
 }
 
 function shieldInteractions(run: Run): IncomingInteraction[] {
@@ -183,8 +204,11 @@ function shieldInteractions(run: Run): IncomingInteraction[] {
     gaveNightShieldToday(run.social, run.humanId, contact.id, run.day)
   )
     return messages
+  const question = publicNightShieldWinners(run).includes(run.humanId)
+    ? 'public-shield-question'
+    : 'shield-question'
   const { text } = pickVariantText(
-    lines['shield-question'],
+    lines[question],
     getVoiceProfile(contact.id),
     new Set(),
     0,

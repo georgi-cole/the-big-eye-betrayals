@@ -1,8 +1,11 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { MinigamePortalContext } from '../components/MinigameHost/minigamePortal'
+import { MinigameReadyCountdown } from '../components/MinigameHost/MinigameReadyCountdown'
 import MinigameRules from '../components/MinigameRules/MinigameRules'
 import MinigameUtilityDock from '../components/MinigameUtilityDock/MinigameUtilityDock'
 import type { GameRegistryEntry } from '../minigames/registryBase'
+import './challengeTheme.css'
 
 type Props = {
   title: string
@@ -13,7 +16,20 @@ type Props = {
 }
 
 export function BetrayalsChallengeStage({ title, game, motion, onForfeit, children }: Props) {
+  const [phase, setPhase] = useState<'rules' | 'countdown' | 'playing'>('rules')
   const [utilityView, setUtilityView] = useState<'menu' | 'rules' | 'forfeit' | null>(null)
+  const [portalTarget] = useState(() => {
+    const element = document.createElement('div')
+    element.className = 'betrayals-challenge-portal'
+    return element
+  })
+  const attachPortal = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (element) element.appendChild(portalTarget)
+      else portalTarget.remove()
+    },
+    [portalTarget]
+  )
   const overlayOpen = utilityView === 'rules' || utilityView === 'forfeit'
 
   useEffect(() => {
@@ -26,14 +42,37 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
   }, [utilityView])
 
   return (
-    <main className="betrayals-layout betrayals-layout--challenge" data-betrayals-motion={motion}>
+    <main
+      className="betrayals-layout betrayals-layout--challenge"
+      data-betrayals-motion={motion}
+      data-minigame-theme="betrayals"
+    >
       <header className="betrayals-challenge-header">
         <h1>{title}</h1>
       </header>
-      <div inert={utilityView !== null}>{children}</div>
+      {phase === 'rules' && !overlayOpen && (
+        <MinigameRules game={game} onConfirm={() => setPhase('countdown')} />
+      )}
+      {phase === 'countdown' && (
+        <div className="betrayals-challenge-ready" inert={utilityView !== null}>
+          <MinigameReadyCountdown
+            title={game.title}
+            paused={utilityView !== null}
+            onComplete={() => setPhase('playing')}
+          />
+        </div>
+      )}
+      {phase === 'playing' && (
+        <div inert={utilityView !== null} className="betrayals-challenge-game" ref={attachPortal}>
+          <MinigamePortalContext.Provider value={portalTarget}>
+            {children}
+          </MinigamePortalContext.Provider>
+        </div>
+      )}
       {!overlayOpen && (
         <MinigameUtilityDock
-          phase="playing"
+          phase={phase}
+          theme="betrayals"
           menuOpen={utilityView === 'menu'}
           onToggleMenu={() => setUtilityView((view) => (view === 'menu' ? null : 'menu'))}
           onCloseMenu={() => setUtilityView(null)}
@@ -44,9 +83,14 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
       )}
       {overlayOpen &&
         createPortal(
-          <div className="betrayals-challenge-utility">
+          <div className="betrayals-challenge-utility" data-minigame-theme="betrayals">
             {utilityView === 'rules' ? (
-              <MinigameRules game={game} mode="reference" onConfirm={() => setUtilityView(null)} />
+              <MinigameRules
+                game={game}
+                mode="reference"
+                confirmLabel={phase === 'countdown' ? 'Return to countdown' : 'Return to game'}
+                onConfirm={() => setUtilityView(null)}
+              />
             ) : (
               <div
                 className="minigame-exit-confirm-overlay minigame-exit-confirm-overlay--obsidian"

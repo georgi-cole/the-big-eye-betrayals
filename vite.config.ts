@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { excludeMobileCinematicAssets } from './scripts/lib/mobile-cinematic-assets.mjs'
+import { betrayalsMinigameCss } from './scripts/lib/betrayals-minigame-css'
 import cinematicPack from './src/cinematic/media/vipCinematicPackManifest.json'
 
 const { version: appVersion } = JSON.parse(
@@ -40,6 +41,7 @@ export default defineConfig(({ mode }) => ({
     ),
   },
   assetsInclude: ['**/*.wp2'],
+  css: { postcss: { plugins: [betrayalsMinigameCss] } },
   plugins: [
     react(),
     {

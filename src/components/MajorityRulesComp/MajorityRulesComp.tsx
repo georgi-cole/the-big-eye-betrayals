@@ -64,6 +64,7 @@ interface Props {
   seed?: number
   /** Selects the VIP-only presentation and content variant for this session. */
   premiumPresentation?: boolean
+  simultaneousFinish?: boolean
   onComplete?: (completion?: ReactMinigameCompletion) => void
 }
 
@@ -448,6 +449,7 @@ export default function MajorityRulesComp({
   prizeType,
   seed,
   premiumPresentation = false,
+  simultaneousFinish = false,
   onComplete,
 }: Props) {
   const aiCapability = useSeasonAiCapability()
@@ -465,6 +467,7 @@ export default function MajorityRulesComp({
     humanPlayerId: string | null
     aiIdentities: Record<string, AiGameIdentity | undefined>
     vipExperience: boolean
+    simultaneousFinish: boolean
   }>(() => ({
     participantIds: [...participantIds],
     competitionType: prizeType,
@@ -474,6 +477,7 @@ export default function MajorityRulesComp({
     seed: seed !== undefined && seed !== 0 ? seed : cryptoSeed(),
     humanPlayerId: participants?.find((participant) => participant.isHuman)?.id ?? null,
     vipExperience: premiumPresentation,
+    simultaneousFinish,
     aiIdentities: Object.fromEntries(
       gamePlayers
         .filter((player) => participantIds.includes(player.id) && player.aiGameIdentity)
@@ -647,14 +651,26 @@ export default function MajorityRulesComp({
     if (game.phase !== 'complete' || completedRef.current) return
     completedRef.current = true
     if (onComplete) {
+      const ranked = game.majorityPicks
+        ? [...game.activeIds, ...[...game.eliminatedIds].reverse()]
+        : undefined
       onComplete({
         authoritativeWinnerId: game.winnerId,
         authoritativeLastPlaceId: game.eliminatedIds[0] ?? null,
+        ...(ranked ? { authoritativeRankedIds: ranked, rawResults: game.majorityPicks } : {}),
       })
     } else {
       dispatch(resolveMajorityRulesOutcome())
     }
-  }, [dispatch, game.eliminatedIds, game.phase, game.winnerId, onComplete])
+  }, [
+    dispatch,
+    game.activeIds,
+    game.eliminatedIds,
+    game.majorityPicks,
+    game.phase,
+    game.winnerId,
+    onComplete,
+  ])
 
   useCompetitionResultCheckpoint(
     (game.phase === 'winner' || game.phase === 'complete') && game.winnerId
@@ -665,6 +681,12 @@ export default function MajorityRulesComp({
             authoritativeWinnerId: game.winnerId,
             authoritativeLastPlaceId: game.eliminatedIds[0] ?? null,
             lastPlaceType: 'survival',
+            ...(game.majorityPicks
+              ? {
+                  authoritativeRankedIds: [...game.activeIds, ...[...game.eliminatedIds].reverse()],
+                  rawResults: game.majorityPicks,
+                }
+              : {}),
           },
         }
       : null
@@ -1692,10 +1714,13 @@ export default function MajorityRulesComp({
           The final verdict
         </span>
         <h2 className="majority-rules-question">
-          {winner.name || 'Someone'} is the last player standing.
+          {winner.name || 'Someone'}{' '}
+          {simultaneousFinish ? 'wins Majority Rules.' : 'is the last player standing.'}
         </h2>
         <p className="majority-rules-copy">
-          They read the room, survived the minority, and held their nerve in the dice duel.
+          {simultaneousFinish
+            ? 'They led the remaining players in majority picks.'
+            : 'They read the room, survived the minority, and held their nerve in the dice duel.'}
         </p>
         <button
           type="button"
@@ -1732,7 +1757,9 @@ export default function MajorityRulesComp({
             <div className="majority-rules-glow majority-rules-glow--intro" aria-hidden="true" />
             <span className="majority-rules-badge">Majority Rules</span>
             <h2 className="majority-rules-question">
-              Read the room. Avoid the minority. Survive to the duel.
+              {simultaneousFinish
+                ? 'Read the room. Back the majority.'
+                : 'Read the room. Avoid the minority. Survive to the duel.'}
             </h2>
             <p className="majority-rules-copy">
               The safest answer is whatever most people believe everyone else will pick.

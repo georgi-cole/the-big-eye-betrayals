@@ -15,6 +15,7 @@ interface Props {
   onRequestExit: () => void
   exitAvailable?: boolean
   exitLabel?: string
+  theme?: 'betrayals'
 }
 
 function EyeIcon(): ReactNode {
@@ -55,6 +56,7 @@ export default function MinigameUtilityDock({
   onRequestExit,
   exitAvailable = true,
   exitLabel = 'Leave competition',
+  theme,
 }: Props) {
   const rulesAvailable = phase === 'countdown' || phase === 'playing'
   const position = useDockPosition(onCloseMenu)
@@ -73,6 +75,7 @@ export default function MinigameUtilityDock({
 
       <div
         className={`minigame-utility-dock ${menuOpen ? 'minigame-utility-dock--open' : ''}`}
+        data-minigame-theme={theme}
         style={{ top: position.top }}
       >
         {menuOpen && (

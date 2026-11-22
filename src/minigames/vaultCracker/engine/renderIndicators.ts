@@ -1,3 +1,4 @@
+import type { MinigameCanvasPaint } from '../../minigameCanvasPaint';
 import type { VaultCrackerLayout, VaultCrackerRuntimeState } from './types';
 import { clamp } from '../utils/math';
 
@@ -28,12 +29,13 @@ export function renderIndicators(
   ctx: CanvasRenderingContext2D,
   state: VaultCrackerRuntimeState,
   layout: VaultCrackerLayout,
+  paint: MinigameCanvasPaint,
 ): void {
   const tension = clamp(state.elapsedMs / 90_000 + state.bestBulls * 0.1, 0, 1);
   const pressure = state.pressure;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(145, 91, 224, 0.48)';
+  ctx.strokeStyle = paint('rgba(145, 91, 224, 0.48)');
   ctx.lineWidth = 10;
   ctx.beginPath();
   ctx.arc(layout.vaultCenterX, layout.vaultCenterY, layout.pressureRadius, Math.PI * 0.78, Math.PI * 2.22);
@@ -54,7 +56,7 @@ export function renderIndicators(
 
   const submitGlow = state.submitPressed ? 0.9 : state.pulse;
   ctx.save();
-  ctx.fillStyle = `rgba(49, 28, 78, ${0.92 - submitGlow * 0.08})`;
+  ctx.fillStyle = paint(`rgba(49, 28, 78, ${0.92 - submitGlow * 0.08})`);
   fillRoundedRect(
     ctx,
     layout.submitRect.x,
@@ -63,7 +65,7 @@ export function renderIndicators(
     layout.submitRect.height,
     18,
   );
-  ctx.strokeStyle = `rgba(192, 132, 252, ${0.32 + submitGlow * 0.38})`;
+  ctx.strokeStyle = paint(`rgba(192, 132, 252, ${0.32 + submitGlow * 0.38})`);
   ctx.lineWidth = 2;
   ctx.strokeRect(
     layout.submitRect.x + 1,
@@ -73,7 +75,7 @@ export function renderIndicators(
   );
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#f8f3ff';
+  ctx.fillStyle = paint('#f8f3ff');
   ctx.font = '700 16px Inter, system-ui, sans-serif';
   ctx.fillText('TEST COMBINATION', layout.submitRect.x + layout.submitRect.width / 2, layout.submitRect.y + layout.submitRect.height / 2);
   ctx.restore();

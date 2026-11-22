@@ -10,6 +10,7 @@ import {
 } from '../../animations/gridOfLuckAnimations'
 import { cryptoSeed } from '../../features/riskWheel/cryptoSpin'
 import type { GenericMinigameProps } from '../../minigames/reactComponents'
+import { useCompetitionResultCheckpoint } from '../../minigames/competitionResultContext'
 import { getNextEligiblePlayer } from './gridOfLuckLogic'
 import { mulberry32 } from '../../store/rng'
 import { isEmoji, resolveAvatarCandidates } from '../../utils/avatar'
@@ -1671,7 +1672,10 @@ export default function GridOfLuck(props: GenericMinigameProps) {
     }
 
     return {
-      accent: activePlayer.isHuman && turnMode === 'box' ? '#f3c269' : '#a855f7',
+      accent:
+        activePlayer.isHuman && turnMode === 'box'
+          ? '#f3c269'
+          : 'var(--betrayals-grid-turn, #a855f7)',
       badge:
         activePlayer.isHuman && turnMode === 'box'
           ? 'Your turn'
@@ -1892,18 +1896,26 @@ export default function GridOfLuck(props: GenericMinigameProps) {
     return () => clearTimeout(timer)
   }, [floatingBursts])
 
-  const finishMinigame = useCallback(() => {
-    if (!props.onFinish || completed) return
+  const completion = useMemo(() => {
     const winner = ranking[0]
-    if (!winner) return
-    setCompleted(true)
-    props.onFinish(winner.lp, undefined, {
+    if (state.gamePhase !== 'finished' || !winner) return null
+    return {
       authoritativeWinnerId: winner.id,
       authoritativeLastPlaceId: ranking[ranking.length - 1]?.id ?? null,
+      authoritativeRankedIds: ranking.map((player) => player.id),
       rawValue: winner.lp,
       rawResults: Object.fromEntries(ranking.map((player) => [player.id, player.lp])),
-    })
-  }, [completed, props, ranking])
+    }
+  }, [ranking, state.gamePhase])
+  useCompetitionResultCheckpoint(
+    completion && { rawValue: completion.rawValue, partial: false, completion }
+  )
+
+  const finishMinigame = useCallback(() => {
+    if (!props.onFinish || completed || !completion) return
+    setCompleted(true)
+    props.onFinish(completion.rawValue, undefined, completion)
+  }, [completed, completion, props])
 
   const handleContinueTurn = useCallback(() => {
     if (turnMode !== 'awaiting-continue') return

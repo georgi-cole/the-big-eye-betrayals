@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
+import { challengeGame } from './challengeRotation'
 import { restoreRun, saveRun } from './persistence'
 import { applySocialMove } from './social'
 import { commandToken, startRun } from './run'
@@ -20,12 +21,30 @@ vi.mock('../services/sound/SoundManager', () => ({
     setCategoryEnabled: vi.fn(),
     setCategoryVolume: vi.fn(),
     play: vi.fn(),
+    stop: vi.fn(),
   },
 }))
 
-vi.mock('../components/ColorMatchComp/ColorMatchComp', () => ({
-  default: ({ onFinish }: { onFinish: (score: number) => void }) => (
-    <button onClick={() => onFinish(100)}>Finish challenge</button>
+vi.mock('../components/HoldTheWallComp/HoldTheWallComp', () => ({
+  default: ({
+    participants,
+    onComplete,
+  }: {
+    participants: { id: string; name: string }[]
+    onComplete: (result: { authoritativeRankedIds: string[] }) => void
+  }) => (
+    <>
+      <ul aria-label="On the wall">
+        {participants.map(({ id, name }) => (
+          <li key={id}>{name}</li>
+        ))}
+      </ul>
+      <button
+        onClick={() => onComplete({ authoritativeRankedIds: participants.map(({ id }) => id) })}
+      >
+        Finish challenge
+      </button>
+    </>
   ),
 }))
 
@@ -34,6 +53,43 @@ vi.mock('../minigames/quickTapRace/QuickTapRaceCanvasGame', () => ({
     <button onClick={() => onFinish(1000)}>Finish challenge</button>
   ),
 }))
+
+vi.mock('../components/TiltLabyrinthComp/TiltLabyrinthComp', async () => {
+  const { useState } = await import('react')
+  const { default: MinigameCompleteWrapper } =
+    await import('../components/MinigameHost/MinigameCompleteWrapper')
+  return {
+    default: function TiltFixture({
+      participants,
+    }: {
+      participants: { id: string; isHuman: boolean }[]
+    }) {
+      const [finished, setFinished] = useState(false)
+      if (!finished) return <button onClick={() => setFinished(true)}>Finish maze</button>
+      const winner = participants.find(({ isHuman }) => isHuman)!
+      const rankedIds = [
+        winner.id,
+        ...participants.filter(({ isHuman }) => !isHuman).map(({ id }) => id),
+      ]
+      return (
+        <MinigameCompleteWrapper
+          result={{
+            rawValue: 160_007,
+            partial: false,
+            completion: {
+              authoritativeRankedIds: rankedIds,
+              rawResults: Object.fromEntries(rankedIds.map((id, i) => [id, 160_007 + i * 10000])),
+            },
+          }}
+          onContinue={vi.fn()}
+          placementsNode={<p>Maze standings</p>}
+        >
+          <h2>Maze results</h2>
+        </MinigameCompleteWrapper>
+      )
+    },
+  }
+})
 
 async function clickAndSave(target: HTMLElement) {
   await act(async () => {
@@ -66,6 +122,106 @@ describe('Betrayals season review', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
+  it('takes over Tilt Labyrinth results once, preserving the time, ranking and shields', async () => {
+    const initial = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-safety-timed-results', roleSeed: 32, publicSeed: 12 }
+    )
+    const fixture = {
+      ...initial,
+      phase: 'safety' as const,
+      day: 2,
+      immunityId: initial.seats[1].id,
+      private: { ...initial.private, betrayers: initial.seats.slice(2, 5).map(({ id }) => id) },
+    }
+    const run = Array.from({ length: 128 }, (_, publicSeed) => ({ ...fixture, publicSeed })).find(
+      (entry) => challengeGame(entry)?.key === 'tiltLabyrinth'
+    )!
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play Tilt Labyrinth' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
+    let finishSave: (result: boolean) => void = () => {}
+    vi.spyOn(durablePersistence, 'flushDurablePersistence').mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishSave = resolve
+      })
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish maze' }))
+    expect(screen.getByText('Saving challenge results.')).toBeVisible()
+    expect(screen.queryByText('Maze results')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+    await act(async () => finishSave(true))
+    const scoreboard = within(screen.getByRole('dialog', { name: 'Safety Challenge results' }))
+    expect(scoreboard.getByRole('region', { name: 'Standings' })).toHaveAttribute('tabindex', '0')
+    expect(scoreboard.getByRole('columnheader', { name: 'Adjusted time' })).toBeVisible()
+    expect(scoreboard.getByRole('row', { name: /Georgi/ })).toHaveTextContent('2:40.01')
+    expect(scoreboard.getAllByText('Won')).toHaveLength(2)
+    expect(scoreboard.getAllByLabelText('Hidden')).toHaveLength(23)
+    await clickAndSave(scoreboard.getByRole('button', { name: 'Continue' }))
+    expect(
+      screen.queryByRole('dialog', { name: 'Safety Challenge results' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Round Table' })).toBeVisible()
+  })
+
+  it('names public Safety winners in the standings and marks their wins on the roster and Faux TV', async () => {
+    const initial = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-safety-public-wall', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, immune, opponent] = initial.seats
+    const run = {
+      ...initial,
+      phase: 'safety' as const,
+      day: 2,
+      immunityId: immune.id,
+      challengeHistory: [] as string[],
+    }
+    let game = challengeGame(run)
+    while (game && game.key !== 'holdWall' && !run.challengeHistory.includes(game.key)) {
+      run.challengeHistory.push(game.key)
+      game = challengeGame(run)
+    }
+    expect(game?.key).toBe('holdWall')
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play Hold the Wall' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
+    const finish = await screen.findByRole('button', { name: 'Finish challenge' })
+    const wall = within(screen.getByRole('list', { name: 'On the wall' }))
+    expect(wall.getByText(opponent.name)).toBeVisible()
+    expect(wall.queryByText(immune.name)).not.toBeInTheDocument()
+    await clickAndSave(finish)
+    const standings = within(screen.getByRole('dialog', { name: 'Safety Challenge results' }))
+    expect(standings.getByRole('rowheader', { name: opponent.name })).toBeVisible()
+    expect(standings.queryByLabelText('Hidden')).not.toBeInTheDocument()
+    await clickAndSave(standings.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to castle' }))
+    const roster = within(screen.getByRole('list', { name: 'Contestant roster' }))
+    expect(
+      roster.getByRole('button', { name: `${opponent.name}, Won a Night Shield` })
+    ).toBeVisible()
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText(/They may have passed their shields on in secret/)).toBeVisible()
+  })
+
   it('waits for the save before showing a scene that must survive an immediate reload', async () => {
     render(<BetrayalsScreen />)
     await clickAndSave(screen.getByRole('button', { name: 'Start season' }))
@@ -89,8 +245,8 @@ describe('Betrayals season review', () => {
   })
 
   it.each([
-    ['immunity', 'Quick Tap Race', /Wait for the start signal/],
-    ['safety', 'Color Match', /red, green, and blue sliders/],
+    ['immunity', 'Hold the Wall', /Press and HOLD the wall panel/],
+    ['safety', 'Quick Tap Race', /Wait for the start signal/],
   ] as const)('offers the shared Eye controls during %s', async (phase, game, rule) => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
@@ -104,12 +260,34 @@ describe('Betrayals season review', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play ' + game }))
     const openEye = () =>
       fireEvent.click(screen.getByRole('button', { name: 'Open minigame menu' }))
+    const rules = () => within(screen.getByRole('dialog', { name: game + ' rules' }))
+    expect(rules().getByText(rule)).toBeVisible()
+    expect(screen.queryByRole('status', { name: 'Get Ready' })).not.toBeInTheDocument()
+
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(rules().getByRole('button', { name: 'Start competition' }))
+      const ready = () => within(screen.getByRole('status', { name: 'Get Ready' }))
+      expect(ready().getByText('3')).toBeVisible()
+      act(() => vi.advanceTimersByTime(1000))
+      expect(ready().getByText('2')).toBeVisible()
+      openEye()
+      fireEvent.click(screen.getByRole('menuitem', { name: /View rules/ }))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(screen.queryByRole('button', { name: 'Finish challenge' })).not.toBeInTheDocument()
+      fireEvent.click(rules().getByRole('button', { name: 'Return to countdown' }))
+      expect(ready().getByText('3')).toBeVisible()
+      act(() => vi.advanceTimersByTime(3000))
+      expect(ready().getByText('GO!')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Finish challenge' })).not.toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(600))
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(await screen.findByRole('button', { name: 'Finish challenge' })).toBeVisible()
     openEye()
     fireEvent.click(screen.getByRole('menuitem', { name: /View rules/ }))
-    const rules = within(screen.getByRole('dialog', { name: game + ' rules' }))
-    expect(rules.getByText(rule)).toBeVisible()
-    fireEvent.click(rules.getByRole('button', { name: 'Return to game' }))
-
+    fireEvent.click(rules().getByRole('button', { name: 'Return to game' }))
     openEye()
     fireEvent.click(screen.getByRole('menuitem', { name: /Forfeit challenge/ }))
     const confirm = () => within(screen.getByRole('dialog', { name: 'Forfeit ' + game + '?' }))
@@ -121,6 +299,51 @@ describe('Betrayals season review', () => {
     expect(screen.queryByRole('button', { name: 'Open minigame menu' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeVisible()
   })
+
+  it.each([
+    ['lastLight', 'The Last Light'],
+    ['rockPaperScissors', 'Rock, Paper, Scissors'],
+    ['riskWheelAbyss', 'Risk Wheel: Abyss'],
+  ] as const)(
+    'launches %s with rules, a ready countdown and a running clock',
+    async (key, title) => {
+      const initial = startRun(
+        { id: 'human', name: 'Georgi' },
+        BETRAYALS_AI_POOL,
+        { publicMode: false, realityMode: 'off' },
+        { id: key, roleSeed: 32, publicSeed: 12 }
+      )
+      const run = {
+        ...initial,
+        day: 3,
+        phase: 'immunity' as const,
+        seats: initial.seats.map((seat, index) =>
+          index < 8 ? seat : { ...seat, exit: { day: 2, cause: 'night' as const } }
+        ),
+        challengeHistory: [] as string[],
+      }
+      let game = challengeGame(run)
+      while (game && game.key !== key && !run.challengeHistory.includes(game.key)) {
+        run.challengeHistory.push(game.key)
+        game = challengeGame(run)
+      }
+      expect(game?.key).toBe(key)
+      saveRun(localStorage, 'edition-local', run)
+      render(<BetrayalsScreen />)
+      fireEvent.click(screen.getByRole('button', { name: 'Play ' + title }))
+      const rules = within(screen.getByRole('dialog', { name: title + ' rules' }))
+      vi.useFakeTimers()
+      try {
+        fireEvent.click(rules.getByRole('button', { name: 'Start competition' }))
+        expect(screen.getByRole('status', { name: 'Get Ready' })).toBeVisible()
+        act(() => vi.advanceTimersByTime(3600))
+      } finally {
+        vi.useRealTimers()
+      }
+      const stage = within(await screen.findByRole('region', { name: title }, { timeout: 4_000 }))
+      expect(await stage.findByRole('timer', { name: 'Seconds remaining' })).toBeVisible()
+    }
+  )
 
   it('explains the sealed finale vote and why a loyal final two win', () => {
     const base = startRun(
@@ -210,7 +433,14 @@ describe('Betrayals season review', () => {
     fireEvent.click(within(conversations).getByRole('button', { name: 'Close social panel' }))
     expect(screen.queryByRole('dialog', { name: 'Social' })).not.toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Play: begin Immunity Challenge' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Play Quick Tap Race' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Play Hold the Wall' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
     await clickAndSave(await screen.findByRole('button', { name: 'Finish challenge' }))
     await finishCinematic()
     expect(screen.getByRole('heading', { name: 'Safety Challenge' })).toBeInTheDocument()

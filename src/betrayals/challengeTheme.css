@@ -1,0 +1,139 @@
+[data-minigame-theme='betrayals'] {
+  --betrayals-game-shadow: 8 9 12;
+  --betrayals-game-base: 14 16 22;
+  --betrayals-game-surface: 23 25 31;
+  --betrayals-game-raised: 43 36 33;
+  --betrayals-game-edge: 88 67 51;
+  --betrayals-game-bronze: 160 115 71;
+  --betrayals-game-gold: 225 181 127;
+  --betrayals-game-ivory: 245 229 207;
+  --betrayals-grid-turn: #c39669;
+}
+
+.betrayals-layout--challenge[data-minigame-theme='betrayals'] {
+  background:
+    radial-gradient(ellipse at 50% 0%, #362821 0%, transparent 55%),
+    linear-gradient(#17191e, #0e1017 68%);
+}
+
+[data-minigame-theme='betrayals'] .minigame-rules-modal {
+  background:
+    radial-gradient(ellipse at 50% -20%, #5c473471, transparent 58%),
+    linear-gradient(156deg, #24221f, #15171b 56%, #0d0f14);
+  border-color: #967350;
+  box-shadow:
+    0 24px 60px #000a,
+    inset 0 1px #f2c29326;
+}
+
+[data-minigame-theme='betrayals'] .minigame-rules-meta span {
+  background: #28231f;
+  border-color: #8b6a4f66;
+}
+
+[data-minigame-theme='betrayals'] .minigame-rules-list li {
+  color: #f1e6dc;
+}
+
+[data-minigame-theme='betrayals'] .minigame-rules-description {
+  color: #c7b4a8;
+}
+
+[data-minigame-theme='betrayals']
+  :is(.minigame-rules-btn-start, .tbg__btn--stop, .pp-primary, .rw-btn--spin, .rw-btn--primary),
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  .hoc-complete-continue {
+  background: linear-gradient(180deg, #f2c293, #b28356);
+  border-color: #e4b98e;
+  color: #1a110d;
+}
+
+[data-minigame-theme='betrayals'] .pp-primary {
+  /* Override the shared studio's white CTA label on the lighter bronze. */
+  color: #1a110d !important;
+}
+
+[data-minigame-theme='betrayals'] :is(.tbg, .tbg__clocks-bg, .eg, .pp) {
+  position: absolute;
+}
+
+/* Deck of Light's standard stylesheet intentionally uses a pastel set.
+   Match its high-specificity phase rules while leaving the cards' own colors. */
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-root, .hoc-complete) {
+  background: radial-gradient(ellipse at 48% 0%, #3f3026, transparent 64%), #111319;
+  color: #f1e6dc;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-root, .hoc-complete)::after,
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  .hoc-complete::before {
+  box-shadow: none;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  .hoc-atmosphere {
+  opacity: 0.18;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-game-heading strong, .hoc-complete-title) {
+  color: #f2c293;
+  text-shadow: none;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-game-heading__kicker, .hoc-game-heading > span:last-child, .hoc-round-summary) {
+  color: #dfc9b3;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-tool-choice, .hoc-round-tool, .hoc-standing-row) {
+  background: #211e1d;
+  border-color: #8e6d505c;
+  color: #f1e6dc;
+  box-shadow: none;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(
+    .hoc-tool-choice strong,
+    .hoc-tool-choice__copy,
+    .hoc-tool-choice__detail,
+    .hoc-standing-summary strong,
+    .hoc-standing-summary span,
+    .hoc-standing-row > strong:last-child
+  ) {
+  color: #e6d4c2;
+}
+
+#root
+  .betrayals-layout--challenge[data-minigame-theme='betrayals']
+  .betrayals-challenge-game
+  :is(.hoc-standing--human, .hoc-standing--winner) {
+  background: #35291e;
+  border-color: #b28a61;
+}
+
+[data-minigame-theme='betrayals'] :is(button, select, input):focus-visible {
+  outline-color: #f2c293;
+}

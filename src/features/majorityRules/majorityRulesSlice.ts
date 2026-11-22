@@ -6,6 +6,7 @@ import {
   buildPollEstimate,
   countAnswerDistribution,
   didReadMajorityRulesRoom,
+  fnv1a32,
   initializeDiceDuel,
   pickAiDuelNumber,
   pickMajorityRulesQuestion,
@@ -74,6 +75,7 @@ export interface MajorityRulesState {
   roomReaderStreak: number
   bestRoomReaderStreak: number
   lastRoomReadCorrect: boolean | null
+  majorityPicks?: Record<string, number>
 }
 
 const initialState: MajorityRulesState = {
@@ -230,7 +232,7 @@ function seedOpeningFinalDuel(state: MajorityRulesState) {
 }
 
 function prepareOpeningPhase(state: MajorityRulesState) {
-  if (state.activeIds.length === 2) {
+  if (state.activeIds.length === 2 && !state.majorityPicks) {
     state.currentQuestion = null
     state.draftAnswers = {}
     state.revealState = null
@@ -240,6 +242,19 @@ function prepareOpeningPhase(state: MajorityRulesState) {
   }
 
   prepareQuestion(state)
+}
+
+function finishSimultaneousBallots(state: MajorityRulesState): boolean {
+  const picks = state.majorityPicks
+  if (!picks || (state.activeIds.length > 2 && state.roundNumber < 12)) return false
+  state.activeIds.sort(
+    (a, b) =>
+      (picks[b] ?? 0) - (picks[a] ?? 0) ||
+      fnv1a32(`${state.seed}:${a}`) - fnv1a32(`${state.seed}:${b}`)
+  )
+  state.winnerId = state.activeIds[0] ?? null
+  state.phase = 'winner'
+  return true
 }
 
 const majorityRulesSlice = createSlice({
@@ -256,6 +271,7 @@ const majorityRulesSlice = createSlice({
         humanPlayerId: string | null
         aiIdentities?: Record<string, AiGameIdentity | undefined>
         vipExperience?: boolean
+        simultaneousFinish?: boolean
       }>
     ): MajorityRulesState {
       const { participantIds, competitionType, seed, humanPlayerId } = action.payload
@@ -281,6 +297,9 @@ const majorityRulesSlice = createSlice({
         aiCapability: action.payload.aiCapability,
         aiIdentities: action.payload.aiIdentities ?? {},
         vipExperience: action.payload.vipExperience === true,
+        majorityPicks: action.payload.simultaneousFinish
+          ? Object.fromEntries(participantIds.map((id) => [id, 0]))
+          : undefined,
       }
       prepareOpeningPhase(state)
       return state
@@ -295,7 +314,7 @@ const majorityRulesSlice = createSlice({
 
     advanceIntro(state) {
       if (state.phase !== 'intro') return
-      if (state.activeIds.length === 2) {
+      if (state.activeIds.length === 2 && !state.majorityPicks) {
         if (!state.finalDuel) {
           seedOpeningFinalDuel(state)
         }
@@ -462,6 +481,13 @@ const majorityRulesSlice = createSlice({
         question: state.currentQuestion,
         eliminationCount: 1,
       })
+      if (state.majorityPicks) {
+        for (const id of state.activeIds) {
+          if (didReadMajorityRulesRoom(simulation.answers[id], result.distribution)) {
+            state.majorityPicks[id] += 1
+          }
+        }
+      }
       if (state.vipExperience && humanId && state.activeIds.includes(humanId)) {
         const readTheRoom = didReadMajorityRulesRoom(
           simulation.answers[humanId],
@@ -489,6 +515,7 @@ const majorityRulesSlice = createSlice({
       // 'revote' is accepted here only to migrate reveal states saved under
       // the older rules. New ballots always report such ties as 'split'.
       if (result.kind === 'revote' || result.kind === 'split' || result.kind === 'unanimous') {
+        if (finishSimultaneousBallots(state)) return
         state.doubleEliminationArmed = false
         state.roundNumber += 1
         state.revoteNumber = 0
@@ -510,6 +537,8 @@ const majorityRulesSlice = createSlice({
       state.activeIds = state.activeIds.filter(
         (playerId) => !result.eliminatedIds.includes(playerId)
       )
+
+      if (finishSimultaneousBallots(state)) return
 
       if (state.activeIds.length <= 1) {
         state.winnerId = state.activeIds[0] ?? null

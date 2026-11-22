@@ -2,6 +2,7 @@ import { useSeasonAiCapability } from '../../ai/competition/SeasonAiContext'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useGlassBridgeAudio } from '../../hooks/useGlassBridgeAudio'
+import { useCompetitionResultCheckpoint } from '../../minigames/competitionResultContext'
 import { SoundManager } from '../../services/sound/SoundManager'
 import {
   BOX_ASSET_BASE,
@@ -356,6 +357,21 @@ export default function BoxedOut({ seed = 0, participants, participantIds, onFin
     return () => window.clearTimeout(timeout)
   }, [awaitingTiebreak, game?.questionIndex])
 
+  const completion = (() => {
+    if (game?.phase !== 'finished' || !game.winnerId) return null
+    const ranked = [game.winnerId, ...standings(game).filter((id) => id !== game.winnerId)]
+    return {
+      authoritativeWinnerId: game.winnerId,
+      authoritativeLastPlaceId: ranked.at(-1),
+      authoritativeRankedIds: ranked,
+      rawValue: game.scores[human?.id ?? game.winnerId],
+      rawResults: { ...game.scores },
+    }
+  })()
+  useCompetitionResultCheckpoint(
+    completion && { rawValue: completion.rawValue, partial: false, completion }
+  )
+
   if (!game) {
     return (
       <div className="boxed-out boxed-out--error" role="alert">
@@ -399,17 +415,9 @@ export default function BoxedOut({ seed = 0, participants, participantIds, onFin
     setGame((current) => (current ? resolveBoxedOutTiebreak(current, answer, elapsed) : current))
   }
   const complete = () => {
-    if (finishedRef.current || !game.winnerId || !onFinish) return
+    if (finishedRef.current || !completion || !onFinish) return
     finishedRef.current = true
-    const ranked = [game.winnerId, ...rank.filter((id) => id !== game.winnerId)]
-    const worst = ranked[ranked.length - 1]
-    onFinish(human ? game.scores[human.id] : game.scores[game.winnerId], undefined, {
-      authoritativeWinnerId: game.winnerId,
-      authoritativeLastPlaceId: worst,
-      authoritativeRankedIds: ranked,
-      rawValue: human ? game.scores[human.id] : game.scores[game.winnerId],
-      rawResults: { ...game.scores },
-    })
+    onFinish(completion.rawValue, undefined, completion)
   }
 
   return (

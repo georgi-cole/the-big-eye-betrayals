@@ -222,6 +222,7 @@ type Props = {
   day?: number
   phase?: Phase
   nightShieldCount?: number
+  publicNightShieldWinnerIds?: readonly string[]
   moveKinds?: readonly SocialEntry['kind'][]
   voteTargetIds?: readonly string[]
   canAct?: boolean
@@ -510,6 +511,7 @@ export function BetrayalsSocialPanel({
   day = 1,
   phase = 'social',
   nightShieldCount = 0,
+  publicNightShieldWinnerIds = [],
   moveKinds = socialMoveKinds({ phase }),
   voteTargetIds,
   canAct = moveKinds.length > 0,
@@ -803,6 +805,12 @@ export function BetrayalsSocialPanel({
                       <span>Vote pact · {label(pact.suspectId)}</span>
                     </div>
                   )}
+                  {moveKinds.includes('ask-shield') &&
+                    publicNightShieldWinnerIds.includes(peer.id) && (
+                      <div className="sp2-focus__commitments" aria-label="Public Night Shield win">
+                        <span>Won a Night Shield. They may have passed it on.</span>
+                      </div>
+                    )}
                   {peerShieldReport && moveKinds.includes('ask-shield') && (
                     <div className="sp2-focus__commitments" aria-label="Night Shield report">
                       <span>

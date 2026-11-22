@@ -16,8 +16,9 @@
 }
 
 .betrayals-safety-results[open] {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .betrayals-safety-results header,
@@ -40,8 +41,11 @@
 }
 
 .betrayals-safety-results__scores {
+  min-height: 0;
   margin-inline: 0.75rem;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 .betrayals-safety-results table {
@@ -57,6 +61,11 @@
   z-index: 1;
   color: #eed3a5;
   background: #252019;
+}
+
+.betrayals-safety-results__scores:focus-visible {
+  outline: 2px solid #f2c293;
+  outline-offset: -2px;
 }
 
 .betrayals-safety-results td,

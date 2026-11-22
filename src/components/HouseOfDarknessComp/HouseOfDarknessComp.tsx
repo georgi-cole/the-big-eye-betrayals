@@ -66,6 +66,7 @@ interface Props {
   seed?: number
   autoStart?: boolean
   premiumPresentation?: boolean
+  reportLifespan?: boolean
   previewStage?: 'round6' | 'final2'
   relationships?: RelationshipsMap
   alliances?: StrategicAllianceSnapshot[]
@@ -238,6 +239,7 @@ export default function HouseOfDarknessComp({
   participants,
   seed,
   premiumPresentation = false,
+  reportLifespan = false,
   previewStage,
   relationships,
   alliances,
@@ -1081,18 +1083,25 @@ export default function HouseOfDarknessComp({
     setCharmFlyOffsets([])
   }, [humanId, participants, portraitPlayers, previewStage, resolvedIds, sessionSeed])
 
-  const finish = useCallback(() => {
-    if (standings.length === 0) return
+  const completion = useMemo(() => {
+    if (standings.length === 0) return null
     const rawResults = Object.fromEntries(
-      standings.map((state, index) => [state.id, (standings.length - index) * 1_000_000])
+      standings.map((state, index) => [
+        state.id,
+        reportLifespan ? state.health : (standings.length - index) * 1_000_000,
+      ])
     )
-    onFinish?.(rawResults[humanId] ?? 0, undefined, {
+    return {
       authoritativeWinnerId: standings[0]?.id ?? null,
       authoritativeRankedIds: standings.map((state) => state.id),
       rawValue: rawResults[humanId] ?? 0,
       rawResults,
-    })
-  }, [humanId, onFinish, standings])
+    }
+  }, [humanId, reportLifespan, standings])
+
+  const finish = useCallback(() => {
+    if (completion) onFinish?.(completion.rawValue, undefined, completion)
+  }, [completion, onFinish])
 
   if (phase === 'mode_select') {
     return (
@@ -1315,29 +1324,18 @@ export default function HouseOfDarknessComp({
     )
   }
 
-  if (phase === 'results' && standings.length > 0) {
+  if (phase === 'results' && completion) {
     const winner = standings[0]
     const winnerParticipant = participants?.find((participant) => participant.id === winner.id)
     return (
       <MinigameCompleteWrapper
         className={`hod-complete hod-final-results hod-complete--${premiumPresentation ? 'premium' : 'standard'}`}
         result={{
-          rawValue: humanId
-            ? (standings.length -
-                Math.max(
-                  0,
-                  standings.findIndex((entry) => entry.id === humanId)
-                )) *
-              1_000_000
-            : 0,
+          rawValue: completion.rawValue,
           partial: false,
           completion: {
-            authoritativeWinnerId: standings[0].id,
+            ...completion,
             authoritativeLastPlaceId: standings.at(-1)?.id,
-            authoritativeRankedIds: standings.map((entry) => entry.id),
-            rawResults: Object.fromEntries(
-              standings.map((entry, index) => [entry.id, (standings.length - index) * 1_000_000])
-            ),
           },
         }}
         onContinue={finish}
