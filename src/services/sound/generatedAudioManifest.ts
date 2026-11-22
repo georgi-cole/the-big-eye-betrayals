@@ -559,6 +559,14 @@ export const GENERATED_AUDIO_ASSETS = [
     "loop": false
   },
   {
+    "key": "tv:betrayer_laugh",
+    "category": "tv",
+    "relativePath": "sounds/tv/tv_betrayer_laugh.wav",
+    "preload": false,
+    "volume": 1,
+    "loop": false
+  },
+  {
     "key": "tv:ceremony_departureFoley",
     "category": "tv",
     "relativePath": "sounds/ceremonies/departureFoley.wav",
@@ -644,6 +652,14 @@ export const GENERATED_AUDIO_ASSETS = [
     "relativePath": "sounds/tv/tv_live_vote.mp3",
     "preload": false,
     "volume": 0.85,
+    "loop": false
+  },
+  {
+    "key": "tv:loyal_light",
+    "category": "tv",
+    "relativePath": "sounds/tv/tv_loyal_light.wav",
+    "preload": false,
+    "volume": 1,
     "loop": false
   },
   {

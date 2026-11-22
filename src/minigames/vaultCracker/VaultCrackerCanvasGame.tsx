@@ -33,7 +33,8 @@ interface Props {
   prizeType?: CodeBreakerPrizeType;
   seed?: number;
   onComplete?: (completion?: ReactMinigameCompletion) => void;
-  onFinish?: (value: number) => void;
+  onFinish?: (value: number, tiebreakerMs?: number, completion?: ReactMinigameCompletion) => void;
+  reportStandings?: boolean;
   autoStart?: boolean;
 }
 
@@ -92,6 +93,7 @@ export default function VaultCrackerCanvasGame({
   seed = 0,
   onComplete,
   onFinish,
+  reportStandings = false,
   autoStart = false,
 }: Props) {
   const aiCapability = useSeasonAiCapability()
@@ -321,19 +323,15 @@ export default function VaultCrackerCanvasGame({
     });
   }, [aiScores, aiSolveProfiles, attempts, humanId, humanScore, participantIds, participants, phase, snapshot.elapsedMs]);
 
+  const completion = leaderboard.length ? {
+    authoritativeWinnerId: leaderboard[0].id,
+    authoritativeLastPlaceId: leaderboard.at(-1)?.id,
+    authoritativeRankedIds: leaderboard.map((entry) => entry.id),
+    rawResults: Object.fromEntries(leaderboard.map((entry) => [entry.id, entry.score])),
+  } : undefined;
   useCompetitionResultCheckpoint(
-    (phase === 'solved' || phase === 'results') && leaderboard.length
-      ? {
-          rawValue: humanScore,
-          partial: false,
-          completion: {
-            authoritativeWinnerId: leaderboard[0].id,
-            authoritativeLastPlaceId: leaderboard.at(-1)?.id,
-            rawResults: Object.fromEntries(leaderboard.map((entry) => [entry.id, entry.score])),
-          },
-        }
-      : null
-  )
+    completion ? { rawValue: humanScore, partial: false, completion } : null
+  );
 
   if (phase === 'results') {
     return (
@@ -399,7 +397,8 @@ export default function VaultCrackerCanvasGame({
           </ol>
           <button className="cb__continue-btn" onClick={() => {
             if (onFinish) {
-              onFinish(humanScore);
+              if (reportStandings && completion) onFinish(humanScore, undefined, completion);
+              else onFinish(humanScore);
             } else {
               onComplete?.();
             }

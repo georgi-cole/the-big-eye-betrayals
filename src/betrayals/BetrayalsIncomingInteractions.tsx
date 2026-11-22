@@ -13,6 +13,8 @@ type Props = {
   interactions: readonly IncomingInteraction[]
   onRespond: (id: string, answer: IncomingAnswer) => void
   onClose: () => void
+  readIds?: ReadonlySet<string>
+  onRead?: (id: string) => void
 }
 
 type ConversationCard = {
@@ -41,11 +43,37 @@ const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
     priority: 'medium',
     choices: { engage: 'Agree to the plan', listen: 'Hear them out', dismiss: 'Pass' },
   },
+  'shield-question': {
+    icon: 'other',
+    label: 'Night Shield question',
+    priority: 'medium',
+    choices: { engage: 'Say I have one', listen: 'Say I have none', dismiss: 'Keep it private' },
+  },
+  'shield-message': {
+    icon: 'gossip',
+    label: 'Night Shield talk',
+    priority: 'low',
+    choices: { engage: 'Acknowledge', dismiss: 'Pass' },
+  },
+  'shield-gift': {
+    icon: 'other',
+    label: 'Night Shield received',
+    priority: 'medium',
+    choices: { engage: 'Acknowledge', dismiss: 'Dismiss message' },
+  },
 }
 
 const answerStyles = { engage: 'positive', listen: 'neutral', dismiss: 'dismiss' } as const
 
 function outcome({ response, kind, speaker, target }: IncomingInteraction) {
+  if (kind === 'shield-question') {
+    if (response === 'engage') return `You told ${speaker.name} you have a Night Shield.`
+    if (response === 'listen') return `You told ${speaker.name} you have no Night Shield.`
+    return `You kept your Night Shield status private with ${speaker.name}.`
+  }
+  if (kind === 'shield-gift')
+    return `The handoff from ${speaker.name} was recorded in your private notes.`
+  if (kind === 'shield-message') return `You heard what ${speaker.name} had to say.`
   if (response === 'dismiss') return `You let ${speaker.name} go.`
   if (response === 'listen') {
     return target
@@ -154,13 +182,23 @@ function InboxMessage({
   )
 }
 
-export function BetrayalsIncomingInteractions({ interactions, onRespond, onClose }: Props) {
+export function BetrayalsIncomingInteractions({
+  interactions,
+  onRespond,
+  onClose,
+  readIds,
+  onRead,
+}: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const [readIds, setReadIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [localReadIds, setLocalReadIds] = useState<ReadonlySet<string>>(() => new Set())
   const [recentIds, setRecentIds] = useState<ReadonlySet<string>>(() => new Set())
-  const markRead = useCallback((id: string) => {
-    setReadIds((current) => (current.has(id) ? current : new Set([...current, id])))
-  }, [])
+  const markRead = useCallback(
+    (id: string) => {
+      if (onRead) onRead(id)
+      else setLocalReadIds((current) => (current.has(id) ? current : new Set([...current, id])))
+    },
+    [onRead]
+  )
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -187,7 +225,7 @@ export function BetrayalsIncomingInteractions({ interactions, onRespond, onClose
     <InboxMessage
       key={interaction.id}
       interaction={interaction}
-      read={readIds.has(interaction.id)}
+      read={(readIds ?? localReadIds).has(interaction.id)}
       onRead={markRead}
       onRespond={respond}
     />

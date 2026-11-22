@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { BetrayalsDock } from './BetrayalsDock'
 
-it('opens Home and exposes incoming requests with their own count', () => {
+it('opens Home and exposes the Inbox with its request count', () => {
   const openHome = vi.fn()
   const openIncoming = vi.fn()
   const advance = vi.fn()
@@ -17,7 +17,7 @@ it('opens Home and exposes incoming requests with their own count', () => {
   const dock = within(screen.getByRole('navigation', { name: 'Season actions' }))
 
   fireEvent.click(dock.getByRole('button', { name: 'Home' }))
-  fireEvent.click(dock.getByRole('button', { name: 'Incoming requests (2)' }))
+  fireEvent.click(dock.getByRole('button', { name: 'Inbox (2)' }))
   fireEvent.click(dock.getByRole('button', { name: 'Continue to dawn' }))
 
   expect(openHome).toHaveBeenCalledOnce()
@@ -27,7 +27,7 @@ it('opens Home and exposes incoming requests with their own count', () => {
 
   rerender(<BetrayalsDock social={{ onClick: vi.fn() }} incoming={{ onClick: openIncoming }} />)
   const social = dock.getByRole('button', { name: 'Social' })
-  const inbox = dock.getByRole('button', { name: 'Incoming requests' })
+  const inbox = dock.getByRole('button', { name: 'Inbox' })
   expect(social.nextElementSibling).toBe(inbox)
   fireEvent.click(inbox)
   expect(openIncoming).toHaveBeenCalledTimes(2)

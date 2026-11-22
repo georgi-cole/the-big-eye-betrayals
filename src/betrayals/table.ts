@@ -1,33 +1,25 @@
+import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
 import { MAX_TABLE_ROUNDS, eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
-import type { Ballot, CommandToken, Run, TableReceipt, TableSway } from './run.ts'
+import type {
+  Ballot,
+  CaseReview,
+  CommandToken,
+  Run,
+  TableArgument,
+  TableReceipt,
+  TableSway,
+} from './run.ts'
 import { settleRun } from './settlement.ts'
-import { getSocialView, rapport, settleVotePacts } from './social.ts'
+import { argumentBasis, hearArgument, relationship, trackRecord } from './perception.ts'
+import { getSocialView, settleVotePacts } from './social.ts'
+import { finishShieldConversations } from './shieldSocial.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
-import { activeLead, canPresentEvidence, evidenceSpeech } from './intel.ts'
+import { activeLead, canPresentEvidence, evidenceSpeech, voluntaryWitness } from './intel.ts'
 
 export type { Ballot } from './run.ts'
 
 type TableSpeech = { speakerId: string; targetId: string; argument: string; verb?: string }
-
-const argumentsAtTable = [
-  'I keep coming back to the way they listen before they commit. I want to know where they stand.',
-  'The room has spent all day looking elsewhere. I think that suits them a little too well.',
-  'I would rather put this on the table now. That is the person I have the hardest time reading.',
-  'Several names have come up, and this is the one I cannot talk myself out of.',
-  'I’ve heard a lot of confidence from them. I want to hear what that confidence is based on.',
-  'I can live with being wrong about a hard call. This is the one I think we need to make.',
-  'When a name comes up, they seem to know exactly when to let someone else take the heat.',
-  'I would ask them one thing. Who are they prepared to stand behind when the votes are read?',
-  'I have been trying to separate who makes me nervous from who seems to be steering us. I keep landing here.',
-  'Every time the conversation gets uncomfortable, they seem to find a safer subject.',
-  'I want to see how they handle a question they had no time to prepare for.',
-  'I can’t make sense of where they stand. I suspect they prefer it that way.',
-  'I think people are giving them a pass because they’re easy to talk to.',
-  'They can read this room. I want to know what they’ve chosen to do with that.',
-  'I’m open to hearing the case against someone else. So far this is where my vote is going.',
-  'I want to hear a name from them before everyone else has finished speaking.',
-]
 
 export function canVoteAtTable(run: Run, id: string): boolean {
   return (
@@ -54,123 +46,251 @@ export function tableDiscussionOpen(run: Run): boolean {
   )
 }
 
+function makeArgument(run: Run, speakerId: string, choice: TableSway): TableArgument {
+  return {
+    ...choice,
+    speakerId,
+    basis: argumentBasis(run, getSocialView(run, speakerId), speakerId, choice.targetId),
+  }
+}
+
+function openingArguments(run: Run): TableArgument[] {
+  const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 349))
+  const witness = voluntaryWitness(run)
+  const order = run.seats
+    .filter(({ id, exit }) => !exit && id !== run.humanId && id !== witness?.speakerId)
+    .map(({ id }) => ({
+      id,
+      initiative:
+        random() + getSocialPersonality(id).assertiveness * 0.44 + trackRecord(run, id) * 0.5,
+    }))
+    .sort((left, right) => right.initiative - left.initiative)
+  const argumentsSoFar: TableArgument[] = witness ? [witness] : []
+  for (const { id } of order) {
+    if (argumentsSoFar.length >= 4) break
+    const eligible = tableTargets(run, id)
+    const last = argumentsSoFar.at(-1)
+    if (last && eligible.includes(last.targetId)) {
+      const { bond } = relationship(run.social, id, last.targetId)
+      if (bond >= 0.24 && !last.stance && hearArgument(run, id, last) < 0.13) {
+        argumentsSoFar.push(
+          makeArgument(run, id, {
+            targetId: last.targetId,
+            tone: 'careful',
+            stance: 'defend',
+          })
+        )
+        continue
+      }
+    }
+    const targetId = chooseTarget(resolutionPerspective(run, id, eligible), 'case')
+    if (!targetId) continue
+    const basis = argumentBasis(run, getSocialView(run, id), id, targetId)
+    const personality = getSocialPersonality(id)
+    const hasLead = argumentsSoFar.some((claim) => claim.targetId === targetId && !claim.stance)
+    const wantsToLead =
+      !hasLead && (basis !== 'impression' || random() < personality.assertiveness * 0.65)
+    argumentsSoFar.push({
+      speakerId: id,
+      targetId,
+      tone:
+        wantsToLead && random() < personality.publicConflictComfort * 0.44 ? 'forceful' : 'careful',
+      stance: wantsToLead ? undefined : 'question',
+      basis,
+    })
+  }
+  return argumentsSoFar
+}
+
+function argumentsAtTable(run: Run): TableArgument[] {
+  if (run.tableArguments) return run.tableArguments
+  if (run.phase !== 'round-table' || run.runoffIds) return []
+  const opening = openingArguments(run)
+  return run.tableSway ? [...opening, makeArgument(run, run.humanId, run.tableSway)] : opening
+}
+
 export function recordTableSway(run: Run, token: CommandToken, choice: TableSway | null): Run {
   if (!isCurrentCommand(run, token) || !tableDiscussionOpen(run)) return run
   if (
     choice &&
     (!tableTargets(run, run.humanId).includes(choice.targetId) ||
       (choice.tone !== 'careful' && choice.tone !== 'forceful') ||
-      (choice.evidence !== undefined && !canPresentEvidence(run, choice.targetId, choice.evidence)))
-  ) {
+      (choice.stance !== undefined && choice.stance !== 'question' && choice.stance !== 'defend') ||
+      (choice.evidence !== undefined &&
+        (choice.stance !== undefined ||
+          !canPresentEvidence(run, choice.targetId, choice.evidence))))
+  )
     return run
-  }
+
+  const tableArguments = openingArguments(run)
   const lead = activeLead(run)
-  const social =
-    choice?.evidence === 'name-source' && lead
-      ? [
-          ...run.social,
-          {
-            day: run.day,
-            actorId: run.humanId,
-            recipientId: lead.sourceId,
-            kind: 'share-suspicion' as const,
-            suspectId: lead.suspectId,
-            reaction: 'backfired' as const,
-          },
-        ]
-      : run.social
-  return { ...run, revision: run.revision + 1, social, tableSway: choice ? { ...choice } : null }
-}
-
-function reactionToSway(run: Run, voterId: string, index: number): number {
-  const sway = run.tableSway
-  if (!sway || sway.evidence || voterId === run.humanId) return 0
-  if (voterId === sway.targetId) return sway.tone === 'forceful' ? -0.62 : -0.3
-
-  const conversations = getSocialView(run, voterId)
-  const credibility = rapport(conversations, voterId, run.humanId)
-  const loyalty = rapport(conversations, voterId, sway.targetId)
-  const mood = mulberry32(run.publicSeed ^ Math.imul(run.day, 313) ^ Math.imul(index + 1, 751))()
-  const hearing = mood + credibility - loyalty
-  const forceful = sway.tone === 'forceful'
-  if (hearing < (forceful ? 0.45 : 0.18)) return forceful ? -0.5 : -0.24
-  if (hearing > (forceful ? 0.57 : 0.48)) return forceful ? 0.5 : 0.3
-  return 0
-}
-
-function strategyTarget(run: Run, voterId: string, eligibleIds: string[], reaction = 0) {
-  const sway = run.tableSway
-  let tablePressure: ReadonlyMap<string, number> | undefined
-  if (sway && reaction) {
-    const directedAt = reaction > 0 ? sway.targetId : run.humanId
-    tablePressure = new Map([[directedAt, Math.abs(reaction)]])
+  let social = run.social
+  if (choice) {
+    const argument = makeArgument(run, run.humanId, choice)
+    tableArguments.push(argument)
+    if (argument.evidence === 'name-source' && lead) {
+      // Naming a private source can strain that relationship. It changes no one's role evidence.
+      social = [
+        ...social,
+        {
+          day: run.day,
+          actorId: argument.speakerId,
+          recipientId: lead.sourceId,
+          kind: 'share-suspicion',
+          suspectId: argument.targetId,
+          reaction: 'backfired',
+        },
+      ]
+    }
   }
-  return chooseTarget(
-    {
-      ...resolutionPerspective(run, voterId, eligibleIds),
-      tableRound: run.runoffIds ? tableRoundNumber(run) : undefined,
-      tablePressure,
-    },
-    'table'
+
+  return {
+    ...run,
+    revision: run.revision + 1,
+    tableArguments,
+    tableSway: choice ? { ...choice } : null,
+    social,
+  }
+}
+
+/** The room can converge on a name, but echoes of the same case add no evidence. */
+export function tableArgumentPressure(
+  run: Run,
+  voterId: string,
+  statements: readonly TableArgument[]
+): ReadonlyMap<string, number> {
+  const supporting = new Map<string, number>()
+  const opposing = new Map<string, number>()
+  for (const argument of statements) {
+    if (argument.evidence) continue // The incident is scored once through the witness logic.
+    const effect = hearArgument(run, voterId, argument)
+    if (effect > 0) {
+      supporting.set(argument.targetId, Math.max(effect, supporting.get(argument.targetId) ?? 0))
+    } else if (effect < 0) {
+      opposing.set(argument.targetId, Math.min(effect, opposing.get(argument.targetId) ?? 0))
+    }
+  }
+  return new Map(
+    [...new Set([...supporting.keys(), ...opposing.keys()])].map((id) => [
+      id,
+      (supporting.get(id) ?? 0) + (opposing.get(id) ?? 0),
+    ])
   )
 }
 
+function toSpeech(run: Run, argument: TableArgument): TableSpeech {
+  const { speakerId, targetId, stance, tone, basis } = argument
+  if (stance === 'defend') {
+    return {
+      speakerId,
+      targetId,
+      verb: 'defends',
+      argument:
+        'There are other explanations. I want to hear a stronger reason before we put their name down.',
+    }
+  }
+  if (stance === 'question') {
+    return {
+      speakerId,
+      targetId,
+      verb: 'questions',
+      argument:
+        basis === 'conversation'
+          ? 'Their name came up earlier. What did anyone actually see?'
+          : 'Can we hear who they suspect and why? I am still deciding.',
+    }
+  }
+  const aimedAtSpeaker = run.lastTable?.revealedBallots?.some(
+    ({ voterId, targetId: votedFor }) => voterId === targetId && votedFor === speakerId
+  )
+  const reason = aimedAtSpeaker
+    ? 'They voted for me last time. I want to know what that vote was based on.'
+    : basis === 'record'
+      ? 'Several people wrote their name down last time. I want to hear why they did.'
+      : basis === 'conversation'
+        ? 'I have heard their name in private. I think we should discuss it in the room.'
+        : 'It is still a hunch, but they are the person I most want us to look at.'
+  return {
+    speakerId,
+    targetId,
+    verb: tone === 'forceful' ? 'presses the case against' : 'names',
+    argument: tone === 'forceful' ? reason + ' My vote is going there.' : reason,
+  }
+}
+
 export function tableDiscussion(run: Run): TableSpeech[] {
-  const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 349))
-  const speakers = run.seats.filter(({ id, exit }) => !exit && id !== run.humanId)
-  const order = seededPickN(random, speakers, speakers.length)
-  const argumentsInOrder = seededPickN(random, argumentsAtTable, argumentsAtTable.length)
-  const pitches = order.flatMap(({ id: speakerId }, index) => {
-    const targets = tableTargets(run, speakerId)
-    const targetId = strategyTarget(run, speakerId, targets)
-    if (!targetId) return []
-    const heard = getSocialView(run, speakerId).some(
-      ({ day, suspectId, recipientId, kind, reaction, accepted }) =>
-        day === run.day &&
-        suspectId === targetId &&
-        recipientId === speakerId &&
-        (kind === 'question' ||
-          (kind === 'share-suspicion' && reaction === 'landed') ||
-          (kind === 'vote-plan' && accepted))
-    )
-    return [
-      {
-        speakerId,
-        targetId,
-        argument: heard
-          ? 'Their name came up in a conversation earlier. I want to hear them answer for themselves.'
-          : argumentsInOrder[index % argumentsInOrder.length],
-      },
-    ]
-  })
-  return [...evidenceSpeech(run), ...pitches]
+  const tableArguments = argumentsAtTable(run)
+  return [
+    ...evidenceSpeech({ ...run, tableArguments }),
+    ...tableArguments
+      .filter((argument) => !argument.evidence)
+      .map((argument) => toSpeech(run, argument)),
+  ]
 }
 
 export function tableSwayResponse(run: Run): string | undefined {
   if (!run.tableSway) return
-  if (run.tableSway.evidence) return evidenceSpeech(run).at(-1)?.argument
-  const responses = run.seats
-    .map(({ id, exit }, index) => (exit ? 0 : reactionToSway(run, id, index)))
-    .filter(Boolean)
-  const support = responses.filter((reaction) => reaction > 0).length
-  const backlash = responses.length - support
-  if (backlash > support) return 'The table bristles. A few guests are now looking your way.'
-  if (support > backlash * 2)
-    return 'Your case finds an audience. Guests are reconsidering their votes.'
-  if (support > 0) return 'Some guests reconsider. Others push back at your accusation.'
-  return 'The guests listen in silence.'
+  const tableArguments = argumentsAtTable(run)
+  if (run.tableSway.evidence) {
+    return evidenceSpeech({ ...run, tableArguments }).at(-1)?.argument
+  }
+  const claim = tableArguments.find(({ speakerId }) => speakerId === run.humanId)
+  if (!claim) return
+  if (claim.stance === 'question')
+    return 'You ask the room for a reason. Guests weigh what they have heard.'
+  const support = run.seats.filter(
+    ({ id, exit }) => !exit && Math.abs(hearArgument(run, id, claim)) >= 0.12
+  ).length
+  if (support >= 3) {
+    return claim.stance === 'defend'
+      ? 'Several guests are less sure they want to vote for them.'
+      : 'Several guests give your case a second look.'
+  }
+  if (support > 0) return 'A few guests hear you out. The rest are still weighing the case.'
+  return 'The room wants a stronger reason before changing its mind.'
 }
 
 export function buildTableBallots(run: Run, humanTarget?: string): Ballot[] {
-  return run.seats.flatMap(({ id: voterId }, index) => {
+  const tableArguments = argumentsAtTable(run)
+  const debate = { ...run, tableArguments }
+  return run.seats.flatMap(({ id: voterId }) => {
     const eligible = tableTargets(run, voterId)
     if (!eligible.length) return []
     const targetId =
       voterId === run.humanId
         ? humanTarget
-        : strategyTarget(run, voterId, eligible, reactionToSway(run, voterId, index))
+        : chooseTarget(
+            {
+              ...resolutionPerspective(debate, voterId, eligible),
+              tableRound: run.runoffIds ? tableRoundNumber(run) : undefined,
+              tablePressure: tableArgumentPressure(debate, voterId, tableArguments),
+            },
+            'table'
+          )
     return targetId && eligible.includes(targetId) ? [{ voterId, targetId }] : []
   })
+}
+
+function reviewCases(
+  run: Run,
+  claims: readonly TableArgument[],
+  targetId: string,
+  role: 'loyal' | 'betrayer'
+): CaseReview[] {
+  const reviewed = new Set<string>()
+  const result = role === 'betrayer' ? 'caught' : 'missed'
+  const reviews: CaseReview[] = []
+  for (const claim of claims) {
+    if (
+      claim.targetId !== targetId ||
+      (result === 'missed' && claim.tone !== 'forceful') ||
+      reviewed.has(claim.speakerId)
+    )
+      continue
+    reviewed.add(claim.speakerId)
+    reviews.push({ day: run.day, speakerId: claim.speakerId, targetId, result })
+  }
+  return [...(run.caseReviews ?? []).filter(({ day }) => day > run.day - 5), ...reviews]
 }
 
 export function tableLeaderboard(ballots: readonly Ballot[], limit = 5) {
@@ -213,7 +333,9 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
   const tied = [...tallied.keys()].filter((id) => tallied.get(id) === topCount).sort()
   if (tied.length === 0) return run
 
-  const revision = run.revision + 1
+  const tableArguments = argumentsAtTable(run)
+  const withShieldTalk = finishShieldConversations(run)
+  const revision = withShieldTalk.revision + 1
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 547) ^ revision)
   const round = tableRoundNumber(run)
   const tableCount = {
@@ -222,7 +344,7 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     tiedIds: tied.length > 1 ? tied : [],
   }
   if (tied.length > 1 && round < MAX_TABLE_ROUNDS) {
-    return { ...run, revision, runoffIds: tied, tableCount }
+    return { ...withShieldTalk, revision, runoffIds: tied, tableCount, tableArguments }
   }
 
   const receipt: TableReceipt = {
@@ -232,12 +354,13 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     tiedByDraw: tied.length > 1,
   }
   return {
-    ...run,
+    ...withShieldTalk,
     phase: 'table-reveal',
     revision,
     runoffIds: undefined,
     tableCount,
-    private: { ...run.private, pendingTable: receipt },
+    tableArguments,
+    private: { ...withShieldTalk.private, pendingTable: receipt },
   }
 }
 
@@ -290,12 +413,19 @@ export function revealTable(run: Run, token: CommandToken): Run {
       : active.length === 5
         ? 'final-challenge'
         : 'night'
+  const revealedRole = seats.find(({ id }) => id === outcome.banishedId)?.exit?.revealedRole
+  const campaigns = (run.tableArguments ?? []).filter(
+    ({ stance, evidence }) => !stance && !evidence
+  )
   const revealed: Run = {
     ...run,
     phase,
     revision: run.revision + 1,
     seats,
-    lastTable: { ...outcome, revealedBallots: run.tableCount?.ballots },
+    lastTable: { ...outcome, revealedBallots: run.tableCount?.ballots, campaigns },
+    caseReviews: revealedRole
+      ? reviewCases(run, campaigns, outcome.banishedId, revealedRole)
+      : run.caseReviews,
     social:
       !outcome.blind && run.tableCount?.round === 1
         ? settleVotePacts(run, run.tableCount.ballots)
@@ -303,11 +433,16 @@ export function revealTable(run: Run, token: CommandToken): Run {
     tableRound: undefined,
     tableCount: undefined,
     tableSway: undefined,
+    tableArguments: undefined,
     immunityId: phase === 'night' ? run.immunityId : undefined,
     private: {
       ...run.private,
       pendingTable: undefined,
-      nightShieldIds: phase === 'night' ? run.private.nightShieldIds : [],
+      nightShieldIds:
+        phase === 'night'
+          ? run.private.nightShieldIds.filter((id) => id !== outcome.banishedId)
+          : [],
+      nightShieldAwardIds: phase === 'night' ? run.private.nightShieldAwardIds : undefined,
     },
   }
   if (lastBetrayer) return settleRun(revealed, 'last-betrayer')

@@ -81,7 +81,12 @@ export default function MinigameCompleteWrapper({
 
       {/* Scrollable placements */}
       {placementsNode !== undefined && (
-        <div className={scrollClass} role={placementsRole} aria-label={placementsAriaLabel}>
+        <div
+          className={scrollClass}
+          role={placementsRole}
+          aria-label={placementsAriaLabel}
+          tabIndex={0}
+        >
           {placementsNode}
         </div>
       )}

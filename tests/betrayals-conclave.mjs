@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  describeConclaveVerdict,
   getConclaveVerdict,
   getConclaveView,
   resolveConclave,
@@ -8,6 +9,7 @@ import {
   revealDawn,
 } from '../src/betrayals/night.ts'
 import { commandToken, startRun } from '../src/betrayals/run.ts'
+import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
 
 function atNight(publicSeed = 1320) {
   const run = startRun(
@@ -43,24 +45,47 @@ test('a strict majority seals its nomination and a Night Shield still blocks it'
   assert.equal(morning.lastDawn.eliminatedId, null)
 })
 
-test('a plurality without a majority draws from every unique nominee', () => {
+test('a repeated 2-1-1 runoff chooses the sole leader and eliminates them at dawn', () => {
+  const run = atNight(0)
+  const leader = 'seat-22'
+  const first = resolveConclave(run, commandToken(run), leader)
+  const tally = 'Contestant 22 2 · Contestant 19 1 · Contestant 10 1'
+  assert.equal(first.phase, 'night')
+  assert.equal(getConclaveView(first, run.humanId).runoff, tally)
+  assert.equal(getConclaveView(first, run.humanId).targetIds.length, 3)
+
+  const final = resolveConclave(first, commandToken(first), leader)
+  assert.equal(final.phase, 'night-resolved')
+  assert.deepEqual(getConclaveVerdict(final, run.humanId), { targetId: leader, byDraw: false })
+  assert.equal(
+    describeConclaveVerdict(final, run.humanId),
+    `Runoff: ${tally}. No votes changed. Contestant 22 was chosen with the most votes.`
+  )
+  const dawn = revealDawn(final, commandToken(final))
+  assert.equal(dawn.lastDawn.eliminatedId, leader)
+})
+
+test('an even final ballot draws only among nominees tied for the lead', () => {
+  const base = atNight()
+  const nominees = base.seats.slice(4, 8).map(({ id }) => id)
   const outcomes = new Set()
   for (let publicSeed = 0; publicSeed < 30; publicSeed++) {
-    const base = atNight()
     const run = { ...base, publicSeed }
-    const [leader, other, third] = run.seats.slice(4, 7).map(({ id }) => id)
-    const nominees = [leader, leader, other, third]
-    const ballots = run.private.betrayers.map((voterId, index) => ({
+    const nominations = run.private.betrayers.map((voterId, index) => ({
       voterId,
       targetId: nominees[index],
     }))
-    const resolved = resolveNight(run, commandToken(run), ballots)
+    const runoff = nominations.map(({ voterId }, index) => ({
+      voterId,
+      targetId: nominees[index % 2],
+    }))
+    const resolved = resolveNight(run, commandToken(run), runoff, nominations)
     const verdict = getConclaveVerdict(resolved, run.humanId)
     assert.equal(verdict.byDraw, true)
-    assert.ok(nominees.includes(verdict.targetId))
+    assert.ok(nominees.slice(0, 2).includes(verdict.targetId))
     outcomes.add(verdict.targetId)
   }
-  assert.equal(outcomes.size, 3)
+  assert.equal(outcomes.size, 2)
 })
 
 test('hidden and spectator projections preserve role confidentiality', () => {
@@ -90,8 +115,58 @@ test('hidden and spectator projections preserve role confidentiality', () => {
   const token = commandToken(run)
   assert.equal(resolveConclave(run, token), run)
   assert.equal(resolveConclave(run, token, run.immunityId), run)
-  const result = resolveConclave(run, token, hidden.id)
+  const first = resolveConclave(run, token, hidden.id)
+  const runoffTargets = getConclaveView(first, run.humanId)?.targetIds
+  const result = runoffTargets?.length
+    ? resolveConclave(first, commandToken(first), runoffTargets[0])
+    : first
   assert.equal(result.phase, 'night-resolved')
   assert.ok(!run.private.betrayers.includes(result.private.pendingNight.targetId))
-  assert.deepEqual(result, resolveConclave(run, token, hidden.id))
+  assert.deepEqual(first, resolveConclave(run, token, hidden.id))
+})
+
+test('a 2–2 first ballot pauses for a saved runoff and the verdict states what decided it', () => {
+  let foundDraw = false
+  let foundMajority = false
+  for (let seed = 0; seed < 100 && (!foundDraw || !foundMajority); seed++) {
+    const run = atNight(seed)
+    const proposals = getConclaveView(run, run.humanId).proposals
+    const other = proposals.find(
+      ({ nomineeName }) =>
+        proposals.filter((proposal) => proposal.nomineeName === nomineeName).length === 1
+    )
+    if (!other || new Set(proposals.map(({ nomineeName }) => nomineeName)).size !== 2) continue
+    const candidate = run.seats.find(({ name }) => name === other.nomineeName)
+    const token = commandToken(run)
+    const first = resolveConclave(run, token, candidate.id)
+    assert.equal(first.phase, 'night')
+    assert.equal(getConclaveVerdict(first, run.humanId), null)
+    assert.equal(resolveConclave(first, token, candidate.id), first)
+    const runoff = getConclaveView(first, run.humanId)
+    assert.match(runoff.runoff, / 2 · .* 2$/)
+    assert.equal(runoff.targetIds.length, 2)
+    assert.equal(getConclaveView(first, candidate.id), null)
+    const storage = new Map()
+    const adapter = {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+    }
+    saveRun(adapter, 'fixture', first)
+    const restored = restoreRun(adapter, 'fixture')
+    assert.equal(restored.status, 'ready')
+    const final = resolveConclave(restored.run, commandToken(restored.run), candidate.id)
+    const verdict = getConclaveVerdict(final, run.humanId)
+    assert.equal(final.phase, 'night-resolved')
+    assert.ok(runoff.targetIds.includes(verdict.targetId))
+    const text = describeConclaveVerdict(final, run.humanId)
+    assert.match(text, /^Runoff: /)
+    assert.match(text, verdict.byDraw ? /chosen by draw/ : /chosen by majority vote/)
+    assert.equal(describeConclaveVerdict(final, candidate.id), undefined)
+    foundDraw ||= verdict.byDraw
+    foundMajority ||= !verdict.byDraw
+    const dawn = revealDawn(final, commandToken(final))
+    assert.equal(dawn.private.conclaveVote, undefined)
+  }
+  assert.ok(foundDraw)
+  assert.ok(foundMajority)
 })

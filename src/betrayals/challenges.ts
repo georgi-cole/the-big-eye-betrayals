@@ -1,12 +1,15 @@
 import { mulberry32 } from '../store/rng.ts'
 import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
+import { prepareShieldConversations } from './shieldSocial.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
 
 export type RankedScore = {
   contestantId: string
   score: number
+  rankScore?: number
   tieBreak?: number
+  placement?: number
   potContribution: number
   forfeited?: boolean
 }
@@ -22,6 +25,8 @@ export function challengeContestantIds(run: Run): string[] {
 function rank(run: Run, scores: readonly RankedScore[]): RankedScore[] {
   const salt = run.phase === 'safety' ? 33 : run.phase === 'immunity' ? 72 : 99
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 2654435761) ^ salt)
+  // A game can report its winner and last place without ordering the middle of the field.
+  const unreportedPlacement = scores.length - 0.5
   const withTieDraw = [...scores]
     .sort((a, b) => a.contestantId.localeCompare(b.contestantId))
     .map((result) => ({ result, draw: random() }))
@@ -31,7 +36,8 @@ function rank(run: Run, scores: readonly RankedScore[]): RankedScore[] {
       const b = right.result
       return (
         Number(Boolean(a.forfeited)) - Number(Boolean(b.forfeited)) ||
-        b.score - a.score ||
+        (a.placement ?? unreportedPlacement) - (b.placement ?? unreportedPlacement) ||
+        (b.rankScore ?? b.score) - (a.rankScore ?? a.score) ||
         (a.tieBreak ?? Infinity) - (b.tieBreak ?? Infinity) ||
         left.draw - right.draw
       )
@@ -42,7 +48,9 @@ function rank(run: Run, scores: readonly RankedScore[]): RankedScore[] {
 export function resolveChallenge(
   run: Run,
   token: CommandToken,
-  scores: readonly RankedScore[]
+  scores: readonly RankedScore[],
+  gameKey?: string,
+  publicResults = false
 ): Run {
   if (!isCurrentCommand(run, token)) return run
   const expected = new Set(challengeContestantIds(run))
@@ -51,7 +59,12 @@ export function resolveChallenge(
     if (
       !expected.delete(score.contestantId) ||
       !Number.isFinite(score.score) ||
+      (score.rankScore !== undefined && !Number.isFinite(score.rankScore)) ||
       (score.tieBreak !== undefined && !Number.isFinite(score.tieBreak)) ||
+      (score.placement !== undefined &&
+        (!Number.isInteger(score.placement) ||
+          score.placement < 1 ||
+          score.placement > scores.length)) ||
       !Number.isFinite(score.potContribution) ||
       score.potContribution < 0 ||
       score.potContribution > 1
@@ -71,6 +84,14 @@ export function resolveChallenge(
     ...run,
     pot,
     revision,
+    ...(gameKey
+      ? {
+          challengeHistory: [
+            ...(run.challengeHistory ?? []).filter((key) => key !== gameKey),
+            gameKey,
+          ],
+        }
+      : {}),
     socialWallets: walletsAfterChallenge(run, standings),
   }
   if (run.phase === 'immunity') {
@@ -78,14 +99,16 @@ export function resolveChallenge(
   }
   if (run.phase === 'safety') {
     const nightShieldIds = standings.slice(0, 2).map(({ contestantId }) => contestantId)
-    return {
+    return prepareShieldConversations({
       ...afterChallenge,
       phase: 'round-table',
       private: {
         ...run.private,
         nightShieldIds,
+        nightShieldAwardIds: undefined,
         safetyStandings: {
           day: run.day,
+          publicResults,
           rows: standings.map(({ contestantId, score, forfeited }) => ({
             contestantId,
             score,
@@ -93,7 +116,7 @@ export function resolveChallenge(
           })),
         },
       },
-    }
+    })
   }
   return { ...afterChallenge, phase: 'final-banishment' }
 }
@@ -106,14 +129,16 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
   const names = new Map(view.seats.map(({ id, name }) => [id, name]))
   return standings.rows.map(({ contestantId, score, forfeited }, index) => {
     const own = activeViewer && contestantId === actorId
-    const revealName = own || view.knownNightShieldIds.includes(contestantId)
+    const shield = index < 2
+    const revealName =
+      standings.publicResults || own || (shield && view.teammateIds.includes(contestantId))
     return {
       name: revealName ? (names.get(contestantId) ?? null) : null,
       own,
       score,
       place: index + 1,
       forfeited: Boolean(forfeited),
-      shield: run.private.nightShieldIds.includes(contestantId),
+      shield,
     }
   })
 }

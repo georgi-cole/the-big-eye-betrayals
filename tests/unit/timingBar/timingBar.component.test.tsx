@@ -211,9 +211,12 @@ describe('TimingBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue ▶' }))
 
-    expect(onFinish).toHaveBeenCalledTimes(1)
-    expect(onFinish.mock.calls[0]?.[2]).toEqual({
+    expect(onFinish).toHaveBeenCalledExactlyOnceWith(0, undefined, {
       authoritativeWinnerId: 'opponent',
+      authoritativeLastPlaceId: 'human',
+      authoritativeRankedIds: ['opponent', 'human'],
+      rawValue: 0,
+      rawResults: { human: 0, opponent: 100 },
     })
   })
 })

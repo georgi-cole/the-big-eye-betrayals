@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
-import { saveRun } from './persistence'
+import { challengeGame } from './challengeRotation'
+import { restoreRun, saveRun } from './persistence'
+import { applySocialMove } from './social'
 import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
 import { resolveTable } from './table'
@@ -19,12 +21,30 @@ vi.mock('../services/sound/SoundManager', () => ({
     setCategoryEnabled: vi.fn(),
     setCategoryVolume: vi.fn(),
     play: vi.fn(),
+    stop: vi.fn(),
   },
 }))
 
-vi.mock('../components/ColorMatchComp/ColorMatchComp', () => ({
-  default: ({ onFinish }: { onFinish: (score: number) => void }) => (
-    <button onClick={() => onFinish(100)}>Finish challenge</button>
+vi.mock('../components/HoldTheWallComp/HoldTheWallComp', () => ({
+  default: ({
+    participants,
+    onComplete,
+  }: {
+    participants: { id: string; name: string }[]
+    onComplete: (result: { authoritativeRankedIds: string[] }) => void
+  }) => (
+    <>
+      <ul aria-label="On the wall">
+        {participants.map(({ id, name }) => (
+          <li key={id}>{name}</li>
+        ))}
+      </ul>
+      <button
+        onClick={() => onComplete({ authoritativeRankedIds: participants.map(({ id }) => id) })}
+      >
+        Finish challenge
+      </button>
+    </>
   ),
 }))
 
@@ -33,6 +53,43 @@ vi.mock('../minigames/quickTapRace/QuickTapRaceCanvasGame', () => ({
     <button onClick={() => onFinish(1000)}>Finish challenge</button>
   ),
 }))
+
+vi.mock('../components/TiltLabyrinthComp/TiltLabyrinthComp', async () => {
+  const { useState } = await import('react')
+  const { default: MinigameCompleteWrapper } =
+    await import('../components/MinigameHost/MinigameCompleteWrapper')
+  return {
+    default: function TiltFixture({
+      participants,
+    }: {
+      participants: { id: string; isHuman: boolean }[]
+    }) {
+      const [finished, setFinished] = useState(false)
+      if (!finished) return <button onClick={() => setFinished(true)}>Finish maze</button>
+      const winner = participants.find(({ isHuman }) => isHuman)!
+      const rankedIds = [
+        winner.id,
+        ...participants.filter(({ isHuman }) => !isHuman).map(({ id }) => id),
+      ]
+      return (
+        <MinigameCompleteWrapper
+          result={{
+            rawValue: 160_007,
+            partial: false,
+            completion: {
+              authoritativeRankedIds: rankedIds,
+              rawResults: Object.fromEntries(rankedIds.map((id, i) => [id, 160_007 + i * 10000])),
+            },
+          }}
+          onContinue={vi.fn()}
+          placementsNode={<p>Maze standings</p>}
+        >
+          <h2>Maze results</h2>
+        </MinigameCompleteWrapper>
+      )
+    },
+  }
+})
 
 async function clickAndSave(target: HTMLElement) {
   await act(async () => {
@@ -65,6 +122,109 @@ describe('Betrayals season review', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
+  it('takes over Tilt Labyrinth results once, preserving the time, ranking and shields', async () => {
+    const initial = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-safety-timed-results', roleSeed: 32, publicSeed: 12 }
+    )
+    const fixture = {
+      ...initial,
+      phase: 'safety' as const,
+      day: 2,
+      immunityId: initial.seats[1].id,
+      private: { ...initial.private, betrayers: initial.seats.slice(2, 5).map(({ id }) => id) },
+    }
+    const run = Array.from({ length: 128 }, (_, publicSeed) => ({ ...fixture, publicSeed })).find(
+      (entry) => challengeGame(entry)?.key === 'tiltLabyrinth'
+    )!
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play Tilt Labyrinth' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
+    await act(async () => {
+      await vi.dynamicImportSettled()
+    })
+    let finishSave: (result: boolean) => void = () => {}
+    vi.spyOn(durablePersistence, 'flushDurablePersistence').mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishSave = resolve
+      })
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish maze' }))
+    expect(screen.getByText('Saving challenge results.')).toBeVisible()
+    expect(screen.queryByText('Maze results')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+    await act(async () => finishSave(true))
+    const scoreboard = within(screen.getByRole('dialog', { name: 'Safety Challenge results' }))
+    expect(scoreboard.getByRole('region', { name: 'Standings' })).toHaveAttribute('tabindex', '0')
+    expect(scoreboard.getByRole('columnheader', { name: 'Adjusted time' })).toBeVisible()
+    expect(scoreboard.getByRole('row', { name: /Georgi/ })).toHaveTextContent('2:40.01')
+    expect(scoreboard.getAllByText('Won')).toHaveLength(2)
+    expect(scoreboard.getAllByLabelText('Hidden')).toHaveLength(23)
+    await clickAndSave(scoreboard.getByRole('button', { name: 'Continue' }))
+    expect(
+      screen.queryByRole('dialog', { name: 'Safety Challenge results' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Round Table' })).toBeVisible()
+  })
+
+  it('names public Safety winners in the standings and marks their wins on the roster and Faux TV', async () => {
+    const initial = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-safety-public-wall', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, immune, opponent] = initial.seats
+    const run = {
+      ...initial,
+      phase: 'safety' as const,
+      day: 2,
+      immunityId: immune.id,
+      challengeHistory: [] as string[],
+    }
+    let game = challengeGame(run)
+    while (game && game.key !== 'holdWall' && !run.challengeHistory.includes(game.key)) {
+      run.challengeHistory.push(game.key)
+      game = challengeGame(run)
+    }
+    expect(game?.key).toBe('holdWall')
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Play Hold the Wall' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
+    const finish = await screen.findByRole('button', { name: 'Finish challenge' })
+    const wall = within(screen.getByRole('list', { name: 'On the wall' }))
+    expect(wall.getByText(opponent.name)).toBeVisible()
+    expect(wall.queryByText(immune.name)).not.toBeInTheDocument()
+    await clickAndSave(finish)
+    const standings = within(screen.getByRole('dialog', { name: 'Safety Challenge results' }))
+    expect(standings.getByRole('rowheader', { name: opponent.name })).toBeVisible()
+    expect(standings.queryByLabelText('Hidden')).not.toBeInTheDocument()
+    await clickAndSave(standings.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to castle' }))
+    const roster = within(screen.getByRole('list', { name: 'Contestant roster' }))
+    expect(
+      roster.getByRole('button', { name: `${opponent.name}, Won a Night Shield` })
+    ).toBeVisible()
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText(/They may have passed their shields on in secret/)).toBeVisible()
+  })
+
   it('waits for the save before showing a scene that must survive an immediate reload', async () => {
     render(<BetrayalsScreen />)
     await clickAndSave(screen.getByRole('button', { name: 'Start season' }))
@@ -84,12 +244,15 @@ describe('Betrayals season review', () => {
     expect(screen.getByRole('heading', { name: 'Your role' })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await act(async () => completeSave(true))
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+    expect(
+      document.querySelector('.betrayals-broadcast__glass .betrayals-dawn')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it.each([
-    ['immunity', 'Quick Tap Race', /Wait for the start signal/],
-    ['safety', 'Color Match', /red, green, and blue sliders/],
+    ['immunity', 'Hold the Wall', /Press and HOLD the wall panel/],
+    ['safety', 'Quick Tap Race', /Wait for the start signal/],
   ] as const)('offers the shared Eye controls during %s', async (phase, game, rule) => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
@@ -103,12 +266,34 @@ describe('Betrayals season review', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Play ' + game }))
     const openEye = () =>
       fireEvent.click(screen.getByRole('button', { name: 'Open minigame menu' }))
+    const rules = () => within(screen.getByRole('dialog', { name: game + ' rules' }))
+    expect(rules().getByText(rule)).toBeVisible()
+    expect(screen.queryByRole('status', { name: 'Get Ready' })).not.toBeInTheDocument()
+
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(rules().getByRole('button', { name: 'Start competition' }))
+      const ready = () => within(screen.getByRole('status', { name: 'Get Ready' }))
+      expect(ready().getByText('3')).toBeVisible()
+      act(() => vi.advanceTimersByTime(1000))
+      expect(ready().getByText('2')).toBeVisible()
+      openEye()
+      fireEvent.click(screen.getByRole('menuitem', { name: /View rules/ }))
+      act(() => vi.advanceTimersByTime(5000))
+      expect(screen.queryByRole('button', { name: 'Finish challenge' })).not.toBeInTheDocument()
+      fireEvent.click(rules().getByRole('button', { name: 'Return to countdown' }))
+      expect(ready().getByText('3')).toBeVisible()
+      act(() => vi.advanceTimersByTime(3000))
+      expect(ready().getByText('GO!')).toBeVisible()
+      expect(screen.queryByRole('button', { name: 'Finish challenge' })).not.toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(600))
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(await screen.findByRole('button', { name: 'Finish challenge' })).toBeVisible()
     openEye()
     fireEvent.click(screen.getByRole('menuitem', { name: /View rules/ }))
-    const rules = within(screen.getByRole('dialog', { name: game + ' rules' }))
-    expect(rules.getByText(rule)).toBeVisible()
-    fireEvent.click(rules.getByRole('button', { name: 'Return to game' }))
-
+    fireEvent.click(rules().getByRole('button', { name: 'Return to game' }))
     openEye()
     fireEvent.click(screen.getByRole('menuitem', { name: /Forfeit challenge/ }))
     const confirm = () => within(screen.getByRole('dialog', { name: 'Forfeit ' + game + '?' }))
@@ -194,8 +379,13 @@ describe('Betrayals season review', () => {
     render(<BetrayalsScreen />)
     expect(screen.getByRole('heading', { name: 'Your role' })).toBeInTheDocument()
 
-    await clickAndSave(screen.getByRole('button', { name: 'Play: open Day 1' }))
-    await finishCinematic()
+    vi.useFakeTimers()
+    try {
+      await clickAndSave(screen.getByRole('button', { name: 'Play: open Day 1' }))
+      await act(async () => vi.advanceTimersByTime(2850))
+    } finally {
+      vi.useRealTimers()
+    }
     expect(screen.getByRole('heading', { name: 'Dawn' })).toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Play: enter Social' }))
     expect(screen.getByRole('heading', { name: 'Social' })).toBeInTheDocument()
@@ -209,7 +399,14 @@ describe('Betrayals season review', () => {
     fireEvent.click(within(conversations).getByRole('button', { name: 'Close social panel' }))
     expect(screen.queryByRole('dialog', { name: 'Social' })).not.toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Play: begin Immunity Challenge' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Play Quick Tap Race' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Play Hold the Wall' }))
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Start competition' }))
+      act(() => vi.advanceTimersByTime(3600))
+    } finally {
+      vi.useRealTimers()
+    }
     await clickAndSave(await screen.findByRole('button', { name: 'Finish challenge' }))
     await finishCinematic()
     expect(screen.getByRole('heading', { name: 'Safety Challenge' })).toBeInTheDocument()
@@ -232,8 +429,15 @@ describe('Betrayals season review', () => {
     expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
     const privateTalk = within(screen.getByRole('dialog', { name: 'Social' }))
+    const general = within(privateTalk.getByRole('region', { name: 'General actions' }))
+    fireEvent.click(general.getByRole('button', { name: /Lay Low/ }))
+    await clickAndSave(general.getByRole('button', { name: 'Execute general action' }))
+    expect(privateTalk.getByText('You kept to yourself and saved your Energy.')).toBeVisible()
+    const guestRoster = within(privateTalk.getByRole('region', { name: 'Player roster' }))
+    fireEvent.click(guestRoster.getAllByRole('button')[0])
     expect(privateTalk.getByRole('button', { name: /Speak one-on-one/ })).toBeVisible()
-    expect(privateTalk.getByRole('button', { name: /Plan a vote/ })).toBeVisible()
+    expect(privateTalk.queryByRole('button', { name: /Plan a vote/ })).toBeNull()
+    expect(privateTalk.queryByRole('button', { name: /Propose Personal Pact/ })).toBeNull()
     fireEvent.click(privateTalk.getByRole('button', { name: 'Close social panel' }))
     fireEvent.click(screen.getByRole('button', { name: 'Enter Round Table' }))
     await clickAndSave(screen.getByRole('button', { name: 'Go to vote' }))
@@ -297,8 +501,12 @@ describe('Betrayals season review', () => {
     saveRun(localStorage, 'edition-local', counted)
     render(<BetrayalsScreen />)
     const feed = within(screen.getByRole('region', { name: 'Round Table vote count' }))
-    fireEvent.click(feed.getByRole('button', { name: 'Show full count' }))
+    fireEvent.click(screen.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Return to vote totals' }))
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+    expect(
+      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
+    ).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
     const social = within(screen.getByRole('dialog', { name: 'Social' }))
@@ -311,6 +519,9 @@ describe('Betrayals season review', () => {
     fireEvent.click(social.getByRole('button', { name: 'Close social panel' }))
 
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
+    expect(
+      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reveal result' })).toBeEnabled()
   })
 
@@ -353,6 +564,7 @@ describe('Betrayals season review', () => {
     await clickAndSave(screen.getByRole('button', { name: 'Reveal result' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'departure')
     await finishCinematic()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(tv.getByText(banished.name + ' was banished. A Loyal.')).toBeVisible()
     const seats = cast.getAllByRole('button')
     expect(seats).toHaveLength(25)
@@ -361,13 +573,96 @@ describe('Betrayals season review', () => {
     await clickAndSave(screen.getByRole('button', { name: 'Play: follow the Night' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(cast.getAllByRole('button', { name: /Asleep/ })).toHaveLength(24)
+    expect(
+      cast
+        .getAllByRole('button', { name: /Asleep/ })
+        .map((seat) => seat.querySelector('.betrayals-sleep-mask img'))
+        .find(Boolean)
+    ).toHaveAttribute('src', expect.stringContaining('assets/betrayals/sleep-mask.webp'))
     expect(seats[position]).not.toHaveAttribute('data-asleep')
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
     await finishCinematic()
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'awakening')
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-reduced', 'true')
     await finishCinematic()
     expect(cast.getAllByRole('button', { name: /Eliminated at Night/ })).toHaveLength(1)
+    expect(
+      cast.getByRole('button', { name: /Eliminated at Night/ }).querySelector('[data-mourning]')
+    ).toBeNull()
+    expect(
+      seats.some((seat) => seat.querySelector('img[data-mourning][src$="_sad_avatar.webp"]'))
+    ).toBe(true)
     expect(cast.queryByRole('button', { name: /Asleep/ })).not.toBeInTheDocument()
+  })
+
+  it('lets a gift recipient bluff in the Inbox and pass the shield on in Social', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'night-shield-handoff', roleSeed: 32, publicSeed: 12 }
+    )
+    const [human, donor, recipient, other] = run.seats
+    const table = {
+      ...run,
+      phase: 'round-table' as const,
+      private: { ...run.private, nightShieldIds: [donor.id, other.id] },
+    }
+    const gifted = applySocialMove(table, commandToken(table), {
+      actorId: donor.id,
+      recipientId: human.id,
+      kind: 'shield-gift',
+    })
+    saveRun(localStorage, 'edition-local', gifted)
+    render(<BetrayalsScreen />)
+
+    const chamber = within(screen.getByRole('dialog', { name: 'Round Table' }))
+    fireEvent.click(chamber.getByRole('button', { name: 'Back to castle' }))
+
+    const roster = within(screen.getByRole('list', { name: 'Contestant roster' }))
+    expect(roster.getByRole('button', { name: 'Georgi, Night Shield' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /^Inbox/ }))
+    const inbox = within(screen.getByRole('dialog', { name: 'Incoming interactions' }))
+    expect(inbox.getByText('Night Shield received')).toBeVisible()
+    expect(inbox.getByRole('button', { name: 'Keep it private' })).toBeVisible()
+    await clickAndSave(inbox.getByRole('button', { name: 'Say I have none' }))
+    expect(inbox.getByText(/you told .* you have no Night Shield/i)).toBeVisible()
+    fireEvent.click(inbox.getByRole('button', { name: 'Close inbox' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    const guests = within(social.getByRole('region', { name: 'Player roster' }))
+    fireEvent.click(guests.getByRole('button', { name: new RegExp(recipient.name) }))
+    fireEvent.click(social.getByRole('tab', { name: 'Shields' }))
+    fireEvent.click(social.getByRole('button', { name: /Say you have no shield/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    fireEvent.click(social.getByRole('button', { name: /Gift a Night Shield/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Give shield' }))
+    expect(social.getByText(/You gave .* a Night Shield. .*you didn't have one/)).toBeVisible()
+    expect(social.getByRole('button', { name: /Gift a Night Shield/ })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    const shieldTalk = [/Say you have a shield/, /Say you have no shield/, /Ask about their shield/]
+    for (const name of shieldTalk) {
+      expect(social.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true')
+    }
+    fireEvent.click(
+      social.getByRole('button', { name: `Deselect ${recipient.name} and show roster` })
+    )
+    fireEvent.click(social.getByRole('button', { name: new RegExp(other.name) }))
+    for (const name of shieldTalk) {
+      expect(social.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'false')
+    }
+    fireEvent.click(social.getByRole('button', { name: 'Close social panel' }))
+    expect(roster.getByRole('button', { name: 'Georgi' })).toBeVisible()
+    expect(roster.getByRole('button', { name: recipient.name })).toBeVisible()
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status).toBe('ready')
+    expect(saved.status === 'ready' && saved.run.private.nightShieldIds).toEqual([
+      recipient.id,
+      other.id,
+    ])
   })
 })

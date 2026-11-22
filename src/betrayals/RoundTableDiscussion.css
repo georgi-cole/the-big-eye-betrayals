@@ -29,7 +29,7 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: clamp(10px, 2dvh, 22px);
   box-sizing: border-box;
   width: min(100%, 58rem);
@@ -37,6 +37,23 @@
   margin-inline: auto;
   padding: max(env(safe-area-inset-top), 14px) clamp(16px, 5vw, 52px)
     max(env(safe-area-inset-bottom), 16px);
+}
+
+.round-table-room__frame[data-case='true'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.round-table-room__shot {
+  height: clamp(105px, 28dvh, 260px);
+  overflow: hidden;
+  border: 1px solid #98724d80;
+  border-radius: 12px;
+  background: #140d0b;
+}
+
+.round-table-room__shot .round-table-shot {
+  width: 100%;
+  height: 100%;
 }
 
 .round-table-room__camera {
@@ -58,11 +75,8 @@
 .round-table-room__camera img {
   object-fit: cover;
   object-position: 51% 46%;
-  opacity: 0.74;
-}
-
-.round-table-room[open] .round-table-room__camera img {
-  animation: round-table-room-camera 2s cubic-bezier(0.13, 0.67, 0.26, 1) both;
+  opacity: 0.4;
+  filter: blur(8px);
 }
 
 .round-table-room__camera::after {
@@ -197,50 +211,6 @@
     serif;
 }
 
-.round-table-room__candidates {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(59px, 1fr));
-  gap: 7px;
-  margin: 0;
-  padding: 2px;
-  list-style: none;
-}
-
-.round-table-room .round-table-room__candidates button {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  align-items: end;
-  width: 100%;
-  min-height: 66px;
-  aspect-ratio: 0.91;
-  overflow: hidden;
-  padding: 3px;
-  border-radius: 7px;
-  background: #2b1c21;
-}
-
-.round-table-room__candidates img,
-.round-table-room__candidates .round-table-room__initial {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 25%;
-}
-
-.round-table-room__candidates button span:last-child {
-  border-radius: 3px;
-  background: #140c12e8;
-  font-size: 0.72rem;
-  font-weight: 650;
-  line-height: 1.45;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
 .round-table-room button {
   min-height: 44px;
   padding: 5px 10px;
@@ -252,13 +222,6 @@
   font-size: 0.81rem;
   font-weight: 650;
   cursor: pointer;
-}
-
-.round-table-room__candidates button[aria-pressed='true'] {
-  border-color: #ffce82;
-  box-shadow:
-    inset 0 0 0 1px #ffce82,
-    0 0 10px #d99a585d;
 }
 
 .round-table-room :focus-visible {
@@ -313,15 +276,6 @@
   }
 }
 
-@keyframes round-table-room-camera {
-  from {
-    transform: scale(1.12);
-  }
-  to {
-    transform: scale(1.025);
-  }
-}
-
 @keyframes round-table-room-line {
   from {
     opacity: 0;
@@ -333,14 +287,7 @@
   }
 }
 
-@media (min-width: 600px) {
-  .round-table-room__candidates {
-    grid-template-columns: repeat(auto-fill, minmax(87px, 1fr));
-  }
-}
-
 .round-table-room[data-motion='reduced'][open],
-.round-table-room[data-motion='reduced'][open] .round-table-room__camera img,
 .round-table-room[data-motion='reduced'] .round-table-room__transcript article[data-current],
 .betrayals-layout[data-betrayals-motion='reduced'][data-round-table-view='return'] .betrayals-cast {
   animation: none;

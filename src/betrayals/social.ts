@@ -1,6 +1,29 @@
-import { eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
+import {
+  eligibleBanishmentTargets,
+  isCurrentCommand,
+  NIGHT_SHIELD_MOVES,
+  nightShieldWinners,
+} from './run.ts'
 import type { Ballot, CommandToken, Phase, Run, SocialEntry, SocialReaction } from './run.ts'
 import { intendsToEnd } from './settlement.ts'
+import {
+  firsthandShieldReports,
+  isNightShieldMove,
+  nightShieldWindowOpen,
+  reactionToShieldClaim,
+  reactionToShieldGift,
+  shieldReplyFor,
+  shieldTalkBlockedAfterGift,
+} from './nightShields.ts'
+import {
+  argumentBasis,
+  between,
+  getSocialView,
+  hasPersonalAlliance,
+  hearArgument,
+  rapport,
+} from './perception.ts'
+
 import {
   missingSocialResource,
   socialMoveCost,
@@ -8,22 +31,29 @@ import {
   walletAfterSocialMove,
 } from './socialResources.ts'
 
-export type SocialMove = Omit<SocialEntry, 'day' | 'accepted' | 'reaction' | 'pledgeResult'>
+export { getSocialView, hasAlliance, rapport } from './perception.ts'
+
+export type SocialMove = Omit<
+  SocialEntry,
+  'day' | 'accepted' | 'reaction' | 'pledgeResult' | 'shieldReply'
+>
 
 const checkIn = ['rapport'] as const
 const makePeace = ['rapport', 'mend-fences'] as const
 const compareNotes = [...makePeace, 'question', 'ask-about'] as const
 const discussSuspicions = [...compareNotes, 'share-suspicion', 'defend-guest'] as const
 const prepareForTable = [...discussSuspicions, 'vote-plan'] as const
+const personalPacts = ['alliance', 'end-pact'] as const
+const talkBeforeVote = [...prepareForTable, ...personalPacts] as const
 const phaseMoves: Record<Phase, readonly SocialEntry['kind'][]> = {
   'role-reveal': checkIn,
-  dawn: [...discussSuspicions, 'alliance', 'debrief'],
-  social: [...prepareForTable, 'alliance'],
-  immunity: prepareForTable,
-  safety: prepareForTable,
-  'round-table': prepareForTable,
+  dawn: [...discussSuspicions, ...personalPacts, 'debrief'],
+  social: talkBeforeVote,
+  immunity: talkBeforeVote,
+  safety: talkBeforeVote,
+  'round-table': compareNotes,
   'table-reveal': makePeace,
-  night: [...makePeace, 'alliance', 'debrief'],
+  night: [...makePeace, 'debrief'],
   'night-resolved': checkIn,
   'final-challenge': compareNotes,
   'final-banishment': compareNotes,
@@ -32,11 +62,13 @@ const phaseMoves: Record<Phase, readonly SocialEntry['kind'][]> = {
 }
 
 export function socialMoveKinds(
-  run: Pick<Run, 'phase' | 'result' | 'tableCount' | 'runoffIds' | 'lastTable'>
+  run: Pick<Run, 'phase' | 'result' | 'tableCount' | 'runoffIds' | 'lastTable'> &
+    Partial<Pick<Run, 'private'>>
 ): readonly SocialEntry['kind'][] {
   if (run.result || run.phase === 'settled') return []
   if (run.tableCount || run.runoffIds) return makePeace
-  const moves = phaseMoves[run.phase]
+  const ordinary = phaseMoves[run.phase]
+  const moves = nightShieldWindowOpen(run) ? [...ordinary, ...NIGHT_SHIELD_MOVES] : ordinary
   return run.lastTable?.blind === false ? moves : moves.filter((kind) => kind !== 'debrief')
 }
 
@@ -45,27 +77,8 @@ export function choosesSocialSubject(kind: SocialEntry['kind']): boolean {
     kind === 'vote-plan' ||
     kind === 'ask-about' ||
     kind === 'share-suspicion' ||
-    kind === 'defend-guest'
-  )
-}
-
-export function getSocialView(run: Run, actorId: string | null): SocialEntry[] {
-  if (actorId === null) return []
-  return run.social
-    .filter((entry) => entry.actorId === actorId || entry.recipientId === actorId)
-    .map((entry) => ({ ...entry }))
-}
-
-function between(entry: SocialEntry, actorId: string, peerId: string): boolean {
-  return (
-    (entry.actorId === actorId && entry.recipientId === peerId) ||
-    (entry.actorId === peerId && entry.recipientId === actorId)
-  )
-}
-
-export function hasAlliance(entries: readonly SocialEntry[], actorId: string, peerId: string) {
-  return entries.some(
-    (entry) => entry.kind === 'alliance' && entry.accepted && between(entry, actorId, peerId)
+    kind === 'defend-guest' ||
+    kind === 'shield-tip'
   )
 }
 
@@ -74,7 +87,13 @@ export function discussedToday(
   move: SocialMove,
   day: number
 ): boolean {
-  if (move.kind === 'rapport' || move.kind === 'alliance' || move.kind === 'vote-plan') return false
+  if (
+    move.kind === 'rapport' ||
+    move.kind === 'alliance' ||
+    move.kind === 'vote-plan' ||
+    move.kind === 'shield-gift'
+  )
+    return false
   return entries.some(
     (entry) =>
       entry.kind === move.kind &&
@@ -131,22 +150,6 @@ export function settleVotePacts(run: Run, ballots: readonly Ballot[]): SocialEnt
   })
 }
 
-export function rapport(entries: readonly SocialEntry[], actorId: string, peerId: string): number {
-  let balance = 0
-  for (const entry of entries) {
-    if (!between(entry, actorId, peerId)) continue
-    if (entry.kind === 'rapport') balance += 0.12
-    if (entry.reaction === 'backfired') balance -= 0.12
-    if (entry.reaction === 'repaired') balance += 0.16
-    if (entry.pledgeResult && entry.pledgeResult !== 'void') {
-      const followed =
-        entry.actorId === peerId ? entry.pledgeResult.actor : entry.pledgeResult.recipient
-      balance += followed ? 0.08 : -0.18
-    }
-  }
-  return Math.max(0, Math.min(0.6, balance)) + (hasAlliance(entries, actorId, peerId) ? 0.24 : 0)
-}
-
 export function hasSocialStrain(entries: readonly SocialEntry[], actorId: string, peerId: string) {
   for (let index = entries.length - 1; index >= 0; index--) {
     const entry = entries[index]
@@ -173,7 +176,7 @@ function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined 
     )
   )
     return
-  const trust = rapport(run.social, actorId, recipientId)
+  const trust = rapport(run.social, recipientId, actorId)
   const subjectTrust = suspectId ? rapport(run.social, recipientId, suspectId) : 0
   const previousVote = run.lastTable?.blind === false ? run.lastTable : undefined
   const votes = suspectId ? (previousVote?.tally[suspectId] ?? 0) : 0
@@ -183,11 +186,19 @@ function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined 
       if (subjectTrust >= 0.24) return 'trusts'
       return votes >= 2 ? 'wary' : 'uncertain'
     case 'share-suspicion':
-      if (subjectTrust - trust >= 0.2) return 'backfired'
-      return trust >= 0.12 || votes >= 2 ? 'landed' : 'unmoved'
-    case 'defend-guest':
-      if (votes >= 3 && subjectTrust + trust < 0.24) return 'backfired'
-      return subjectTrust + trust >= 0.12 ? 'landed' : 'unmoved'
+    case 'defend-guest': {
+      if (!suspectId) return 'unmoved'
+      const defending = kind === 'defend-guest'
+      const effect = hearArgument(run, recipientId, {
+        speakerId: actorId,
+        targetId: suspectId,
+        tone: 'careful',
+        stance: defending ? 'defend' : undefined,
+        basis: argumentBasis(run, getSocialView(run, actorId), actorId, suspectId),
+      })
+      if (!defending && subjectTrust - trust >= 0.23 && effect < 0.07) return 'backfired'
+      return Math.abs(effect) >= 0.11 ? 'landed' : 'unmoved'
+    }
     case 'mend-fences':
       return run.social.some(
         (entry) => entry.kind === 'rapport' && between(entry, actorId, recipientId)
@@ -233,8 +244,10 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
   if (missingSocialResource(socialWalletFor(run, actorId), cost)) return run
   if (
     discussedToday(social, move, day) ||
+    shieldTalkBlockedAfterGift(social, move, day) ||
     (kind === 'mend-fences' && !hasSocialStrain(social, actorId, recipientId)) ||
-    (kind === 'alliance' && hasAlliance(social, actorId, recipientId)) ||
+    (kind === 'alliance' && hasPersonalAlliance(social, actorId, recipientId)) ||
+    (kind === 'end-pact' && !hasPersonalAlliance(social, actorId, recipientId)) ||
     (kind === 'vote-plan' && latestPact(social, actorId, recipientId, day)?.suspectId === suspectId)
   )
     return run
@@ -248,10 +261,48 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
   if (choosesSocialSubject(kind) || kind === 'question') {
     entry.suspectId = suspectId
   }
-  if (kind === 'vote-plan' || kind === 'alliance') {
-    entry.accepted = rapport(social, actorId, recipientId) >= 0.12
+  if (kind === 'shield-gift') {
+    const owners = run.private.nightShieldIds
+    const slot = owners.indexOf(actorId)
+    if (slot === -1) return run
+    const reaction = reactionToShieldGift(run, entry)
+    if (reaction) entry.reaction = reaction
+    return {
+      ...run,
+      revision: run.revision + 1,
+      private: {
+        ...run.private,
+        nightShieldAwardIds: nightShieldWinners(run).slice(),
+        nightShieldIds: owners.map((id, index) => (index === slot ? recipientId : id)),
+      },
+      social: [...social, entry],
+    }
   }
-  const reaction = responseToMove(run, move)
+  if (kind === 'ask-shield') {
+    if (recipientId === run.humanId) return run
+    entry.shieldReply = shieldReplyFor(run, recipientId, actorId)
+  }
+  if (kind === 'shield-tip') {
+    const report = firsthandShieldReports(social, actorId, day).get(suspectId ?? '')
+    if (!report) return run
+    entry.shieldReply = report.claim
+    if (
+      report.changedStory ||
+      (!report.witnessedGift && rapport(social, actorId, suspectId ?? '') < 0.16)
+    ) {
+      entry.reaction = 'uncertain'
+    }
+  }
+  if (kind === 'vote-plan' || kind === 'alliance') {
+    const trust = rapport(social, recipientId, actorId)
+    const protectingAlly = Boolean(
+      kind === 'vote-plan' && suspectId && rapport(social, recipientId, suspectId) > trust + 0.22
+    )
+    entry.accepted = trust >= 0.12 && !protectingAlly
+  }
+  const reaction = isNightShieldMove(kind)
+    ? reactionToShieldClaim(run, entry)
+    : responseToMove(run, move)
   if (reaction) entry.reaction = reaction
 
   return {

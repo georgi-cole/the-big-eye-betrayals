@@ -1,88 +1,201 @@
 .betrayals-conclave {
-  margin-block-start: 0.6rem;
-  color: #ede5ef;
+  color: #f1dec5;
+  font-size: 0.8rem;
 }
 
-.betrayals-conclave__voices {
-  display: grid;
-  gap: 0.34rem;
-  max-block-size: 8.7rem;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #a17a8e #251a2e;
-  margin: 0;
-  padding: 0.1rem 0.3rem 0.1rem 0;
-  list-style: none;
+.betrayals-conclave p {
+  margin: 0.26rem 0;
 }
 
 .betrayals-conclave__voice {
   display: grid;
-  grid-template-columns: 1.65rem 1fr;
-  gap: 0.5rem;
+  grid-template-columns: 2.5rem 1fr;
   align-items: start;
-  border: 1px solid #b989a332;
-  border-radius: 0.4rem;
-  padding: 0.34rem 0.44rem;
-  background: linear-gradient(105deg, #352437d6, #171020d6);
-  animation: betrayals-conclave-voice 360ms ease-out var(--conclave-delay) both;
+  gap: 0.65rem;
+  text-align: start;
 }
 
 .betrayals-conclave__voice img,
-.betrayals-conclave__hood {
+.betrayals-conclave__voice > span {
   display: block;
-  width: 1.65rem;
-  height: 1.87rem;
-  border: 1px solid #b989a38c;
-  border-radius: 0.28rem;
+  width: 2.5rem;
+  aspect-ratio: 0.86;
+  border: 1px solid #aa8a655e;
+  border-radius: 0.3rem;
   object-fit: cover;
   object-position: 50% 24%;
+  background: #1c1918 url('/assets/betrayals/conclave/hood-seated.webp') center 18% / cover;
 }
 
-.betrayals-conclave__hood {
-  background:
-    radial-gradient(ellipse at 50% 52%, #0b0710 0 28%, transparent 33%),
-    radial-gradient(ellipse at 50% 58%, #604662 0 43%, #251a2e 50%);
+.betrayals-conclave__speaker,
+.betrayals-conclave__count {
+  color: #edc996;
 }
 
-.betrayals-conclave__voice p {
+.betrayals-conclave-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(100%, 54rem);
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: auto;
+  padding: max(1rem, env(safe-area-inset-top)) clamp(0.85rem, 4vw, 2.5rem)
+    max(1rem, env(safe-area-inset-bottom));
+  border: 0;
+  background: #0a0a0f;
+  color: #f5ead8;
+  overflow: hidden;
+  isolation: isolate;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.7rem;
+}
+
+.betrayals-conclave-dialog[open] {
+  display: grid;
+}
+.betrayals-conclave-dialog::backdrop {
+  background: #080809;
+}
+
+.betrayals-conclave-dialog__shot {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+}
+
+.betrayals-conclave-dialog header,
+.betrayals-conclave-dialog footer {
+  display: flex;
+  gap: 0.66rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.betrayals-conclave-dialog h1,
+.betrayals-conclave-dialog h2 {
   margin: 0;
-  font-size: 0.75rem;
+  color: #f6e5cd;
+  font-family: Georgia, serif;
+  font-weight: 600;
+  text-shadow: 0 2px 8px #000;
 }
 
-.betrayals-conclave__voice .betrayals-conclave__nomination {
-  margin-block-end: 0.12rem;
-  color: #eacae6;
+.betrayals-conclave-dialog h1 {
+  font-size: clamp(1.3rem, 4vw, 2rem);
+}
+.betrayals-conclave-dialog h2 {
+  font-size: clamp(1.35rem, 5vw, 2.2rem);
 }
 
-.betrayals-conclave .betrayals-conclave__choice {
-  margin: 0.34rem 0 0;
-  color: #f2dcba;
+.betrayals-conclave-dialog .betrayals-primary {
+  margin-inline-start: auto;
+}
+.betrayals-conclave-dialog button {
+  min-height: 2.65rem;
+}
+
+.betrayals-conclave-dialog button:disabled {
+  opacity: 0.46;
+}
+
+.betrayals-conclave-dialog .betrayals-secondary {
+  border: 1px solid #b38a5c7a;
+  border-radius: 0.45rem;
+  padding: 0.42rem 0.8rem;
+  color: #f5dec0;
+  background: #161319e8;
+  font-weight: 650;
+}
+
+.betrayals-conclave-dialog__caption,
+.betrayals-conclave-dialog__ballot {
+  align-self: end;
+  width: min(100%, 36rem);
+  max-height: 100%;
+  justify-self: center;
+  border: 1px solid #a27d541f;
+  border-radius: 0.7rem;
+  background: linear-gradient(148deg, #1c1714f5, #0c0b10f3);
+  padding: clamp(0.66rem, 3vw, 1.25rem);
+}
+
+.betrayals-conclave-dialog__caption {
+  margin-block-end: 0.3rem;
+}
+.betrayals-conclave-dialog__caption p {
+  margin: 0 0 0.3rem;
+  color: #e5bc89;
+}
+.betrayals-conclave-dialog__caption blockquote {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.betrayals-conclave-dialog__ceremony {
+  align-self: end;
+  justify-self: center;
+  text-align: center;
+  padding: 0.7rem 1.2rem;
+  max-width: 33rem;
+  text-shadow: 0 2px 6px #000;
+}
+
+.betrayals-conclave-dialog__ceremony p {
+  margin: 0.5rem 0 0;
+  line-height: 1.45;
+}
+
+.betrayals-conclave-dialog__ballot {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  max-height: min(74dvh, 100%);
+}
+
+.betrayals-conclave-dialog__ballot p {
+  margin: 0;
+  color: #e5cfb2;
+}
+
+.betrayals-conclave-dialog__candidates {
+  grid-row: 3;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(4.25rem, 100%), 1fr));
+  gap: 0.5rem;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 0.2rem 0.25rem;
+}
+
+.betrayals-conclave-dialog__candidates button {
+  display: grid;
+  place-items: center;
+  align-content: end;
+  gap: 0.16rem;
+  border: 1px solid #a083654d;
+  border-radius: 0.45rem;
+  padding: 0.22rem;
+  background: #1d1817;
+  color: #f6e5cd;
+  overflow: hidden;
+}
+
+.betrayals-conclave-dialog__candidates button[aria-pressed='true'] {
+  border-color: #e2ae73;
+  box-shadow: inset 0 0 0 1px #e2ae73;
+  background: #3b281d;
+}
+
+.betrayals-conclave-dialog__candidates img {
+  width: 100%;
+  max-height: 5.5rem;
+  aspect-ratio: 0.91;
+  object-fit: cover;
+}
+.betrayals-conclave-dialog__candidates span {
   font-size: 0.78rem;
-}
-
-.betrayals-conclave__choice p {
-  margin: 0;
-}
-
-@keyframes betrayals-conclave-voice {
-  from {
-    opacity: 0;
-    transform: translateY(0.24rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-[data-betrayals-motion='reduced'] .betrayals-conclave__voice {
-  animation: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .betrayals-conclave__voice {
-    animation: none;
-  }
 }

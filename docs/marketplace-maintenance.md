@@ -44,6 +44,21 @@ store listings or change configured prices.
 
 ## Review log
 
+- 2026-11-22: Betrayals includes The Last Light, Rock, Paper, Scissors, and
+  Risk Wheel: Abyss with edition-owned presentation and artwork. Reviewed
+  the Deck of Light memory recalibration and confirmed the existing Quick
+  Tap AI tuning. Big Eye prices and entitlements are unchanged.
+
+- 2026-11-21: Reviewed the four-board Deck of Light challenge for Betrayals.
+  Betrayals uses the standard presentation and scores every contestant across
+  four independent boards. The catalog continues to describe the existing
+  Big Eye tournament and the premium presentation included with Premium
+  Challenges and VIP. The Betrayals rotation also uses the standard Crystal
+  Path games and offers the Solo Rush mode of Chain of Greed. Grid of Luck
+  returns as a Betrayals challenge for up to six active guests. Reviewed the
+  Betrayals-only charcoal and bronze theme for the shared minigame interface.
+  The current catalog still describes the premium versions and their access.
+
 - 2026-11-19: Reviewed Quick Tap Race and Quick Tap Race 2: Seasons in Standard
   and premium play. The new AI band tuning applies to new attempts. Saved
   attempts preserve their AI tuning, and Premium Challenges and VIP both
@@ -683,3 +698,7 @@ store listings or change configured prices.
   champion portrait selection. Standard and VIP use the shared ceremony and
   champion coronation. The presentation update preserves existing marketplace
   products, pricing, benefits and entitlement rules.
+
+- 2026-11-22: Reviewed the Betrayals banishment presentation. The shared
+  departure renderer adds a Betrayals theme for the existing exit and Skip
+  flow. Marketplace products, pricing, benefits and entitlements stay the same.

@@ -2,6 +2,7 @@ import {
   CAST_SIZE,
   INCOMING_ANSWERS,
   MAX_TABLE_ROUNDS,
+  NIGHT_SHIELD_MOVES,
   PHASES,
   PRESENTATION_CUES,
   RULES_VERSION,
@@ -41,12 +42,18 @@ function validSeat(seat: unknown): seat is Seat {
   )
 }
 
-function validIds(value: unknown, seats: Set<string>, min: number, max: number): boolean {
+function validIds(
+  value: unknown,
+  seats: Set<string>,
+  min: number,
+  max: number,
+  distinct = true
+): boolean {
   return (
     Array.isArray(value) &&
     value.length >= min &&
     value.length <= max &&
-    new Set(value).size === value.length &&
+    (!distinct || new Set(value).size === value.length) &&
     value.every((id) => typeof id === 'string' && seats.has(id))
   )
 }
@@ -88,6 +95,45 @@ function validTableCount(value: unknown, ids: Set<string>): boolean {
   return true
 }
 
+function validConclaveVotes(value: unknown, ids: Set<string>, betrayers: ReadonlySet<string>) {
+  if (!Array.isArray(value) || value.length > betrayers.size) return false
+  const voters = new Set<string>()
+  for (const ballot of value) {
+    const row = asObject(ballot)
+    if (
+      !row ||
+      typeof row.voterId !== 'string' ||
+      !betrayers.has(row.voterId) ||
+      voters.has(row.voterId) ||
+      typeof row.targetId !== 'string' ||
+      !ids.has(row.targetId) ||
+      betrayers.has(row.targetId)
+    )
+      return false
+    voters.add(row.voterId)
+  }
+  return true
+}
+
+function validConclaveVote(
+  value: unknown,
+  phase: unknown,
+  ids: Set<string>,
+  betrayerIds: string[]
+) {
+  if (value === undefined) return true
+  if (phase !== 'night' && phase !== 'night-resolved') return false
+  const vote = asObject(value)
+  const betrayers = new Set(betrayerIds)
+  return Boolean(
+    vote &&
+    validConclaveVotes(vote.nominations, ids, betrayers) &&
+    (phase === 'night'
+      ? vote.runoff === undefined && (vote.nominations as unknown[]).length >= 2
+      : vote.runoff === undefined || validConclaveVotes(vote.runoff, ids, betrayers))
+  )
+}
+
 function validSafetyStandings(value: unknown, ids: Set<string>, day: number): boolean {
   if (value === undefined) return true
   const standings = asObject(value)
@@ -97,6 +143,7 @@ function validSafetyStandings(value: unknown, ids: Set<string>, day: number): bo
     !Number.isSafeInteger(standings.day) ||
     standings.day < 1 ||
     standings.day > day ||
+    (standings.publicResults !== undefined && typeof standings.publicResults !== 'boolean') ||
     !Array.isArray(standings.rows)
   ) {
     return false
@@ -123,10 +170,64 @@ function validIncomingResponses(value: unknown, day: number): boolean {
   return Boolean(
     responses &&
     Object.entries(responses).every(([id, answer]) => {
-      const match = /^([1-9]\d*):(social:[12]|round-table:1)$/.exec(id)
+      const match =
+        /^([1-9]\d*):(social:[12]|round-table:1|shield-question|shield-note:[1-9]\d*)$/.exec(id)
       return match && Number(match[1]) <= day && INCOMING_ANSWERS.some((valid) => answer === valid)
     })
   )
+}
+
+function validShieldConversations(entries: unknown[], ids: Set<string>, day: number) {
+  return entries.every((value) => {
+    const entry = asObject(value)
+    if (entry?.kind === 'found-alliance' || entry?.kind === 'alliance-update') {
+      const group = asObject(entry.alliance)
+      return Boolean(
+        group &&
+        typeof group.id === 'string' &&
+        group.id &&
+        typeof group.name === 'string' &&
+        group.name &&
+        typeof group.leaderId === 'string' &&
+        ids.has(group.leaderId) &&
+        validIds(group.memberIds, ids, group.closed === true ? 0 : 2, 6) &&
+        (group.closed === undefined || typeof group.closed === 'boolean') &&
+        typeof entry.accepted === 'boolean' &&
+        typeof entry.day === 'number' &&
+        Number.isSafeInteger(entry.day) &&
+        entry.day >= 1 &&
+        entry.day <= day &&
+        typeof entry.actorId === 'string' &&
+        ids.has(entry.actorId) &&
+        typeof entry.recipientId === 'string' &&
+        ids.has(entry.recipientId) &&
+        (entry.declinedIds === undefined || validIds(entry.declinedIds, ids, 0, 5))
+      )
+    }
+    if (!entry || !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
+    if (
+      typeof entry.day !== 'number' ||
+      !Number.isSafeInteger(entry.day) ||
+      entry.day < 1 ||
+      entry.day > day ||
+      !validIds([entry.actorId, entry.recipientId], ids, 2, 2)
+    )
+      return false
+    if (entry.kind === 'shield-tip') {
+      return (
+        validIds([entry.actorId, entry.recipientId, entry.suspectId], ids, 3, 3) &&
+        (entry.shieldReply === 'has' || entry.shieldReply === 'none')
+      )
+    }
+    if (entry.kind === 'ask-shield') {
+      return (
+        entry.shieldReply === 'has' ||
+        entry.shieldReply === 'none' ||
+        entry.shieldReply === 'private'
+      )
+    }
+    return entry.shieldReply === undefined && entry.suspectId === undefined
+  })
 }
 
 function validSocialWallets(value: unknown, ids: Set<string>, day: number): boolean {
@@ -169,6 +270,54 @@ function validWitnessLead(value: unknown, ids: Set<string>, day: number): boolea
   )
 }
 
+function validTableArguments(value: unknown, ids: Set<string>): boolean {
+  if (value === undefined) return true
+  if (!Array.isArray(value) || value.length > 5) return false
+  const speakers = new Set<string>()
+  return value.every((entry: unknown) => {
+    const argument = asObject(entry)
+    if (
+      !argument ||
+      typeof argument.speakerId !== 'string' ||
+      speakers.has(argument.speakerId) ||
+      !validIds([argument.speakerId, argument.targetId], ids, 2, 2) ||
+      (argument.tone !== 'careful' && argument.tone !== 'forceful') ||
+      (argument.stance !== undefined &&
+        argument.stance !== 'question' &&
+        argument.stance !== 'defend') ||
+      (argument.basis !== 'impression' &&
+        argument.basis !== 'conversation' &&
+        argument.basis !== 'record') ||
+      (argument.evidence !== undefined &&
+        argument.evidence !== 'call-witness' &&
+        argument.evidence !== 'name-source')
+    )
+      return false
+    speakers.add(argument.speakerId)
+    return true
+  })
+}
+
+function validCaseReviews(value: unknown, ids: Set<string>, day: number): boolean {
+  if (value === undefined) return true
+  return (
+    Array.isArray(value) &&
+    value.length <= 25 &&
+    value.every((entry: unknown) => {
+      const review = asObject(entry)
+      return (
+        review &&
+        typeof review.day === 'number' &&
+        Number.isSafeInteger(review.day) &&
+        review.day >= 1 &&
+        review.day <= day &&
+        validIds([review.speakerId, review.targetId], ids, 2, 2) &&
+        (review.result === 'caught' || review.result === 'missed')
+      )
+    })
+  )
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
@@ -200,6 +349,7 @@ function isRun(value: unknown): value is Run {
   const shield = asObject(item.publicShield)
   const pendingTable = asObject(hidden?.pendingTable)
   const pendingNight = asObject(hidden?.pendingNight)
+  const lastShieldSave = asObject(hidden?.lastShieldSave)
   const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
   return Boolean(
@@ -211,21 +361,36 @@ function isRun(value: unknown): value is Run {
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
     hidden &&
     validIds(hidden.betrayers, ids, 3, 4) &&
+    validConclaveVote(hidden.conclaveVote, item.phase, ids, hidden.betrayers as string[]) &&
     (hidden.hiddenBetrayerIds === undefined ||
       validIds(hidden.hiddenBetrayerIds, new Set(hidden.betrayers as string[]), 0, 4)) &&
-    validIds(hidden.nightShieldIds, ids, 0, 2) &&
+    validIds(hidden.nightShieldIds, ids, 0, 2, false) &&
+    (hidden.nightShieldAwardIds === undefined || validIds(hidden.nightShieldAwardIds, ids, 1, 2)) &&
+    (hidden.lastShieldSave === undefined ||
+      (lastShieldSave &&
+        typeof lastShieldSave.id === 'string' &&
+        ids.has(lastShieldSave.id) &&
+        typeof lastShieldSave.day === 'number' &&
+        Number.isSafeInteger(lastShieldSave.day) &&
+        lastShieldSave.day >= 2 &&
+        lastShieldSave.day <= item.day)) &&
+    validShieldConversations(item.social, ids, item.day) &&
     (item.runoffIds === undefined || validIds(item.runoffIds, ids, 2, CAST_SIZE)) &&
     (item.tableRound === undefined || validTableRound(item.tableRound)) &&
     validTableCount(item.tableCount, ids) &&
     (lastTable?.revealedBallots === undefined ||
       (Array.isArray(lastTable.revealedBallots) &&
         validTableCount({ round: 1, ballots: lastTable.revealedBallots, tiedIds: [] }, ids))) &&
+    validTableArguments(item.tableArguments, ids) &&
+    validTableArguments(lastTable?.campaigns, ids) &&
+    validCaseReviews(item.caseReviews, ids, item.day) &&
     validWitnessLead(item.witnessLead, ids, item.day) &&
     (item.tableSway == null ||
       (sway &&
         typeof sway.targetId === 'string' &&
         ids.has(sway.targetId) &&
         (sway.tone === 'careful' || sway.tone === 'forceful') &&
+        (sway.stance === undefined || sway.stance === 'question' || sway.stance === 'defend') &&
         (sway.evidence === undefined ||
           ((sway.evidence === 'call-witness' || sway.evidence === 'name-source') &&
             asObject(item.witnessLead)?.day === item.day &&
@@ -233,7 +398,24 @@ function isRun(value: unknown): value is Run {
             (sway.evidence !== 'call-witness' ||
               asObject(item.witnessLead)?.promised === true))))) &&
     validSafetyStandings(hidden.safetyStandings, ids, item.day) &&
+    (item.challengeHistory === undefined ||
+      (Array.isArray(item.challengeHistory) &&
+        item.challengeHistory.every((key) => typeof key === 'string'))) &&
     validIncomingResponses(item.incomingResponses, item.day) &&
+    (item.activity === undefined ||
+      (Array.isArray(item.activity) &&
+        item.activity.every((value) => {
+          const entry = asObject(value)
+          return (
+            entry &&
+            typeof entry.day === 'number' &&
+            Number.isSafeInteger(entry.day) &&
+            entry.day >= 1 &&
+            entry.day <= Number(item.day) &&
+            typeof entry.text === 'string' &&
+            ['season', 'vote', 'departure', 'conversation'].some((kind) => kind === entry.kind)
+          )
+        }))) &&
     validSocialWallets(item.socialWallets, ids, item.day) &&
     (item.presentation === undefined ||
       (Array.isArray(item.presentation) &&
@@ -252,6 +434,7 @@ function isRun(value: unknown): value is Run {
       ? pendingNight &&
         typeof pendingNight.blocked === 'boolean' &&
         (pendingNight.byDraw === undefined || typeof pendingNight.byDraw === 'boolean') &&
+        (pendingNight.filmPlayed === undefined || typeof pendingNight.filmPlayed === 'boolean') &&
         (pendingNight.targetId === null ||
           (typeof pendingNight.targetId === 'string' && ids.has(pendingNight.targetId)))
       : hidden.pendingNight === undefined) &&

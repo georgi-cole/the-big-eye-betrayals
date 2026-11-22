@@ -1,9 +1,10 @@
-import { mulberry32 } from '../store/rng.ts'
-import { hashId, viewFor } from './run.ts'
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
+import { mulberry32 } from '../store/rng.ts'
 import { incidentPressure } from './intel.ts'
-import type { Ballot, Phase, Role, Run, SocialEntry } from './run.ts'
-import { getSocialView, hasAlliance, rapport } from './social.ts'
+import { nightShieldReads } from './nightShields.ts'
+import { getSocialView, hasAlliance, relationship } from './perception.ts'
+import { hashId, viewFor } from './run.ts'
+import type { Ballot, Phase, Role, Run, SocialEntry, TableArgument } from './run.ts'
 
 type Perspective = {
   actorId: string
@@ -15,10 +16,13 @@ type Perspective = {
   ownConversations: readonly SocialEntry[]
   publicTally: Readonly<Record<string, number>>
   revealedBallots?: readonly Ballot[]
+  campaigns?: readonly TableArgument[]
+  dawnClue?: string
   eligibleIds: readonly string[]
   evidence?: ReadonlyMap<string, number>
   tableRound?: number
   tablePressure?: ReadonlyMap<string, number>
+  shieldReads?: ReturnType<typeof nightShieldReads>
 }
 
 export function resolutionPerspective(
@@ -27,6 +31,7 @@ export function resolutionPerspective(
   eligibleIds: readonly string[]
 ): Perspective {
   const view = viewFor(run, actorId)
+  const morningExit = run.lastDawn?.day === run.day && run.lastDawn.eliminatedId
   return {
     actorId,
     role: view.role ?? 'loyal',
@@ -38,96 +43,146 @@ export function resolutionPerspective(
     ownConversations: getSocialView(run, actorId),
     publicTally: run.lastTable?.tally ?? {},
     revealedBallots: run.lastTable?.revealedBallots,
+    campaigns: run.lastTable?.campaigns,
+    dawnClue: morningExit
+      ? run.lastTable?.revealedBallots?.find(({ voterId }) => voterId === morningExit)?.targetId
+      : undefined,
     evidence: incidentPressure(run, actorId),
+    shieldReads: run.phase === 'night' ? nightShieldReads(run, actorId) : undefined,
   }
 }
 
-function socialPressure({ actorId, day, ownConversations }: Perspective) {
-  const pledges = new Map<string, string>()
-  const suspicions = new Map<string, string>()
-  const argumentsHeard = new Map<string, SocialEntry>()
-
+function privateSignals({ actorId, day, ownConversations }: Perspective) {
+  const activePacts = new Map<string, string>()
+  const caseFor = new Map<string, number>()
+  const caseAgainst = new Map<string, number>()
+  const rumors = new Map<string, Set<string>>()
   for (const entry of ownConversations) {
-    if (entry.day !== day || !entry.suspectId) continue
-    const incoming = entry.recipientId === actorId
-    if (!incoming && entry.actorId !== actorId) continue
-
-    if (entry.kind === 'vote-plan' && entry.accepted && !entry.pledgeResult)
-      pledges.set(incoming ? entry.actorId : entry.recipientId, entry.suspectId)
-    if (entry.kind === 'question' && incoming) suspicions.set(entry.actorId, entry.suspectId)
-    if (incoming && (entry.kind === 'share-suspicion' || entry.kind === 'defend-guest')) {
-      argumentsHeard.set(JSON.stringify([entry.actorId, entry.suspectId]), entry)
+    const { suspectId, kind, recipientId, actorId: speaker } = entry
+    if (!suspectId) continue
+    const incoming = recipientId === actorId
+    if (
+      (incoming || speaker === actorId) &&
+      kind === 'vote-plan' &&
+      entry.day === day &&
+      entry.accepted &&
+      !entry.pledgeResult
+    ) {
+      activePacts.set(incoming ? speaker : recipientId, suspectId)
+    }
+    if (!incoming || entry.day < day - 1) continue
+    if (kind === 'question' || (kind === 'share-suspicion' && entry.reaction === 'landed')) {
+      const speakers = rumors.get(suspectId) ?? new Set<string>()
+      speakers.add(speaker)
+      rumors.set(suspectId, speakers)
+    }
+    if (entry.reaction !== 'landed') continue
+    const today = entry.day === day
+    // A theory remains one weak signal even if it travels through several guests.
+    if (kind === 'share-suspicion') {
+      caseFor.set(suspectId, Math.max(caseFor.get(suspectId) ?? 0, today ? 0.2 : 0.1))
+    } else if (kind === 'defend-guest') {
+      caseAgainst.set(suspectId, Math.max(caseAgainst.get(suspectId) ?? 0, today ? 0.2 : 0.1))
     }
   }
 
-  const pressure = new Map<string, number>()
-  for (const [, suspectId] of suspicions) {
-    pressure.set(suspectId, Math.min(0.2, (pressure.get(suspectId) ?? 0) + 0.1))
+  const pactSupport = new Map<string, number>()
+  for (const [peerId, suspectId] of activePacts) {
+    const { reliability } = relationship(ownConversations, actorId, peerId)
+    const weight =
+      (hasAlliance(ownConversations, actorId, peerId) ? 0.64 : 0.48) + reliability * 0.25
+    pactSupport.set(suspectId, Math.min(0.85, (pactSupport.get(suspectId) ?? 0) + weight))
   }
-  for (const [peerId, suspectId] of pledges) {
-    const weight = hasAlliance(ownConversations, actorId, peerId) ? 0.72 : 0.55
-    pressure.set(suspectId, Math.min(0.85, (pressure.get(suspectId) ?? 0) + weight))
-  }
-  for (const { actorId: speaker, suspectId, kind, reaction } of argumentsHeard.values()) {
-    if (reaction === 'backfired') {
-      pressure.set(speaker, Math.min(0.85, (pressure.get(speaker) ?? 0) + 0.24))
-    } else if (reaction === 'landed' && suspectId) {
-      const weight = kind === 'defend-guest' ? -0.27 : 0.28
-      const prior = pressure.get(suspectId) ?? 0
-      pressure.set(suspectId, Math.min(0.85, Math.max(-0.5, prior + weight)))
-    }
-  }
-  return pressure
+  return { caseFor, caseAgainst, rumors, pactSupport }
 }
+
+type TargetContext = 'case' | 'table' | 'night'
 
 function scoreChoice(
   perspective: Perspective,
   id: string,
-  night: boolean,
-  pressure: number
+  context: TargetContext,
+  signals: ReturnType<typeof privateSignals>
 ): number {
   const { actorId, day, role, seed, teammates, publicTally, ownConversations } = perspective
-  const roundSalt = !night && perspective.tableRound ? Math.imul(perspective.tableRound, 229) : 0
+  const roundSalt =
+    context === 'table' && perspective.tableRound ? Math.imul(perspective.tableRound, 229) : 0
   const random = mulberry32(seed ^ Math.imul(day, 1021) ^ hashId(actorId + ':' + id) ^ roundSalt)
-  const uncertainty = random() * 0.8
-  const trust = rapport(ownConversations, actorId, id)
-  const targetPressure = (publicTally[id] ?? 0) / 12
+  const uncertainty = random() * 0.64
+  const { bond } = relationship(ownConversations, actorId, id)
   const personality = getSocialPersonality(actorId)
-  if (night) {
+  const publicHeat = Math.min(0.55, (publicTally[id] ?? 0) / 12)
+  if (context === 'night') {
     const rivalVote = perspective.revealedBallots?.find(({ voterId }) => voterId === id)?.targetId
-    const threat =
-      rivalVote === actorId ? 0.5 : rivalVote && teammates.includes(rivalVote) ? 0.32 : 0
-    return uncertainty - trust * 0.65 - targetPressure * 0.55 + threat
+    const againstUs = (targetId?: string) =>
+      targetId === actorId || (targetId !== undefined && teammates.includes(targetId))
+    const ledCase = perspective.campaigns?.some(
+      (claim) => claim.speakerId === id && againstUs(claim.targetId)
+    )
+    const threat = ledCase ? 0.56 : againstUs(rivalVote) ? 0.34 : 0
+    const obvious = ledCase ? threat * personality.strategicCalculation * 0.24 : 0
+    const read = perspective.shieldReads?.get(id)
+    const confidence = read?.conflicting ? 0.5 : 1
+    const shieldRisk = read ? Math.max(0, read.protected - read.exposed * 0.65) : 0
+    const opportunity = read ? Math.max(0, read.exposed - read.protected) : 0
+    return (
+      uncertainty -
+      bond * 0.62 -
+      publicHeat * 0.6 +
+      threat -
+      obvious +
+      confidence * (opportunity * 0.22 - shieldRisk * (1.07 - personality.riskTolerance * 0.38))
+    )
   }
+
+  const publicArgument = perspective.tablePressure?.get(id) ?? 0
+  const privateCase = (signals.caseFor.get(id) ?? 0) - (signals.caseAgainst.get(id) ?? 0)
+  const weightOfCase =
+    Math.max(0, privateCase, publicArgument) + Math.min(0, privateCase, publicArgument)
   const evidence =
-    (perspective.evidence?.get(id) ?? 0) * (0.8 + 0.4 * personality.strategicCalculation)
+    (perspective.evidence?.get(id) ?? 0) * (0.86 + 0.36 * personality.strategicCalculation)
+  const dawnClue = perspective.dawnClue === id ? 0.08 : 0
+  const suspicion = evidence + weightOfCase + dawnClue
   const teammateCost =
     role === 'betrayer' && teammates.includes(id)
-      ? Math.max(0.2, 0.75 - (targetPressure + evidence) * 0.45)
+      ? Math.max(
+          0.15,
+          0.48 + personality.loyalty * 0.36 - (publicHeat + Math.max(0, suspicion)) * 0.52
+        )
       : 0
-  // A contested voter has more to gain by joining a plausible alternative.
+  const read = uncertainty + suspicion - teammateCost - bond * (0.22 + personality.loyalty * 0.28)
+  if (context === 'case') return read
+
+  const rumorSupport = Math.min(0.16, (signals.rumors.get(id)?.size ?? 0) * 0.065)
+  const momentum = (publicHeat + rumorSupport) * (0.7 + (1 - personality.riskTolerance) * 0.4)
+  const pact = perspective.phase === 'final-banishment' ? 0 : (signals.pactSupport.get(id) ?? 0)
   const danger = Math.min(1, (publicTally[actorId] ?? 0) / 4)
-  const viability = Math.min(1, targetPressure + Math.max(0, pressure) + Math.max(0, evidence))
-  const defensiveVote = viability * danger * (0.18 + 0.24 * personality.riskTolerance)
-  return uncertainty - trust - teammateCost + targetPressure + pressure + evidence + defensiveVote
+  const viability = Math.min(1, momentum + pact + Math.max(0, suspicion))
+  const selfPreservation = viability * danger * (0.12 + 0.23 * personality.strategicCalculation)
+  return read + momentum + pact + selfPreservation - bond * 0.22
 }
 
-export function chooseTarget(
-  perspective: Perspective,
-  context: 'table' | 'night'
-): string | undefined {
-  const night = context === 'night'
-  const pressure =
-    !night && perspective.phase !== 'final-banishment' ? socialPressure(perspective) : undefined
+export function chooseTarget(perspective: Perspective, context: TargetContext): string | undefined {
+  const signals = privateSignals(perspective)
   const ranked = perspective.eligibleIds.map((id) => ({
     id,
-    score: scoreChoice(
-      perspective,
-      id,
-      night,
-      (pressure?.get(id) ?? 0) + (night ? 0 : (perspective.tablePressure?.get(id) ?? 0))
-    ),
+    score: scoreChoice(perspective, id, context, signals),
   }))
   ranked.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
   return ranked[0]?.id
+}
+
+/** Finale decisions need the best case the guest can actually make. */
+export function strongestCase(perspective: Perspective) {
+  const signals = privateSignals(perspective)
+  return Math.max(
+    0,
+    ...perspective.eligibleIds.map(
+      (id) =>
+        (perspective.evidence?.get(id) ?? 0) +
+        (signals.caseFor.get(id) ?? 0) -
+        (signals.caseAgainst.get(id) ?? 0) +
+        (perspective.dawnClue === id ? 0.08 : 0)
+    )
+  )
 }

@@ -5,7 +5,6 @@
   flex: 1 1 0;
   width: 100%;
   min-height: 0;
-  max-block-size: 540px;
   gap: clamp(3px, 1vw, 6px);
   list-style: none;
   padding: 0;
@@ -56,6 +55,34 @@
   cursor: default;
 }
 
+.betrayals-layout
+  .betrayals-roster__seat[data-runoff='other']:not([data-exit])
+  .betrayals-roster__portrait
+  > img {
+  filter: saturate(0.65) brightness(0.65);
+}
+
+.betrayals-roster__seat[data-runoff='tied']:not([aria-pressed='true']) {
+  border-color: #bbd7cb;
+  box-shadow: 0 0 8px #9de3ca60;
+}
+
+.betrayals-roster__runoff-mark {
+  position: absolute;
+  z-index: 2;
+  top: 3px;
+  left: 3px;
+  padding: 2px 4px;
+  border-radius: 2px 5px 5px 2px;
+  background: #b8dbcd;
+  color: #162b27;
+  font:
+    750 0.51rem/1.2 system-ui,
+    sans-serif;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
 .betrayals-roster__portrait {
   position: absolute;
   inset: 0;
@@ -92,7 +119,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 42%;
+  object-position: center calc(var(--betrayals-portrait-focus-y) * 100%);
   transition:
     filter 520ms ease,
     opacity 520ms ease;
@@ -117,19 +144,9 @@
   transition: opacity 520ms ease;
 }
 
-.betrayals-roster__seat[data-exit] {
-  --seal-ink: #ba795c;
-  --seal-glow: #5b2820;
-}
-
-.betrayals-roster__seat[data-exit='night'] {
-  --seal-ink: #9eaecc;
-  --seal-glow: #29283f;
-}
-
-.betrayals-roster__seat[data-exit] .betrayals-roster__portrait img {
-  filter: grayscale(1) brightness(0.53) contrast(0.94);
-  opacity: 0.66;
+.betrayals-roster__seat[data-exit] .betrayals-roster__portrait > img {
+  filter: grayscale(0.8) brightness(0.61) contrast(0.97);
+  opacity: 0.88;
 }
 
 .betrayals-roster__seat[data-exit] .betrayals-roster__initial {
@@ -137,7 +154,6 @@
 }
 
 .betrayals-roster__seat[data-asleep='true'] {
-  --sleep-mask-top: 32%;
   background: #171322;
 }
 
@@ -149,131 +165,142 @@
   opacity: 0.18;
 }
 
+.betrayals-roster__seal,
+.betrayals-roster__role,
+.betrayals-roster__protections > span {
+  --sigil-ink: #d8bd92;
+  --sigil-accent: #eed6ae;
+  --sigil-metal: #a4855d;
+  --sigil-wash: #4e392c;
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--sigil-metal) 75%, #1b1316);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 33% 15%, var(--sigil-wash), transparent 75%),
+    linear-gradient(155deg, #21171b, #130f14);
+  box-shadow:
+    inset 0 1px 2px #f0c99322,
+    0 2px 5px #0a0709a8;
+  color: var(--sigil-ink);
+}
+
+.betrayals-roster__seal::before {
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--sigil-metal) 38%, transparent);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+}
+
 .betrayals-roster__seal {
   position: absolute;
   z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 47%;
-  max-width: 31px;
-  aspect-ratio: 1;
-  color: var(--seal-ink);
-  background: radial-gradient(circle, var(--seal-glow), #0e1019e8);
-  border: 1px solid var(--seal-ink);
-  border-radius: 50%;
-  box-shadow:
-    0 0 10px var(--seal-glow),
-    inset 0 0 0 2px #13131e;
-  animation: betrayals-seat-seal 420ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  align-self: center;
+  margin-block-start: 12%;
+  width: clamp(27px, 9.6vw, 42px);
+  max-width: 67%;
+  aspect-ratio: 1.09;
+  border-radius: 49% 48% 51% 47% / 50% 51% 47% 49%;
+  animation: betrayals-seat-seal 350ms ease-out both;
 }
 
-.betrayals-roster__seal::before,
-.betrayals-roster__seal::after {
-  content: '';
-  position: absolute;
-  width: 56%;
-  height: 1px;
-  background: currentColor;
-  transform: rotate(45deg);
+.betrayals-roster__seal[data-seal='night'] {
+  --sigil-ink: #d0b8a2;
+  --sigil-accent: #e2c9a9;
+  --sigil-metal: #916355;
+  --sigil-wash: #522c31;
 }
 
-.betrayals-roster__seal::after {
-  transform: rotate(-45deg);
+.betrayals-roster__seal svg,
+.betrayals-roster__role svg,
+.betrayals-roster__protections svg {
+  position: relative;
+  width: 73%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.95;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.betrayals-roster__seat[data-exit='night'] .betrayals-roster__seal::before {
-  width: 44%;
-  height: 44%;
-  background: transparent;
-  border-radius: 50%;
-  box-shadow: inset 2px 1px currentColor;
-  transform: rotate(-22deg);
+.betrayals-roster .cast-sigil__fill {
+  fill: currentColor;
+  opacity: 0.16;
+  stroke: none;
 }
 
-.betrayals-roster__seat[data-exit='night'] .betrayals-roster__seal::after {
-  display: none;
+.betrayals-roster .cast-sigil__accent {
+  stroke: var(--sigil-accent);
+}
+
+.betrayals-roster .cast-sigil__wax {
+  fill: #89463e;
+  stroke-width: 1.35;
 }
 
 @keyframes betrayals-seat-seal {
   from {
     opacity: 0;
-    transform: scale(1.36);
+    transform: translateY(-2px) scale(1.08);
   }
-
-  62% {
-    opacity: 1;
-    transform: scale(0.94);
-  }
-
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
 .betrayals-roster__role {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  display: grid;
-  place-items: center;
-  width: 1.25em;
-  aspect-ratio: 1;
-  border: 1px solid #7aa1a9;
-  border-radius: 50%;
-  background: radial-gradient(circle at 45% 20%, #263e42, #0b1522);
-  color: #c0e2e5;
-  box-shadow: 0 2px 5px #050609;
-  font:
-    700 0.63rem / 1 Georgia,
-    serif;
+  inset: 3px auto auto 3px;
+  width: clamp(17px, 4.7vw, 22px);
+  aspect-ratio: 0.96;
 }
 
-.betrayals-roster__seat[data-role='betrayer'] .betrayals-roster__role {
-  color: #f0a494;
-  border-color: #99564d;
-  background: radial-gradient(circle at 45% 20%, #512c28, #1d1014);
+.betrayals-roster__role[data-role-sigil='loyal'] {
+  --sigil-ink: #c5c8a0;
+  --sigil-accent: #dfc99c;
+  --sigil-metal: #788166;
+  --sigil-wash: #353e31;
+}
+
+.betrayals-roster__role[data-role-sigil='betrayer'] {
+  --sigil-ink: #caa6a8;
+  --sigil-accent: #ecc2ac;
+  --sigil-metal: #835f64;
+  --sigil-wash: #4b2a34;
 }
 
 .betrayals-roster__protections {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  inset: 3px 3px auto auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  width: min-content;
   gap: 2px;
 }
 
 .betrayals-roster__protections > span {
-  display: grid;
-  place-items: center;
-  width: clamp(10px, 3.8vw, 16px);
-  aspect-ratio: 1;
-  border: 1px solid #b98a56;
-  border-radius: 50%;
-  background: #130c0be8;
-  box-shadow: 0 2px 5px #020107;
-}
-
-.betrayals-roster__protections img {
-  width: 88%;
-  height: 88%;
-  object-fit: contain;
+  width: clamp(14px, 4.3vw, 19px);
 }
 
 .betrayals-roster__protections > [data-protection='public'] {
-  border-color: #6a9f92;
+  --sigil-ink: #b7e3da;
+  --sigil-accent: #dcf5e9;
+  --sigil-metal: #64958e;
+  --sigil-wash: #274943;
 }
 
 .betrayals-roster__protections > [data-protection='night'] {
-  border-color: #8f759e;
-}
-
-.betrayals-roster__protections > [data-protection='public'] img {
-  filter: sepia(0.32) hue-rotate(92deg) brightness(1.16);
-}
-
-.betrayals-roster__protections > [data-protection='night'] img {
-  filter: sepia(0.32) hue-rotate(229deg) brightness(1.18);
+  --sigil-ink: #d3c9ed;
+  --sigil-accent: #efe6ff;
+  --sigil-metal: #8c76b0;
+  --sigil-wash: #3b3057;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -288,28 +315,6 @@
   }
 }
 
-.betrayals-roster__seat[data-night-reveal] .betrayals-roster__portrait > img {
-  animation: betrayals-night-portrait 820ms ease-out both;
-}
-
-.betrayals-roster__seat[data-night-reveal] .betrayals-roster__seal {
-  animation: betrayals-seat-seal 520ms 350ms ease-out both;
-}
-
-@keyframes betrayals-night-portrait {
-  from {
-    filter: grayscale(0.15) brightness(0.82);
-    opacity: 1;
-  }
-  to {
-    filter: grayscale(1) brightness(0.53) contrast(0.94);
-    opacity: 0.66;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .betrayals-roster__seat[data-night-reveal] .betrayals-roster__portrait > img,
-  .betrayals-roster__seat[data-night-reveal] .betrayals-roster__seal {
-    animation: none;
-  }
+[data-betrayals-motion='reduced'] .betrayals-roster__seal {
+  animation: none;
 }

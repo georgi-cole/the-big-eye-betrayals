@@ -37,6 +37,14 @@ export type Seat = Contestant & {
 export type RunOptions = { publicMode: boolean; realityMode: RealityPreset }
 export const INCOMING_ANSWERS = ['engage', 'listen', 'dismiss'] as const
 export type IncomingAnswer = (typeof INCOMING_ANSWERS)[number]
+export const NIGHT_SHIELD_MOVES = [
+  'shield-gift',
+  'shield-claim',
+  'shield-deny',
+  'ask-shield',
+  'shield-tip',
+] as const
+export type NightShieldClaim = 'has' | 'none'
 
 export type SocialReaction =
   | 'wary'
@@ -50,6 +58,14 @@ export type SocialReaction =
   | 'end'
   | 'banish'
 
+export type CastleAlliance = {
+  id: string
+  name: string
+  leaderId: string
+  memberIds: string[]
+  closed?: boolean
+}
+
 export type SocialEntry = {
   day: number
   actorId: string
@@ -58,6 +74,7 @@ export type SocialEntry = {
     | 'rapport'
     | 'question'
     | 'alliance'
+    | 'end-pact'
     | 'vote-plan'
     | 'ask-about'
     | 'share-suspicion'
@@ -65,8 +82,20 @@ export type SocialEntry = {
     | 'mend-fences'
     | 'debrief'
     | 'ask-end'
+    | 'group-chat'
+    | 'lay-low'
+    | 'explore-castle'
+    | 'eavesdrop'
+    | 'found-alliance'
+    | 'consult-alliance'
+    | 'alliance-update'
+    | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
+  shieldReply?: NightShieldClaim | 'private'
   accepted?: boolean
+  alliance?: CastleAlliance
+  allianceChange?: 'invite' | 'leave' | 'rename' | 'remove' | 'dissolve'
+  declinedIds?: string[]
   reaction?: SocialReaction
   pledgeResult?: { actor: boolean; recipient: boolean } | 'void'
 }
@@ -77,6 +106,7 @@ export type TableReceipt = {
   tally: Record<string, number>
   tiedByDraw: boolean
   revealedBallots?: Ballot[]
+  campaigns?: TableArgument[]
 }
 
 export const PRESENTATION_CUES = [
@@ -105,6 +135,19 @@ export type TableSway = {
   targetId: string
   tone: 'careful' | 'forceful'
   evidence?: import('./intel.ts').TableEvidence
+  stance?: 'question' | 'defend'
+}
+
+export type TableArgument = TableSway & {
+  speakerId: string
+  basis: 'impression' | 'conversation' | 'record'
+}
+
+export type CaseReview = {
+  day: number
+  speakerId: string
+  targetId: string
+  result: 'caught' | 'missed'
 }
 
 export type Run = {
@@ -120,14 +163,25 @@ export type Run = {
   private: {
     betrayers: string[]
     hiddenBetrayerIds?: string[]
+    // One owner per awarded shield. Two shields may be held by the same guest.
     nightShieldIds: string[]
-    safetyStandings?: { day: number; rows: SafetyStanding[] }
+    nightShieldAwardIds?: string[]
+    lastShieldSave?: { day: number; id: string }
+    safetyStandings?: { day: number; publicResults?: boolean; rows: SafetyStanding[] }
     pendingTable?: TableReceipt
-    pendingNight?: { targetId: string | null; blocked: boolean; byDraw?: boolean }
+    conclaveVote?: { nominations: Ballot[]; runoff?: Ballot[] }
+    pendingNight?: {
+      targetId: string | null
+      blocked: boolean
+      byDraw?: boolean
+      filmPlayed?: boolean
+    }
   }
   publicSeed: number
   pot: number
+  challengeHistory?: string[]
   social: SocialEntry[]
+  activity?: import('./gameLog.ts').GameLogEntry[]
   witnessLead?: import('./intel.ts').WitnessLead
   socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>
@@ -140,6 +194,8 @@ export type Run = {
   tableRound?: number
   tableCount?: TableCount
   tableSway?: TableSway | null
+  tableArguments?: TableArgument[]
+  caseReviews?: CaseReview[]
   lastTable?: TableReceipt
   lastDawn?: { day: number; eliminatedId: string | null }
   result?: {
@@ -256,6 +312,18 @@ export function knownTeammateIds(run: Run, actorId: string | null): string[] {
     .map(({ id }) => id)
 }
 
+export function nightShieldWinners(run: Run): readonly string[] {
+  const standings = run.private.safetyStandings
+  return standings?.day === run.day
+    ? standings.rows.slice(0, 2).map(({ contestantId }) => contestantId)
+    : (run.private.nightShieldAwardIds ?? run.private.nightShieldIds)
+}
+
+export function publicNightShieldWinners(run: Run): readonly string[] {
+  const standings = run.private.safetyStandings
+  return standings?.day === run.day && standings.publicResults ? nightShieldWinners(run) : []
+}
+
 export function viewFor(run: Run, actorId: string | null) {
   const actor = actorId ? run.seats.find(({ id }) => id === actorId) : undefined
   const role: Role | null = actor
@@ -265,17 +333,33 @@ export function viewFor(run: Run, actorId: string | null) {
     : null
   const activeActor = actor && !actor.exit
   const teammateIds = knownTeammateIds(run, actorId)
-  const knownNightShieldIds = activeActor
-    ? run.private.nightShieldIds.filter((id) => id === actor.id || teammateIds.includes(id))
-    : []
+  const nightShieldCount = activeActor
+    ? run.private.nightShieldIds.filter((id) => id === actor.id).length
+    : 0
+  // Teammates see who won at Safety, but don't get updates about private handoffs.
+  const shieldCycle =
+    run.phase === 'round-table' ||
+    (run.phase === 'table-reveal' && !run.private.pendingTable?.blind) ||
+    run.phase === 'night' ||
+    run.phase === 'night-resolved'
+  const publicNightShieldWinnerIds = shieldCycle ? publicNightShieldWinners(run) : []
+  const knownNightShieldIds = new Set(publicNightShieldWinnerIds)
+  if (shieldCycle) {
+    for (const id of nightShieldWinners(run)) {
+      if (teammateIds.includes(id)) knownNightShieldIds.add(id)
+    }
+  }
+  if (activeActor && nightShieldCount) knownNightShieldIds.add(actor.id)
 
   return {
     phase: run.phase,
     day: run.day,
     role,
     teammateIds,
-    knownNightShieldIds,
-    hasNightShield: Boolean(activeActor && knownNightShieldIds.includes(actor.id)),
+    knownNightShieldIds: [...knownNightShieldIds],
+    publicNightShieldWinnerIds,
+    hasNightShield: nightShieldCount > 0,
+    nightShieldCount,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,

@@ -1,8 +1,9 @@
-import { statusBadgeImageSrc } from '../utils/statusBadges'
+import { CastSigil } from './CastSigil'
+import { SleepMask } from './SleepMask'
+import { sadBetrayalsPortrait } from './betrayalsAppearance'
 import houseguestGridStyles from '../components/HouseguestGrid/HouseguestGrid.module.css'
 import type { viewFor } from './run'
 import './roster.css'
-import './sleep-mask.css'
 
 type CastView = ReturnType<typeof viewFor>
 type Props = {
@@ -10,8 +11,11 @@ type Props = {
   selectedId?: string
   humanId: string
   sleeping?: boolean
-  nightRevealId?: string
   selectableIds?: readonly string[]
+  runoffIds?: readonly string[]
+  announcedNightId?: string
+  compactExitId?: string
+  mourning?: boolean
   onSelect: (id: string) => void
 }
 
@@ -20,24 +24,38 @@ export function Roster({
   selectedId,
   humanId,
   sleeping,
-  nightRevealId,
   selectableIds,
+  runoffIds,
+  announcedNightId,
+  compactExitId,
+  mourning,
   onSelect,
 }: Props) {
   return (
     <ul className="betrayals-roster" aria-label="Contestant roster">
       {view.seats.map((seat) => {
-        const asleep = sleeping && !seat.exit
-        const hasNightShield = !seat.exit && view.knownNightShieldIds.includes(seat.id)
+        const cause = seat.exit?.cause ?? (seat.id === announcedNightId ? 'night' : undefined)
+        const compactExit = seat.id === compactExitId
+        const asleep = sleeping && !cause
+        const sadPortrait = mourning && !cause ? sadBetrayalsPortrait(seat.portrait) : undefined
+        const nightShield =
+          !seat.exit &&
+          view.knownNightShieldIds.includes(seat.id) &&
+          (seat.id === humanId && view.nightShieldCount
+            ? view.nightShieldCount > 1
+              ? '2 Night Shields'
+              : 'Night Shield'
+            : 'Won a Night Shield')
         const selectable = !selectableIds || selectableIds.includes(seat.id)
+        const tied = runoffIds?.includes(seat.id)
         const confirmedRole = seat.exit?.revealedRole ?? seat.finaleRole
         const roleLabel = confirmedRole && (confirmedRole === 'betrayer' ? 'Betrayer' : 'Loyal')
-        const exitLabel =
-          seat.exit && (seat.exit.cause === 'banished' ? 'Banished' : 'Eliminated at Night')
+        const exitLabel = cause && (cause === 'banished' ? 'Banished' : 'Eliminated at Night')
         const status = [
+          tied && 'Tied in the runoff',
           seat.fullImmunity && 'Full Immunity',
           seat.publicShield && 'Public Shield',
-          hasNightShield && 'Night Shield',
+          nightShield,
           asleep && 'Asleep',
           exitLabel,
           roleLabel,
@@ -53,53 +71,92 @@ export function Roster({
               aria-disabled={!selectable || undefined}
               data-seat-id={seat.id}
               data-you={seat.id === humanId || undefined}
-              data-exit={seat.exit?.cause}
+              data-exit={cause}
               data-role={confirmedRole}
               data-asleep={asleep || undefined}
-              data-night-reveal={seat.id === nightRevealId || undefined}
+              data-runoff={runoffIds?.length ? (tied ? 'tied' : 'other') : undefined}
               onClick={selectable ? () => onSelect(seat.id) : undefined}
             >
               <span className="betrayals-roster__portrait" aria-hidden="true">
                 {seat.portrait ? (
-                  <img src={seat.portrait} alt="" decoding="async" draggable={false} />
+                  <img
+                    key={sadPortrait || seat.portrait}
+                    src={sadPortrait || seat.portrait}
+                    data-mourning={
+                      Boolean(sadPortrait && sadPortrait !== seat.portrait) || undefined
+                    }
+                    alt=""
+                    decoding="async"
+                    draggable={false}
+                    onError={(event) => {
+                      const image = event.currentTarget
+                      if (image.hasAttribute('data-mourning') && seat.portrait) {
+                        image.removeAttribute('data-mourning')
+                        image.src = seat.portrait
+                      }
+                    }}
+                  />
                 ) : (
                   <span className="betrayals-roster__initial">{seat.name[0]}</span>
                 )}
-                {asleep && (
+                {asleep && <SleepMask portrait={seat.portrait} />}
+                {compactExit && (
                   <span
-                    className="betrayals-sleep-mask"
-                    data-symbolic={!seat.portrait || undefined}
-                  />
+                    aria-hidden="true"
+                    className={
+                      houseguestGridStyles.cross + ' ' + houseguestGridStyles.crossAnimated
+                    }
+                    data-brief-exit-mark
+                  >
+                    <img
+                      className={houseguestGridStyles.crossArtwork}
+                      src={import.meta.env.BASE_URL + 'evictionmark/evictionmark.png'}
+                      alt=""
+                      draggable={false}
+                    />
+                  </span>
                 )}
-                {seat.exit && (
-                  <span className="betrayals-roster__seal" title={exitLabel || undefined} />
+                {cause && !compactExit && (
+                  <span
+                    className="betrayals-roster__seal"
+                    data-seal={cause}
+                    title={exitLabel || undefined}
+                  >
+                    <CastSigil kind={cause} />
+                  </span>
                 )}
                 <span className={houseguestGridStyles.nameOverlay}>{seat.name}</span>
               </span>
+              {tied && (
+                <span className="betrayals-roster__runoff-mark" aria-hidden="true">
+                  Tied
+                </span>
+              )}
               {confirmedRole && (
                 <span
                   className="betrayals-roster__role"
+                  data-role-sigil={confirmedRole}
                   aria-hidden="true"
                   title={roleLabel || undefined}
                 >
-                  {confirmedRole === 'betrayer' ? 'B' : 'L'}
+                  <CastSigil kind={confirmedRole === 'betrayer' ? 'betrayer' : 'loyal'} />
                 </span>
               )}
-              {(seat.fullImmunity || seat.publicShield || hasNightShield) && (
+              {(seat.fullImmunity || seat.publicShield || nightShield) && (
                 <span className="betrayals-roster__protections" aria-hidden="true">
                   {seat.fullImmunity && (
                     <span title="Full Immunity" data-protection="immunity">
-                      <img src={statusBadgeImageSrc('loh')} alt="" />
+                      <CastSigil kind="immunity" />
                     </span>
                   )}
                   {seat.publicShield && (
                     <span title="Public Shield" data-protection="public">
-                      <img src={statusBadgeImageSrc('pos')} alt="" />
+                      <CastSigil kind="public" />
                     </span>
                   )}
-                  {hasNightShield && (
-                    <span title="Night Shield" data-protection="night">
-                      <img src={statusBadgeImageSrc('pos')} alt="" />
+                  {nightShield && (
+                    <span title={nightShield} data-protection="night">
+                      <CastSigil kind="shield-night" />
                     </span>
                   )}
                 </span>

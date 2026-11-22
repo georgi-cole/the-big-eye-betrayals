@@ -1,52 +1,62 @@
+.betrayals-roster__portrait,
+.betrayals-cine__tile {
+  container-type: size;
+  --betrayals-portrait-focus-y: 0.42;
+}
+
 .betrayals-sleep-mask {
   position: absolute;
   z-index: 1;
-  inset: var(--sleep-mask-top, 32%) auto auto 50%;
-  width: 43%;
-  aspect-ratio: 3 / 1;
-  background: url('/assets/betrayals/sleep-mask.webp') center / contain no-repeat;
-  filter: drop-shadow(0 1px 2px #04050abf);
-  transform: translateX(-50%);
   pointer-events: none;
 }
 
-.betrayals-sleep-mask::after {
-  position: absolute;
-  top: -1.1em;
-  left: 92%;
-  color: #c4d6f0;
-  content: 'Zz';
-  font:
-    italic 700 clamp(0.46rem, 2vw, 0.7rem) Georgia,
-    serif;
-  text-shadow: 0 1px 4px #050918;
+.betrayals-sleep-mask:not([data-symbolic]) {
+  /* Project the fit through the same square cover crop as the portrait. */
+  --sleep-portrait-size: max(100cqw, 100cqh);
+  left: calc(50% + var(--sleep-portrait-size) * var(--sleep-eye-x));
+  top: calc(
+    var(--betrayals-portrait-focus-y) * 100% + var(--sleep-portrait-size) *
+      (var(--sleep-eye-y) - var(--betrayals-portrait-focus-y))
+  );
+  width: calc(var(--sleep-portrait-size) * var(--sleep-mask-width));
+  filter: drop-shadow(0 1px 3px #04050ac0);
+  transform: translate(-50%, -50%) rotate(var(--sleep-mask-angle));
+}
+
+.betrayals-sleep-mask > img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .betrayals-sleep-mask[data-symbolic] {
-  inset: 29% 19% auto auto;
-  width: auto;
-  background: none;
-  transform: none;
+  inset: 24% 18% auto auto;
 }
 
 .betrayals-sleep-mask[data-symbolic]::after {
-  position: relative;
-  inset: auto;
+  color: #c4d6f0;
+  content: 'Zz';
+  font:
+    italic 700 0.65rem Georgia,
+    serif;
 }
 
 .betrayals-cine__tile[data-awake='true'] .betrayals-sleep-mask {
   opacity: 0;
-  animation: betrayals-mask-lift 420ms ease-out both;
-  animation-delay: calc(var(--wake-order) * 55ms);
+  animation: betrayals-mask-lift 490ms ease-out both;
+  animation-delay: calc(var(--wake-order) * 63ms);
 }
 
 @keyframes betrayals-mask-lift {
-  from {
+  0% {
     opacity: 1;
     translate: 0 0;
   }
-  to {
+  30% {
+    opacity: 1;
+  }
+  100% {
     opacity: 0;
-    translate: 0 -40%;
+    translate: 0 -72%;
   }
 }

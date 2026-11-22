@@ -320,6 +320,36 @@ describe('CodeBreakerComp', () => {
     expect(onFinish).toHaveBeenCalledWith(computeSolvedScore(2, 15_000))
   })
 
+  it('forwards the displayed standings when a hosted player finishes', async () => {
+    const participants = makeParticipants()
+    const { onFinish } = renderCodeBreaker({
+      participantIds: participants.map(({ id }) => id),
+      participants,
+      reportStandings: true,
+    })
+    const score = computeSolvedScore(2, 15_000)
+
+    await act(async () => {
+      getMockEngines()[0].emitWin({
+        ...makeSnapshot({ attempts: 2, elapsedMs: 15_000, phase: 'successAnimating' }),
+        secretCode: generateSecretCode(42),
+      })
+      await vi.advanceTimersByTimeAsync(1_800)
+    })
+    await act(async () => {
+      screen.getByRole('button', { name: /continue/i }).click()
+    })
+
+    expect(onFinish).toHaveBeenCalledWith(
+      score,
+      undefined,
+      expect.objectContaining({
+        authoritativeRankedIds: expect.arrayContaining(participants.map(({ id }) => id)),
+        rawResults: expect.objectContaining({ human: score }),
+      })
+    )
+  })
+
   it('shows the competition scoreboard before completing the minigame flow', async () => {
     const onComplete = vi.fn()
     const { container } = renderCodeBreaker({

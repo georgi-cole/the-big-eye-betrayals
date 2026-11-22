@@ -1,3 +1,4 @@
+import type { MinigameCanvasPaint } from '../../minigameCanvasPaint';
 import type { DialSlotLayout, VaultCrackerLayout, VaultCrackerRuntimeState } from './types';
 import { clamp } from '../utils/math';
 
@@ -30,18 +31,19 @@ function renderDial(
   digit: number,
   offset: number,
   glow: number,
+  paint: MinigameCanvasPaint,
 ): void {
   ctx.save();
-  ctx.fillStyle = 'rgba(16, 10, 28, 0.94)';
+  ctx.fillStyle = paint('rgba(16, 10, 28, 0.94)');
   fillRoundedRect(ctx, slot.x, slot.y, slot.width, slot.height, 16);
 
   const glowGradient = ctx.createLinearGradient(slot.x, slot.y, slot.x, slot.y + slot.height);
-  glowGradient.addColorStop(0, `rgba(196, 164, 255, ${0.22 + glow * 0.2})`);
-  glowGradient.addColorStop(1, 'rgba(67, 40, 104, 0.22)');
+  glowGradient.addColorStop(0, paint(`rgba(196, 164, 255, ${0.22 + glow * 0.2})`));
+  glowGradient.addColorStop(1, paint('rgba(67, 40, 104, 0.22)'));
   ctx.fillStyle = glowGradient;
   fillRoundedRect(ctx, slot.x + 2, slot.y + 2, slot.width - 4, slot.height - 4, 14);
 
-  ctx.strokeStyle = `rgba(196, 164, 255, ${0.35 + glow * 0.35})`;
+  ctx.strokeStyle = paint(`rgba(196, 164, 255, ${0.35 + glow * 0.35})`);
   ctx.lineWidth = 1.5;
   ctx.strokeRect(slot.x + 1.5, slot.y + 1.5, slot.width - 3, slot.height - 3);
 
@@ -58,7 +60,7 @@ function renderDial(
     const alpha = clamp(1 - distanceFromCenter * 0.6, 0.2, 1);
     const size = 26 - distanceFromCenter * 8;
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = value === digit ? '#fffaff' : 'rgba(221, 205, 250, 0.58)';
+    ctx.fillStyle = value === digit ? '#fffaff' : paint('rgba(221, 205, 250, 0.58)');
     ctx.font = `700 ${size}px Inter, system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -73,6 +75,7 @@ export function renderVault(
   ctx: CanvasRenderingContext2D,
   state: VaultCrackerRuntimeState,
   layout: VaultCrackerLayout,
+  paint: MinigameCanvasPaint,
 ): void {
   const rotation = state.successPulse * 0.28 + Math.sin(state.idleMotion * 0.0012) * 0.015;
 
@@ -82,21 +85,21 @@ export function renderVault(
 
   const outerGradient = ctx.createRadialGradient(0, -layout.vaultRadius * 0.22, layout.vaultRadius * 0.1, 0, 0, layout.vaultRadius);
   outerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
-  outerGradient.addColorStop(0.35, '#765e96');
-  outerGradient.addColorStop(0.75, '#322442');
-  outerGradient.addColorStop(1, '#140e1f');
+  outerGradient.addColorStop(0.35, paint('#765e96'));
+  outerGradient.addColorStop(0.75, paint('#322442'));
+  outerGradient.addColorStop(1, paint('#140e1f'));
   ctx.fillStyle = outerGradient;
   ctx.beginPath();
   ctx.arc(0, 0, layout.vaultRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(196, 164, 255, ${0.28 + state.glow * 0.38})`;
+  ctx.strokeStyle = paint(`rgba(196, 164, 255, ${0.28 + state.glow * 0.38})`);
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(0, 0, layout.vaultRadius + 2, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(221, 205, 250, 0.2)';
+  ctx.strokeStyle = paint('rgba(221, 205, 250, 0.2)');
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 7]);
   ctx.beginPath();
@@ -104,7 +107,7 @@ export function renderVault(
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = '#1b1228';
+  ctx.fillStyle = paint('#1b1228');
   ctx.beginPath();
   ctx.arc(0, 0, layout.vaultInnerRadius, 0, Math.PI * 2);
   ctx.fill();
@@ -113,16 +116,16 @@ export function renderVault(
   ctx.rotate(-rotation * 2.2 + state.successPulse * 0.42);
   for (let index = 0; index < 6; index += 1) {
     ctx.rotate((Math.PI * 2) / 6);
-    ctx.fillStyle = 'rgba(221, 205, 250, 0.2)';
+    ctx.fillStyle = paint('rgba(221, 205, 250, 0.2)');
     fillRoundedRect(ctx, -6, -layout.vaultInnerRadius + 8, 12, layout.vaultInnerRadius * 0.58, 6);
   }
   ctx.restore();
 
   const coreGradient = ctx.createRadialGradient(0, -10, 2, 0, 0, layout.vaultInnerRadius * 0.52);
-  coreGradient.addColorStop(0, '#fffaff');
-  coreGradient.addColorStop(0.28, '#d5b6ff');
-  coreGradient.addColorStop(0.65, '#49345f');
-  coreGradient.addColorStop(1, '#100a19');
+  coreGradient.addColorStop(0, paint('#fffaff'));
+  coreGradient.addColorStop(0.28, paint('#d5b6ff'));
+  coreGradient.addColorStop(0.65, paint('#49345f'));
+  coreGradient.addColorStop(1, paint('#100a19'));
   ctx.fillStyle = coreGradient;
   ctx.beginPath();
   ctx.arc(0, 0, layout.vaultInnerRadius * 0.46, 0, Math.PI * 2);
@@ -130,7 +133,7 @@ export function renderVault(
 
   ctx.restore();
 
-  ctx.fillStyle = 'rgba(14, 9, 24, 0.94)';
+  ctx.fillStyle = paint('rgba(14, 9, 24, 0.94)');
   fillRoundedRect(
     ctx,
     layout.digitRackRect.x,
@@ -140,7 +143,7 @@ export function renderVault(
     24,
   );
 
-  ctx.strokeStyle = 'rgba(192, 132, 252, 0.22)';
+  ctx.strokeStyle = paint('rgba(192, 132, 252, 0.22)');
   ctx.lineWidth = 1.5;
   ctx.strokeRect(
     layout.digitRackRect.x + 1,
@@ -150,6 +153,6 @@ export function renderVault(
   );
 
   state.dialAnimations.forEach((animation, index) => {
-    renderDial(ctx, layout.dialSlots[index], state.digits[index], animation.offset, animation.glow);
+    renderDial(ctx, layout.dialSlots[index], state.digits[index], animation.offset, animation.glow, paint);
   });
 }
