@@ -1,18 +1,21 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { REALITY_MODE_PRESETS } from '../modes/realityMode'
 import {
   flushDurablePersistence,
   getDurableItem,
   setDurableItem,
 } from '../store/durablePersistence'
 import { currentAudienceApproval } from './audience'
+import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import { BetrayalsBroadcast } from './BetrayalsBroadcast'
 import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
-import { BetrayalsConclave } from './BetrayalsConclave'
+import { BetrayalsConclave, ConclaveDiscussion } from './BetrayalsConclave'
 import { BetrayalsDock } from './BetrayalsDock'
 import { BetrayalsGameLog } from './BetrayalsGameLog'
+import { BetrayalsHome } from './BetrayalsHome'
+import { BetrayalsRewardActions, type SeasonReward } from './BetrayalsRewardActions'
 import { gameLogFor, recordGameActivity } from './gameLog'
+import { recordSeasonCheckpoints, rewindOffer, rewindSeason } from './seasonRewards'
 import { BetrayalsIncomingInteractions } from './BetrayalsIncomingInteractions'
 import { BetrayalsSocialPanel } from './BetrayalsSocialPanel'
 import {
@@ -20,7 +23,7 @@ import {
   applyGeneralSocialMove,
   generalSocialOpen,
 } from './generalSocial'
-import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
+import { BetrayalsUtilityPanel, type BetrayalsProfileControls } from './BetrayalsUtilities'
 import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferences'
 import type { Run, Phase, RealityPreset } from './run'
 import { acknowledgeRole, commandToken, eligibleBanishmentTargets, startRun, viewFor } from './run'
@@ -28,10 +31,17 @@ import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
 import { challengeGame, scoreField } from './challengeRotation'
 import type { ReactMinigameCompletion } from '../minigames/competitionResult'
-import { CinematicScene } from './CinematicScene'
+import { BriefRosterExit, CinematicScene, type CinematicCompletion } from './CinematicScene'
 import { getIncomingInteractions, respondToIncomingInteraction } from './incoming'
-import { getConclaveView, resolveConclave, revealDawn } from './night'
-import { cinematicFor, presentationAfter } from './presentation'
+import {
+  conclaveGuests,
+  describeConclaveVerdict,
+  getConclaveView,
+  resolveConclave,
+  revealDawn,
+} from './night'
+import { castleWeather, cinematicFor, presentationAfter } from './presentation'
+import { DawnWeather } from './DawnWeather'
 import { chooseTarget, resolutionPerspective } from './strategy'
 import { advanceDayBeat } from './daySocial'
 import { askWitness, leadForPlayer } from './intel'
@@ -58,9 +68,9 @@ import { Roster } from './Roster'
 import './season.css'
 
 const ChallengeGame = lazy(() => import('./BetrayalsChallengeGame'))
-const saveId = 'edition-local'
+const legacySave = 'edition-local'
+const legacyClaim = 'big-eye:betrayals:season:legacy-claimed'
 const artBase = import.meta.env.BASE_URL + 'assets/betrayals/'
-const hero = artBase + 'observatory.jpg'
 const castleExterior = artBase + 'castle-exterior.jpg'
 const finaleEnding = {
   'last-betrayer': 'The last Betrayer was banished at the Round Table.',
@@ -140,12 +150,12 @@ function restoreInboxReads(key: string): InboxReads | undefined {
   }
 }
 
-export default function BetrayalsScreen() {
+export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProfileControls }) {
+  const player = profiles?.player
+  const saveId = player ? 'profile-' + player.id : legacySave
   const [run, setRun] = useState<Run | null>(() => restore(saveId))
   const current = useRef(run)
   const [name, setName] = useState('')
-  const [publicMode, setPublicMode] = useState(false)
-  const [realityMode, setRealityMode] = useState<RealityPreset>('off')
   const [selected, setSelected] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
   const [incomingOpen, setIncomingOpen] = useState(false)
@@ -155,7 +165,9 @@ export default function BetrayalsScreen() {
   const [countReady, setCountReady] = useState<string>()
   const [voteActionsTarget, setVoteActionsTarget] = useState<HTMLDivElement | null>(null)
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
+  const [conclaveProgress, setConclaveProgress] = useState<{ key: string; step: number }>()
   const [saveIssue, setSaveIssue] = useState(false)
+  const rosterSection = useRef<HTMLElement>(null)
   const inboxReadsKey = 'big-eye:betrayals:inbox:' + saveId
   const [inboxReads, setInboxReads] = useState(() => restoreInboxReads(inboxReadsKey))
   const runId = run?.id
@@ -173,9 +185,12 @@ export default function BetrayalsScreen() {
     if (inboxReads) setDurableItem(inboxReadsKey, JSON.stringify(inboxReads))
   }, [inboxReads, inboxReadsKey])
 
-  const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing)
+  const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing, run?.options)
+  const systemReducedMotion = usePresentationReducedMotion()
+  const playNightFilm = !utilities.preferences.reducedMotion && !systemReducedMotion
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
-  const portrait = getBetrayalsPortrait(utilities.preferences.lookId)
+  const portrait = profiles ? player?.portrait : getBetrayalsPortrait(utilities.preferences.lookId)
+  const needsLook = Boolean(profiles && !portrait)
 
   function openIncoming() {
     utilities.playEffect('ui:navigate', 0.45)
@@ -183,18 +198,19 @@ export default function BetrayalsScreen() {
     setIncomingOpen(true)
   }
 
-  async function commit(updated: Run) {
+  async function commit(updated: Run, claimLegacy = false, rewinding = false) {
     const before = current.current
-    if (before !== run) return
-    const cues = before ? presentationAfter(before, updated) : []
-    const next = recordGameActivity(
-      before,
-      cues.length ? { ...updated, presentation: cues } : updated
-    )
+    if (before !== run) return false
+    const cues = before && !rewinding ? presentationAfter(before, updated, playNightFilm) : []
+    const presented = cues.length ? { ...updated, presentation: cues } : updated
+    const next = rewinding
+      ? presented
+      : recordSeasonCheckpoints(before, recordGameActivity(before, presented))
     current.current = next
     let saved = false
     try {
       saveRun(saveStorage, saveId, next)
+      if (claimLegacy) saveStorage.setItem(legacyClaim, saveId)
       // A reload must resume a beat as soon as it is visible.
       saved = await flushDurablePersistence()
     } catch {
@@ -204,7 +220,12 @@ export default function BetrayalsScreen() {
     if (before?.id !== next.id) setHomeOpen(false)
     setSaveIssue(!saved)
     const phaseChanged = before?.phase !== next.phase || next.id !== before?.id
-    if (phaseChanged || before?.runoffIds !== next.runoffIds) setSelected(undefined)
+    if (
+      phaseChanged ||
+      before?.runoffIds !== next.runoffIds ||
+      before?.private.conclaveVote !== next.private.conclaveVote
+    )
+      setSelected(undefined)
     if (phaseChanged) {
       if (
         next.phase !== 'settled' &&
@@ -220,91 +241,105 @@ export default function BetrayalsScreen() {
       setIncomingOpen(false)
     }
     setPlaying(false)
+    return saved
+  }
+
+  async function claimSeasonReward(reward: SeasonReward) {
+    const active = current.current
+    if (!active || active !== run || active.presentation?.length) return false
+
+    if (reward === 'roles') {
+      if (!active.result || active.phase !== 'settled' || active.seasonRewards?.finaleRevealed) {
+        return false
+      }
+      await commit({
+        ...active,
+        revision: active.revision + 1,
+        seasonRewards: { ...active.seasonRewards, finaleRevealed: true },
+      })
+      return true
+    }
+
+    const offer = rewindOffer(active)
+    const restored = rewindSeason(active)
+    if (!offer || !restored) return false
+    setSelected(undefined)
+    setLogOpen(false)
+    setClosedDiscussion(undefined)
+    setCountReady(undefined)
+    setConclaveProgress(undefined)
+    setInboxReads((receipts) => {
+      if (!receipts || receipts.runId !== active.id) return receipts
+      return {
+        ...receipts,
+        ids: receipts.ids.filter((id) => {
+          const [day, phase] = id.split(':')
+          return (
+            Number(day) < restored.day ||
+            (offer.type === 'table' && Number(day) === restored.day && phase === 'social')
+          )
+        }),
+      }
+    })
+    await commit(restored, false, true)
     return true
   }
 
-  if (!run || homeOpen) {
-    const resumable = run && run.phase !== 'settled'
+  const firstCue = run?.presentation?.[0]
+  const omitConclaveFilm =
+    !playNightFilm && (firstCue === 'conclave-arrival' || firstCue === 'conclave-seal')
+  const dismissConclaveFilm = useEffectEvent(() => {
+    if (!run?.presentation || current.current !== run) return
+    const rest = run.presentation.slice(1)
+    void commit({ ...run, presentation: rest.length ? rest : undefined })
+  })
+  useEffect(() => {
+    if (omitConclaveFilm) dismissConclaveFilm()
+  }, [omitConclaveFilm, firstCue])
+
+  if (!run || homeOpen || needsLook) {
+    const previous =
+      player?.portrait && !run && !getDurableItem(legacyClaim) ? restore(legacySave) : null
+    const resumeLegacy =
+      previous && player && previous.phase !== 'settled'
+        ? () =>
+            void commit(
+              {
+                ...previous,
+                seats: previous.seats.map((seat) =>
+                  seat.id === previous.humanId
+                    ? { ...seat, name: player.name, portrait: player.portrait }
+                    : seat
+                ),
+              },
+              true
+            )
+        : undefined
+
     return (
-      <main className="betrayals-layout betrayals-entry" data-betrayals-motion={motion}>
-        <img className="betrayals-entry__art" src={hero} alt="" fetchPriority="high" />
-        <div className="betrayals-entry__utilities">
-          <BetrayalsUtilityChips utilities={utilities} />
-        </div>
-        <div className="betrayals-entry__identity">
-          <span className="betrayals-eye" aria-hidden="true" />
-          <p className="betrayals-franchise">The Big Eye</p>
-          <h1>Betrayals</h1>
-        </div>
-        {resumable ? (
-          <section className="betrayals-entry__form" aria-label="Current season">
-            <p className="betrayals-entry__progress">
-              Day {run.day} · {phaseLabel[run.phase]}
-            </p>
-            <button className="betrayals-primary" type="button" onClick={() => setHomeOpen(false)}>
-              Continue season
-            </button>
-          </section>
-        ) : (
-          <form
-            className="betrayals-entry__form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void commit(begin(name, publicMode, realityMode, portrait))
-            }}
-          >
-            <label>
-              Your name
-              <input
-                value={name}
-                maxLength={24}
-                autoComplete="nickname"
-                placeholder="Enter the observatory"
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <div className="betrayals-entry__options">
-              <label className="betrayals-entry__toggle">
-                <input
-                  type="checkbox"
-                  checked={publicMode}
-                  onChange={(event) => setPublicMode(event.target.checked)}
-                />
-                Public Mode
-              </label>
-              <label className="betrayals-entry__preset">
-                <span>Reality Mode</span>
-                <select
-                  value={realityMode}
-                  onChange={(event) => setRealityMode(event.target.value as RealityPreset)}
-                >
-                  <option value="off">Off</option>
-                  {REALITY_MODE_PRESETS.filter(({ minimumAge }) => minimumAge === undefined).map(
-                    ({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-            </div>
-            <button type="submit" className="betrayals-primary">
-              Start season
-            </button>
-            {run && (
-              <button
-                className="betrayals-inline-action"
-                type="button"
-                onClick={() => setHomeOpen(false)}
-              >
-                View season result
-              </button>
-            )}
-          </form>
-        )}
-        <BetrayalsUtilityPanel utilities={utilities} />
-      </main>
+      <BetrayalsHome
+        utilities={utilities}
+        profiles={profiles}
+        name={name}
+        onNameChange={setName}
+        season={
+          run
+            ? { day: run.day, phase: phaseLabel[run.phase], settled: run.phase === 'settled' }
+            : undefined
+        }
+        onPlaySeason={() =>
+          void commit(
+            begin(
+              player?.name ?? name,
+              utilities.seasonOptions.publicMode,
+              utilities.seasonOptions.realityMode,
+              portrait
+            )
+          )
+        }
+        onReturnToSeason={() => setHomeOpen(false)}
+        onResumeLegacy={resumeLegacy}
+      />
     )
   }
 
@@ -322,10 +357,17 @@ export default function BetrayalsScreen() {
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
   const conclave = getConclaveView(run, viewerId, selected)
+  const conclaveLines = conclave ? [...(conclave.shieldBriefing ?? []), ...conclave.proposals] : []
+  const conclaveKey = `${run.id}:${run.day}`
+  const conclaveStep = conclaveProgress?.key === conclaveKey ? conclaveProgress.step : 0
+  const conclaveLine = conclaveLines[conclaveStep]
+  const moveConclave = (step: number) => setConclaveProgress({ key: conclaveKey, step })
   const targets =
     votePhase && !audiencePending && !discussion && !counting
       ? tableTargets(run, run.humanId)
-      : (conclave?.targetIds ?? [])
+      : conclaveLine
+        ? []
+        : (conclave?.targetIds ?? [])
   const field = challengeContestantIds(run)
   const canPlay = field.includes(run.humanId)
   const game = challengeGame(run)
@@ -348,15 +390,64 @@ export default function BetrayalsScreen() {
   const readIncoming = new Set(inboxReads?.runId === run.id ? inboxReads.ids : [])
   const unreadIncoming = pendingIncoming.filter(({ id }) => !readIncoming.has(id))
   const cue = run.presentation?.[0]
+  const rewindTarget = cue ? undefined : rewindOffer(run)?.type
+  const showRevealReward =
+    !cue && stage === 'settled' && !!run.result && !run.seasonRewards?.finaleRevealed
+  const openingConclave =
+    cue === 'conclave-arrival' && conclave ? (run.day === 1 ? 'first' : 'return') : undefined
+  const conclaveVerdict =
+    cue === 'conclave-seal' ? describeConclaveVerdict(run, viewerId) : undefined
+  const filmDiscussion = Boolean(
+    playNightFilm && ((conclave && (!cue || openingConclave)) || conclaveVerdict)
+  )
+  const bypassHotel =
+    cue === 'death-letter' && run.presentation?.[1] === 'awakening' && !playNightFilm
+  const shownCue = bypassHotel ? 'awakening' : cue
   const discussionKey = run.id + ':' + run.day
   const discussionVisible = discussion && !cue && closedDiscussion !== discussionKey
   const cinematic =
-    cue && cue !== 'safety-results' ? cinematicFor(run, cue, viewerId, castleExterior) : undefined
-  function finishCue() {
+    shownCue &&
+    !filmDiscussion &&
+    !omitConclaveFilm &&
+    shownCue !== 'safety-results' &&
+    shownCue !== 'sunrise'
+      ? cinematicFor(run, shownCue, viewerId, castleExterior)
+      : undefined
+  const compactExit =
+    cinematic &&
+    utilities.preferences.reducedMotion &&
+    (shownCue === 'departure' || shownCue === 'death-letter' || shownCue === 'elimination')
+  const pendingNight = run.private.pendingNight
+  const mourning =
+    (stage === 'dawn' || stage === 'final-challenge') &&
+    run.lastDawn?.day === run.day &&
+    !!run.lastDawn.eliminatedId
+  const openWeather = shownCue === 'sunrise' || (stage === 'night-resolved' && !cue)
+  const announcedNightId =
+    stage === 'night-resolved' && pendingNight?.targetId === run.humanId && !pendingNight.blocked
+      ? run.humanId
+      : undefined
+
+  function getRosterSeat(id: string) {
+    return (
+      Array.from(rosterSection.current?.querySelectorAll<HTMLElement>('[data-seat-id]') ?? []).find(
+        (seat) => seat.dataset.seatId === id
+      ) ?? null
+    )
+  }
+
+  function finishCue(completion?: CinematicCompletion) {
     const active = current.current
     if (!active?.presentation || active.presentation !== run?.presentation) return
-    const [, ...rest] = active.presentation
-    void commit({ ...active, presentation: rest.length ? rest : undefined })
+    const playedHotel = cue === 'death-letter' && !bypassHotel && completion === 'played'
+    const skipRollCall = playedHotel && active.presentation[1] === 'awakening'
+    const rest = active.presentation.slice(bypassHotel || skipRollCall ? 2 : 1)
+    const night = active.private.pendingNight
+    const privateState =
+      playedHotel && night
+        ? { ...active.private, pendingNight: { ...night, filmPlayed: true } }
+        : active.private
+    void commit({ ...active, private: privateState, presentation: rest.length ? rest : undefined })
   }
 
   function apply(transform: (active: Run) => Run) {
@@ -371,6 +462,14 @@ export default function BetrayalsScreen() {
     }
     const next = transform(active)
     if (next !== active) return commit(next)
+  }
+
+  function advanceConclave() {
+    if (conclaveLine) {
+      moveConclave(conclaveStep + 1)
+      return
+    }
+    apply((active) => resolveConclave(active, token, selected))
   }
 
   function end(continueVoting: boolean) {
@@ -468,7 +567,6 @@ export default function BetrayalsScreen() {
   switch (stage) {
     case 'role-reveal':
       message = view.role === 'betrayer' ? 'You are a Betrayer.' : 'You are a Loyal.'
-      detail = view.teammateIds.length ? view.teammateIds.map(label).join(' · ') : undefined
       play = {
         label: 'Play: open Day 1',
         onClick: () => apply((active) => acknowledgeRole(active, token)),
@@ -559,7 +657,7 @@ export default function BetrayalsScreen() {
             : publicShieldId
               ? label(publicShieldId) + ' has the Public Shield.'
               : view.hasNightShield
-                ? 'You hold a Night Shield.'
+                ? 'You hold a Night Shield. You can give it away in Social before voting.'
                 : undefined)
         play = {
           label: targets.length > 0 ? 'Lock vote' : 'View votes',
@@ -581,24 +679,39 @@ export default function BetrayalsScreen() {
       }
       break
     case 'night':
-      message = banishment ?? 'The house goes quiet.'
-      detail = conclave ? (
-        <BetrayalsConclave
-          view={conclave}
-          selectedName={isTarget && selected ? label(selected) : undefined}
-        />
-      ) : (
-        'Doors close across the castle.'
-      )
+      message = conclave ? undefined : (banishment ?? 'The house goes quiet.')
+      detail = conclave
+        ? !playNightFilm && (
+            <BetrayalsConclave
+              line={conclaveLine}
+              vote={conclave}
+              selectedName={isTarget && selected ? label(selected) : undefined}
+            />
+          )
+        : 'Doors close across the castle.'
       play = {
-        label: targets.length ? 'Lock Night choice' : 'Play: follow the Night',
-        faceLabel: targets.length ? 'Lock choice' : undefined,
-        disabled: targets.length > 0 && !isTarget,
-        onClick: () => apply((active) => resolveConclave(active, token, selected)),
+        label: conclaveLine
+          ? 'Play: next Conclave speaker'
+          : conclave?.runoff
+            ? 'Lock runoff vote'
+            : targets.length
+              ? 'Lock Night choice'
+              : 'Play: follow the Night',
+        faceLabel: conclaveLine
+          ? undefined
+          : conclave?.runoff
+            ? 'Vote'
+            : targets.length
+              ? 'Lock choice'
+              : undefined,
+        disabled: !conclaveLine && targets.length > 0 && !isTarget,
+        onClick: advanceConclave,
       }
       break
     case 'night-resolved':
-      message = 'Morning is close.'
+      message = !playNightFilm
+        ? (describeConclaveVerdict(run, viewerId) ?? 'Morning is close.')
+        : 'Morning is close.'
       play = {
         label: 'Open Dawn',
         faceLabel: 'Dawn',
@@ -637,6 +750,16 @@ export default function BetrayalsScreen() {
               .map(([id, amount]) => label(id) + ' ' + amount.toLocaleString())
               .join(', ')}
           </p>
+          {run.seasonRewards?.finaleRevealed && (
+            <p>
+              Betrayers:{' '}
+              {view.seats
+                .filter(({ finaleRole }) => finaleRole === 'betrayer')
+                .map(({ name }) => name)
+                .join(', ')}
+              .
+            </p>
+          )}
         </div>
       )
       play = {
@@ -644,7 +767,12 @@ export default function BetrayalsScreen() {
         faceLabel: 'New season',
         onClick: () => {
           void commit(
-            begin(human?.name ?? 'You', run.options.publicMode, run.options.realityMode, portrait)
+            begin(
+              human?.name ?? 'You',
+              utilities.seasonOptions.publicMode,
+              utilities.seasonOptions.realityMode,
+              portrait
+            )
           )
         },
       }
@@ -703,7 +831,7 @@ export default function BetrayalsScreen() {
                 : undefined
             : undefined
         }
-        inert={Boolean(cue) || discussionVisible}
+        inert={Boolean(cue) || discussionVisible || filmDiscussion}
       >
         <div className="betrayals-room" aria-hidden="true">
           <img
@@ -752,10 +880,20 @@ export default function BetrayalsScreen() {
           title={conclave ? 'The Conclave' : phaseLabel[stage]}
           message={message}
           detail={detail}
-          interactive={Boolean(tableFeed || conclave)}
+          interactive={Boolean(tableFeed || (conclave && !playNightFilm))}
           cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
           mode={broadcastMode}
           art={artBase + scene + '.jpg'}
+          opener={
+            openWeather && (
+              <DawnWeather
+                key={[run.id, run.day, stage].join(':')}
+                weather={castleWeather(run, run.day + Number(stage === 'night-resolved'))}
+                reducedMotion={!playNightFilm}
+                onFinish={shownCue === 'sunrise' ? finishCue : undefined}
+              />
+            )
+          }
         />
 
         <div className="betrayals-status" role="group" aria-label="Season status">
@@ -783,14 +921,17 @@ export default function BetrayalsScreen() {
           </span>
         </div>
 
-        <section className="betrayals-cast" aria-label="Cast seats">
+        <section ref={rosterSection} className="betrayals-cast" aria-label="Cast seats">
           <Roster
             view={view}
             selectedId={selected}
             humanId={run.humanId}
-            sleeping={stage === 'night-resolved' || cue === 'awakening'}
+            sleeping={stage === 'night-resolved' || shownCue === 'awakening'}
             selectableIds={targets.length ? targets : undefined}
             runoffIds={votePhase ? run.runoffIds : undefined}
+            announcedNightId={announcedNightId}
+            compactExitId={compactExit ? cinematic.subject?.id : undefined}
+            mourning={mourning}
             onSelect={setSelected}
           />
           <div className="betrayals-cast__caption">
@@ -818,20 +959,38 @@ export default function BetrayalsScreen() {
         <BetrayalsDock
           play={play}
           utility={
-            !cue && counting ? (
-              <div className="betrayals-dock__vote-slot" ref={setVoteActionsTarget} />
-            ) : stage === 'end-vote' && participating ? (
-              <button type="button" className="betrayals-inline-action" onClick={() => end(true)}>
-                Banish Again
-              </button>
+            (!cue && counting) ||
+            (stage === 'end-vote' && participating) ||
+            rewindTarget ||
+            showRevealReward ? (
+              <>
+                {!cue && counting && (
+                  <div className="betrayals-dock__vote-slot" ref={setVoteActionsTarget} />
+                )}
+                {stage === 'end-vote' && participating && (
+                  <button
+                    type="button"
+                    className="betrayals-inline-action"
+                    onClick={() => end(true)}
+                  >
+                    Banish Again
+                  </button>
+                )}
+                {(rewindTarget || showRevealReward) && (
+                  <BetrayalsRewardActions
+                    key={run.id}
+                    rewindTarget={rewindTarget}
+                    showReveal={showRevealReward}
+                    onClaim={claimSeasonReward}
+                  />
+                )}
+              </>
             ) : undefined
           }
           home={{
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
               setName(human?.name ?? '')
-              setPublicMode(run.options.publicMode)
-              setRealityMode(run.options.realityMode)
               setHomeOpen(true)
             },
           }}
@@ -935,8 +1094,28 @@ export default function BetrayalsScreen() {
             }
           />
         )}
-        <BetrayalsUtilityPanel utilities={utilities} />
+        <BetrayalsUtilityPanel utilities={utilities} profiles={profiles} />
       </main>
+      {filmDiscussion && (
+        <ConclaveDiscussion
+          key={conclaveKey}
+          cast={conclaveGuests(run, viewerId)}
+          candidates={view.seats.filter(({ id }) => targets.includes(id))}
+          vote={conclave ?? undefined}
+          line={conclaveLine}
+          step={conclaveStep}
+          total={conclaveLines.length}
+          selectedId={selected}
+          onSelect={setSelected}
+          onAdvance={advanceConclave}
+          onBack={() => moveConclave(conclaveStep - 1)}
+          onSkip={() => moveConclave(conclaveLines.length)}
+          opening={openingConclave}
+          verdict={conclaveVerdict}
+          playEffect={utilities.playEffect}
+          onFinishFilm={finishCue}
+        />
+      )}
       {discussion && !cue && (
         <RoundTableDiscussion
           key={discussionKey}
@@ -964,13 +1143,19 @@ export default function BetrayalsScreen() {
           onComplete={finishCue}
         />
       )}
-      {cinematic && (
+      {cinematic && compactExit && (
+        <BriefRosterExit key={cinematic.id} scene={cinematic} onComplete={finishCue} />
+      )}
+      {cinematic && !compactExit && (
         <CinematicScene
           key={cinematic.id}
           scene={cinematic}
-          reducedMotion={utilities.preferences.reducedMotion}
-          autoAdvance={cue !== 'death-letter' && (run.presentation?.length ?? 0) > 1}
+          reducedMotion={utilities.preferences.reducedMotion || shownCue === 'awakening'}
+          autoAdvance={
+            cue !== 'death-letter' && cue !== 'departure' && (run.presentation?.length ?? 0) > 1
+          }
           playEffect={utilities.playEffect}
+          getRosterSeat={getRosterSeat}
           onComplete={finishCue}
         />
       )}

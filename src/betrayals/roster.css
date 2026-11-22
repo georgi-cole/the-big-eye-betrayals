@@ -154,7 +154,6 @@
 }
 
 .betrayals-roster__seat[data-asleep='true'] {
-  --sleep-mask-top: 32%;
   background: #171322;
 }
 

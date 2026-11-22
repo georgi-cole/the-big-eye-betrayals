@@ -42,11 +42,30 @@
 
 .round-table-shot__figure {
   position: absolute;
-  display: block;
   width: 15.625%;
-  height: auto;
   translate: -50% 0;
+  aspect-ratio: 24 / 25;
+  overflow: hidden;
   filter: drop-shadow(0 0.2rem 0.5rem #100a08b8);
+}
+
+.round-table-shot__figure > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.round-table-shot__figure[data-cutout-crop='bust'] > img {
+  position: absolute;
+  left: -75%;
+  top: -18.3%;
+  width: 250%;
+}
+
+.round-table-shot__figure[data-portrait] > img {
+  height: 100%;
+  object-fit: cover;
+  mask-image: radial-gradient(ellipse at 50% 48%, #000 36%, transparent 72%);
 }
 
 .round-table-shot__table {

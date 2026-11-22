@@ -14,7 +14,15 @@ import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { joinPublicAssetPath } from '../../utils/avatar'
 import LookLockInReveal, { LOCK_IN_FRAME_URL, type LockInLook } from './LookLockInReveal'
 import { preloadImage } from '../../utils/preload'
+import {
+  BETRAYALS_LOOKS,
+  betrayalsWardrobe,
+  IS_BETRAYALS_EDITION,
+} from '../../betrayals/betrayalsAppearance'
 import './DressingRoom.css'
+
+const looks = IS_BETRAYALS_EDITION ? BETRAYALS_LOOKS : SELECTABLE_LOOKS
+const figureRole = IS_BETRAYALS_EDITION ? 'formal' : 'casual'
 
 export default function DressingRoom() {
   const navigate = useNavigate()
@@ -32,24 +40,29 @@ export default function DressingRoom() {
   const profile = useAppSelector(selectCurrentProfile)
   const isVip = useAppSelector(selectIsVipActive)
   const atProfileLimit = useAppSelector((state) => state.profiles.profiles.length >= MAX_PROFILES)
-  const canFillCurrentLook = useAppSelector((state) =>
-    Boolean(state.game && canFillInitialSeasonAppearance(state.game))
+  const canFillCurrentLook = useAppSelector(
+    (state) =>
+      !IS_BETRAYALS_EDITION && Boolean(state.game && canFillInitialSeasonAppearance(state.game))
   )
   const profileIdAtOpen = useRef(creatingProfile ? undefined : profile?.id)
   const figureRef = useRef<HTMLImageElement>(null)
   const [lockIn, setLockIn] = useState<LockInLook | null>(null)
   const [marketOption, setMarketOption] = useState<LookMarketOption | null>(null)
+  const savedLookId =
+    !creatingProfile && profile?.appearanceSelection?.kind === 'catalog'
+      ? profile.appearanceSelection.lookId
+      : undefined
   const [selectedId, setSelectedId] = useState(
-    SELECTABLE_LOOKS.some((look) => look.id === routeState?.initialLookId)
+    looks.some((look) => look.id === routeState?.initialLookId)
       ? routeState!.initialLookId!
-      : !creatingProfile && profile?.appearanceSelection?.kind === 'catalog'
-        ? profile.appearanceSelection.lookId
-        : (SELECTABLE_LOOKS[0]?.id ?? '')
+      : (looks.find(({ id }) => id === savedLookId)?.id ?? looks[0]?.id ?? '')
   )
-  const returnTo = routeState?.from === '/' ? '/' : '/game'
+  const returnTo = IS_BETRAYALS_EDITION || routeState?.from === '/' ? '/' : '/game'
   const creationBack = routeState?.fromPlayerAccount ? '/profile/account' : '/'
-  const currentLook = SELECTABLE_LOOKS.find((look) => look.id === selectedId)
-  const isAvailable = hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
+  const currentLook = looks.find((look) => look.id === selectedId)
+  const isAvailable = IS_BETRAYALS_EDITION
+    ? Boolean(currentLook)
+    : hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
   const balance = creatingProfile ? 0 : (profile?.eyeoleans ?? 0)
 
   useEffect(() => {
@@ -73,7 +86,7 @@ export default function DressingRoom() {
   }, [creatingProfile, navigate, profile, returnTo])
 
   useEffect(() => {
-    const look = SELECTABLE_LOOKS.find((candidate) => candidate.id === selectedId)
+    const look = looks.find((candidate) => candidate.id === selectedId)
     if (look) {
       void warmAppearanceRole({ kind: 'catalog', lookId: look.id, revision: look.revision }, 'main')
     }
@@ -83,9 +96,9 @@ export default function DressingRoom() {
 
   function confirmSelection() {
     if ((!creatingProfile && (!profile || profile.id !== profileIdAtOpen.current)) || lockIn) return
-    const look = SELECTABLE_LOOKS.find((candidate) => candidate.id === selectedId)
+    const look = looks.find((candidate) => candidate.id === selectedId)
     if (!look) return
-    if (!hasAppearanceLookAccess(look.id, creatingProfile ? null : profile, isVip)) {
+    if (!isAvailable) {
       setMarketOption('eyeros')
       return
     }
@@ -94,7 +107,7 @@ export default function DressingRoom() {
     const appliesToCurrentSeason =
       canFillCurrentLook &&
       (firstAppearance?.kind !== 'catalog' || firstAppearance.lookId === selection.lookId)
-    const casualAsset = getAppearanceAsset(selection, 'casual')
+    const casualAsset = getAppearanceAsset(selection, figureRole)
     const portraitAsset = getAppearanceAsset(selection, 'main')
     const figure = figureRef.current
     const bounds = figure?.getBoundingClientRect()
@@ -193,8 +206,15 @@ export default function DressingRoom() {
           <span>Changing room</span>
         </div>
         <h1>Choose your look</h1>
-        <p className="dressing-room__subtitle">Your name. Your story. Your style.</p>
+        <p className="dressing-room__subtitle">
+          {IS_BETRAYALS_EDITION
+            ? 'Choose how you’ll appear at the castle.'
+            : 'Your name. Your story. Your style.'}
+        </p>
         <AppearanceCarousel
+          looks={looks}
+          backdrop={IS_BETRAYALS_EDITION ? betrayalsWardrobe : undefined}
+          figureRole={figureRole}
           selectedId={selectedId}
           onSelect={(lookId) => {
             setSelectedId(lookId)
@@ -203,22 +223,25 @@ export default function DressingRoom() {
           onConfirm={isAvailable ? confirmSelection : undefined}
           confirmLabel={creatingProfile ? 'Choose this look' : 'Use this look'}
           accessContent={
-            <LookAccessBadges
-              isFree={isFreeAppearanceLook(selectedId)}
-              isVip={isVip}
-              isOwned={isAvailable}
-              onOpen={(option) => {
-                if (option === 'vip') openVipStore()
-                else setMarketOption('eyeros')
-              }}
-            />
+            !IS_BETRAYALS_EDITION && (
+              <LookAccessBadges
+                isFree={isFreeAppearanceLook(selectedId)}
+                isVip={isVip}
+                isOwned={isAvailable}
+                onOpen={(option) => {
+                  if (option === 'vip') openVipStore()
+                  else setMarketOption('eyeros')
+                }}
+              />
+            )
           }
           figureRef={figureRef}
         />
         {!creatingProfile && (
           <p className="dressing-room__season-note">
-            Your first character replaces the guest silhouette now. Changing an existing character
-            takes effect next season.
+            {IS_BETRAYALS_EDITION
+              ? 'Your look applies when you start your next season.'
+              : 'Your first character replaces the guest silhouette now. Changing an existing character takes effect next season.'}
           </p>
         )}
       </main>

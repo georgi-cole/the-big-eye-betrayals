@@ -4,6 +4,7 @@ import ConfirmExitModal from '../../components/ConfirmExitModal/ConfirmExitModal
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { usePlayerSafety } from '../../safety/usePlayerSafety'
 import { isPlayerSignInConfigured, isPlayerSignInPreview } from '../../services/backend/config'
+import { IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
 import {
   deletePlayerAccount,
   observePlayerAccount,
@@ -160,7 +161,7 @@ export default function PlayerAccount() {
     void navigate('/profile/dressing-room', {
       state: {
         createProfile: true,
-        adoptGuestRun: isGuest && gameInProgress,
+        adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && gameInProgress,
         fromPlayerAccount: true,
         playerAccountId: account?.id,
       },
@@ -173,7 +174,7 @@ export default function PlayerAccount() {
         state: {
           from: entryReturnTo,
           createProfile: true,
-          adoptGuestRun: isGuest && gameInProgress,
+          adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && gameInProgress,
         },
       })
       return
@@ -231,7 +232,11 @@ export default function PlayerAccount() {
           </p>
         )}
         {!configured || !eligible ? (
-          <p>Account sign-in is unavailable. You can play with a local profile or as a guest.</p>
+          <p>
+            {IS_BETRAYALS_EDITION
+              ? 'Account sign-in is unavailable. You can play with a local profile.'
+              : 'Account sign-in is unavailable. You can play with a local profile or as a guest.'}
+          </p>
         ) : account === undefined && !preview ? (
           <p role="status">Checking sign-in…</p>
         ) : account ? (

@@ -22,6 +22,36 @@
   background: #080a10;
 }
 
+.betrayals-brief-exit {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  margin: 0;
+  padding: max(4rem, calc(env(safe-area-inset-top) + 3rem)) 1rem 0;
+  border: 0;
+  color: #f5e5d1;
+  background: transparent;
+  text-align: center;
+}
+
+.betrayals-brief-exit::backdrop {
+  background: #05060850;
+}
+
+.betrayals-brief-exit strong {
+  display: inline-block;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.4rem;
+  background: #151119ec;
+  font:
+    1rem Georgia,
+    serif;
+}
+
 .betrayals-cine__frame {
   position: relative;
   isolation: isolate;
@@ -33,9 +63,18 @@
   background: #0b1015;
 }
 
+.betrayals-cine__shared-exit {
+  position: absolute;
+  inset: 0;
+}
+
+.betrayals-cine[data-scene='departure']:is([data-beat='2'], [data-beat='3'])
+  .betrayals-cine__caption {
+  opacity: 0;
+}
+
 .betrayals-cine__camera,
 .betrayals-cine__backdrop,
-.betrayals-cine__weather,
 .betrayals-cine__grade,
 .betrayals-cine__edge {
   position: absolute;
@@ -54,28 +93,17 @@
   object-position: 50% 46%;
 }
 
-.betrayals-cine[data-scene='round-table'] .betrayals-cine__camera {
-  animation-name: betrayals-cine-table;
-  animation-duration: 3s;
-}
-
-.betrayals-cine[data-scene='departure'] .betrayals-cine__camera,
-.betrayals-cine[data-scene='conclave-arrival'][data-inside='false'] .betrayals-cine__camera {
+.betrayals-cine[data-scene='departure'] .betrayals-cine__camera {
   animation: none;
 }
 
-.betrayals-cine[data-scene='departure'] .betrayals-cine__backdrop,
-.betrayals-cine[data-scene='conclave-arrival'][data-inside='false'] .betrayals-cine__backdrop {
+.betrayals-cine[data-scene='departure'] .betrayals-cine__backdrop {
   object-position: center;
 }
 
-.betrayals-cine:is([data-scene='sunrise'], [data-scene='sunset']) .betrayals-cine__backdrop {
-  object-position: 62% 45%;
-  animation: betrayals-cine-daybreak 1.45s ease-in-out both;
-}
-
 .betrayals-cine[data-scene='sunset'] .betrayals-cine__backdrop {
-  animation-direction: reverse;
+  object-position: 62% 45%;
+  animation: betrayals-cine-daybreak 1.45s ease-in-out reverse both;
 }
 
 .betrayals-cine__grade {
@@ -99,6 +127,216 @@
   display: grid;
   place-items: center;
   container-type: size;
+}
+
+.betrayals-cine[data-scene='round-table'] .betrayals-cine__stage,
+.betrayals-cine[data-reveal='true'] .betrayals-cine__stage,
+.betrayals-cine__stage > .round-table-shot {
+  position: absolute;
+  inset: 0;
+}
+
+.betrayals-cine__reveal-plane {
+  /* Match the centered observatory plate, including its floor under the figure. */
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(100cqw, calc(100cqh * 941 / 1672));
+  aspect-ratio: 941 / 1672;
+  translate: -50% -50%;
+}
+
+.betrayals-cine__reveal-light {
+  position: absolute;
+  inset: 9% 6% 23%;
+  background: radial-gradient(ellipse at 50% 46%, #b8d0e66b, #7a9ca928 38%, transparent 67%);
+  opacity: 0.44;
+  transition: opacity 700ms ease;
+}
+
+.betrayals-cine[data-verdict-beat] .betrayals-cine__reveal-light {
+  opacity: 1;
+}
+
+.betrayals-cine[data-role-revealed='betrayer'] .betrayals-cine__reveal-light {
+  background: radial-gradient(ellipse at 50% 49%, #b34c427e, #8038302b 41%, transparent 67%);
+}
+
+.betrayals-cine__reveal-actor {
+  position: absolute;
+  inset: 18% 16% 33.5%;
+  container-type: size;
+}
+
+.betrayals-cine__reveal-actor::before {
+  position: absolute;
+  inset: auto 34% -1.5% 34%;
+  height: 5.5%;
+  background: radial-gradient(ellipse, #050709f0 6%, #0507098c 44%, transparent 72%);
+  content: '';
+}
+
+.betrayals-cine__reveal-actor img {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter: brightness(0.89) saturate(0.79) drop-shadow(0 0 8px #88b0c244);
+  transition: filter 660ms ease;
+}
+
+.betrayals-cine__reveal-front {
+  translate: 0 5%;
+}
+
+.betrayals-cine[data-verdict-beat] .betrayals-cine__reveal-actor img {
+  filter: brightness(1) saturate(0.86) drop-shadow(0 0 12px #e7bb8580);
+}
+
+.betrayals-cine[data-role-revealed='betrayer'] .betrayals-cine__reveal-actor img {
+  filter: brightness(0.58) saturate(0.75) sepia(0.26) drop-shadow(0 0 20px #dc421391);
+}
+
+.betrayals-cine[data-role-revealed='betrayer'] .betrayals-cine__grade {
+  background:
+    radial-gradient(ellipse at 50% 60%, #c2331848, transparent 55%),
+    radial-gradient(ellipse at 48% 46%, transparent 14%, #0f0304e8 80%);
+  animation: betrayals-hell-light 700ms ease both;
+}
+
+.betrayals-cine__loyal-light,
+.betrayals-cine__embers,
+.betrayals-cine__curtains {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.betrayals-cine__loyal-light {
+  background: radial-gradient(ellipse at 50% 37%, #fff0c983, #ffe9c239 22%, transparent 53%);
+  animation: betrayals-loyal-aura 2.75s ease both;
+}
+
+.betrayals-cine__loyal-wings,
+.betrayals-cine__loyal-halo {
+  position: absolute;
+  left: 50%;
+  width: 79%;
+  translate: -50% 0;
+  filter: drop-shadow(0 0 12px #ffefc97d);
+}
+
+.betrayals-cine__loyal-wings {
+  top: 26%;
+}
+
+.betrayals-cine__loyal-halo {
+  top: 18%;
+  width: 21%;
+}
+
+.betrayals-cine__embers {
+  background:
+    radial-gradient(circle at 24% 64%, #ffb05c 0 1px, transparent 2px),
+    radial-gradient(circle at 66% 59%, #ff693c 0 1px, transparent 2px),
+    radial-gradient(circle at 79% 44%, #ff9d47 0 1px, transparent 2px),
+    radial-gradient(circle at 39% 60%, #ffa553 0 1px, transparent 2px),
+    radial-gradient(ellipse at 50% 78%, #8c1b147a, transparent 52%);
+  animation: betrayals-ember-rise 2.9s ease-out both;
+}
+
+.betrayals-cine__curtains {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  z-index: 2;
+  overflow: hidden;
+  isolation: isolate;
+  transform-origin: center top;
+  animation: betrayals-curtains-fall 970ms 2050ms cubic-bezier(0.53, 0.06, 0.63, 1) both;
+}
+
+.betrayals-cine__curtains::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(0deg, #0c0307, transparent 62%, #07010466),
+    repeating-linear-gradient(94deg, #180709 0%, #4d1a20 8%, #2c0c13 11%, #140508 16%);
+  content: '';
+}
+
+.betrayals-cine__curtains img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.42) sepia(0.28) saturate(1.15);
+}
+
+.betrayals-cine__curtains img:first-child {
+  object-position: left;
+}
+
+.betrayals-cine__curtains img:last-child {
+  scale: -1 1;
+  object-position: left;
+}
+
+.betrayals-cine__reveal-actor[data-unidentified='true'] img {
+  filter: brightness(0.23) saturate(0.2) drop-shadow(0 0 7px #88b0c24f);
+}
+
+.betrayals-cine[data-verdict-beat] .betrayals-cine__caption p {
+  color: #efcb9d;
+  font:
+    clamp(1.2rem, 5.6cqw, 2rem) / 1.25 Georgia,
+    serif;
+}
+
+@keyframes betrayals-loyal-aura {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  24%,
+  61% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes betrayals-hell-light {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes betrayals-ember-rise {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  24%,
+  71% {
+    opacity: 1;
+  }
+  to {
+    translate: 0 -9%;
+  }
+}
+
+@keyframes betrayals-curtains-fall {
+  from {
+    translate: 0 -100%;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+.betrayals-cine[data-role-revealed='betrayer'] .betrayals-cine__caption p {
+  color: #f5a08e;
 }
 
 .betrayals-cine__caption {
@@ -177,67 +415,6 @@
     radial-gradient(ellipse at 50% 62%, #930e271f, transparent 64%),
     linear-gradient(180deg, #0c07166b, transparent 51%, #100911db),
     radial-gradient(ellipse at center, transparent 25%, #08060de0 93%);
-}
-
-/* Keep the figure's foot anchor and its shadow on the same floor mark. */
-.betrayals-cine__meeting {
-  position: absolute;
-  inset: 16% 5% 21%;
-  display: flex;
-  align-items: end;
-  justify-content: center;
-  gap: 2%;
-}
-
-.betrayals-cine__guest {
-  position: relative;
-  flex: 0 1 29%;
-  height: 86%;
-  container-type: size;
-  min-width: 0;
-  margin: 0;
-}
-
-.betrayals-cine__meeting:has(.betrayals-cine__guest:nth-child(4)) .betrayals-cine__guest {
-  flex-basis: 23%;
-}
-
-.betrayals-cine__guest:nth-child(even) {
-  height: 74%;
-  margin-bottom: 5cqh;
-}
-
-.betrayals-cine__guest::before {
-  position: absolute;
-  inset: auto 14% 1% 14%;
-  height: 6%;
-  border-radius: 50%;
-  background: #030608d9;
-  filter: blur(4px);
-  content: '';
-}
-
-.betrayals-cine__guest img {
-  position: absolute;
-  inset: auto auto 0 50%;
-  width: 145%;
-  max-width: none;
-  height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
-  transform: translateX(-50%);
-  filter: saturate(0.78) brightness(0.83) drop-shadow(0 7px 4px #101112bb);
-}
-
-.betrayals-cine__guest figcaption {
-  position: absolute;
-  inset: auto 0 -1.35rem;
-  overflow: hidden;
-  color: var(--cine-gold);
-  font-size: clamp(0.62rem, 2.45cqw, 1rem);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .betrayals-cine__settlement {
@@ -359,42 +536,131 @@
   animation: betrayals-cine-stamp 840ms ease-in-out both;
 }
 
-.betrayals-cine__notice {
-  position: relative;
-  width: min(77cqw, 25rem);
-  min-height: 48%;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 1rem;
-  padding: 1.2rem;
-  transform: rotate(-3deg);
-  box-sizing: border-box;
-  border: 1px solid #ac784e;
-  background: radial-gradient(ellipse at 42% 25%, #e9caa0, #b9946f 87%);
-  box-shadow:
-    0 1.5rem 4rem #000d,
-    inset 0 0 1.7rem #59301b97;
-  color: #40142d;
-  text-align: center;
-  animation: betrayals-cine-letter 700ms ease both;
+.betrayals-hotel__camera {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #100e10;
+  animation: betrayals-hotel-cut 600ms ease-out both;
 }
 
-.betrayals-cine__notice small {
-  font:
-    600 0.75rem/1.2 system-ui,
-    sans-serif;
+.betrayals-hotel__camera .betrayals-cine__backdrop {
+  object-position: center 43%;
+  animation: betrayals-hotel-push 5.8s cubic-bezier(0.22, 0.55, 0.3, 1) both;
+  transform-origin: 50% 44%;
 }
 
-.betrayals-cine__notice strong {
+.betrayals-hotel__camera::after {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, #090a0e 0%, #090a0eca 12%, transparent 35%),
+    linear-gradient(180deg, #0a0b0f6b 0%, transparent 22%);
+  content: '';
+}
+
+.betrayals-hotel__camera[data-shot='1'] .betrayals-cine__backdrop {
+  object-position: 30% 47%;
+  transform-origin: 36% 43%;
+}
+
+.betrayals-hotel__camera[data-shot='2'] .betrayals-cine__backdrop {
+  animation: betrayals-hotel-knock 530ms ease-out both;
+}
+
+.betrayals-hotel__camera:is([data-shot='3'], [data-shot='4']) .betrayals-cine__backdrop {
+  object-position: 50% 42%;
+}
+
+.betrayals-hotel__camera[data-composite] .betrayals-cine__backdrop {
+  object-position: 52% 56%;
+  filter: brightness(0.64) blur(2px);
+}
+
+.betrayals-hotel__reader {
+  position: absolute;
+  left: 51%;
+  bottom: 19%;
+  width: min(104%, 60cqh);
+  aspect-ratio: 24 / 25;
+  transform: translateX(-50%);
+  overflow: hidden;
+  mask-image: linear-gradient(#000 0 73%, transparent 100%);
+  animation: betrayals-hotel-push 5s cubic-bezier(0.22, 0.55, 0.3, 1) both;
+  filter: brightness(0.93) saturate(0.8) drop-shadow(0 0.4rem 1.2rem #080e17b0);
+}
+
+.betrayals-hotel__reader > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.betrayals-hotel__reader[data-crop='bust'] > img {
+  position: absolute;
+  left: -75%;
+  top: -18.3%;
+  width: 250%;
+}
+
+.betrayals-hotel__reader[data-portrait] {
+  width: min(58%, 43cqh);
+  aspect-ratio: 4 / 5;
+  border: 1px solid #b28d6280;
+  border-radius: 48% 48% 18% 18%;
+}
+
+.betrayals-hotel__reader[data-portrait] > img {
+  height: 100%;
+  object-fit: cover;
+}
+
+.betrayals-hotel__camera[data-shot='5'] .betrayals-cine__backdrop {
+  filter: brightness(0.39) saturate(0.55) blur(4px);
+}
+
+.betrayals-cine[data-scene='death-letter']:not([data-beat='5']) .betrayals-cine__caption h2 {
+  font-size: clamp(1.2rem, 4.5cqw, 2.25rem);
+}
+
+.betrayals-cine[data-scene='death-letter'][data-beat='4'] .betrayals-cine__caption p {
+  color: #f8e6cf;
   font:
-    700 clamp(1.4rem, 7cqw, 2.6rem)/1.1 Georgia,
+    clamp(1rem, 3.5cqw, 1.3rem) Georgia,
     serif;
 }
 
-.betrayals-cine__notice i {
-  width: 11%;
-  color: #732845;
+@keyframes betrayals-hotel-cut {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes betrayals-hotel-push {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: 1.06;
+  }
+}
+
+@keyframes betrayals-hotel-knock {
+  0%,
+  34%,
+  56%,
+  100% {
+    translate: 0;
+    scale: 1.035;
+  }
+  22%,
+  45% {
+    translate: 0.4% 0;
+    scale: 1.035;
+  }
 }
 
 .betrayals-cine__horizon {
@@ -410,9 +676,9 @@
   inset: 14% 4% 7%;
   background: radial-gradient(
     ellipse at 50% 47%,
-    #f8c47b8f 2%,
-    #f699696e 15%,
-    #9c547c45 35%,
+    #f8c47b45 2%,
+    #f6996932 15%,
+    #9c547c1a 35%,
     transparent 66%
   );
   animation: betrayals-cine-sunrise 2.55s ease-in-out both;
@@ -422,51 +688,8 @@
   animation-direction: reverse;
 }
 
-.betrayals-cine__horizon i::after {
-  position: absolute;
-  inset: 43% auto auto 34%;
-  width: 6cqw;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #ffddae9c;
-  box-shadow: 0 0 1.2rem 0.3rem #ffc4808f;
-  content: '';
-  filter: blur(1px);
-}
-
 .betrayals-cine[data-scene='sunset'][data-beat='1'] .betrayals-cine__grade {
   background: linear-gradient(#07142692, #06071393 62%, #090a12);
-}
-
-.betrayals-cine[data-scene='sunrise'][data-beat='1'] .betrayals-cine__grade {
-  background: linear-gradient(#f394662b, transparent 50%, #090a12);
-}
-
-.betrayals-cine[data-weather='mist'] .betrayals-cine__weather {
-  inset: 18% -22% -22%;
-  background:
-    radial-gradient(ellipse at 30% 60%, #c4d6e05a, transparent 41%),
-    radial-gradient(ellipse at 68% 49%, #e5d8b84d, transparent 43%);
-  animation: betrayals-cine-mist 6s ease-in-out infinite alternate;
-}
-
-.betrayals-cine:is([data-scene='sunrise'], [data-scene='sunset'])[data-weather='rain']
-  .betrayals-cine__weather {
-  inset: -17%;
-  opacity: 0.27;
-  background:
-    repeating-linear-gradient(103deg, transparent 0 28px, #b5d1e175 29px, transparent 30px 46px),
-    repeating-linear-gradient(101deg, transparent 0 42px, #b8d4e75e 43px, transparent 45px 67px);
-  mask-image: radial-gradient(ellipse at 52% 37%, #000 10%, transparent 74%);
-  animation: betrayals-cine-rain 690ms linear infinite;
-}
-
-.betrayals-cine[data-weather='rain'] .betrayals-cine__horizon {
-  opacity: 0.19;
-}
-
-.betrayals-cine:is([data-weather='mist'], [data-weather='rain']) .betrayals-cine__horizon i::after {
-  opacity: 0.17;
 }
 
 .betrayals-cine__rollcall {
@@ -494,6 +717,16 @@
   filter: brightness(0.37) saturate(0.18);
 }
 
+.betrayals-cine__tile > img,
+.betrayals-cine__verdict-photo > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center calc(var(--betrayals-portrait-focus-y, 0.42) * 100%);
+}
+
 .betrayals-cine__tile[data-awake='true'] {
   filter: none;
   border-color: #a37b57;
@@ -504,10 +737,6 @@
 .betrayals-cine__tile[data-empty='true'] {
   filter: grayscale(1) brightness(0.38);
   border-color: #706252;
-}
-
-.betrayals-cine[data-scene='awakening'] .betrayals-cine__weather {
-  display: none;
 }
 
 .betrayals-cine__rollcall[data-sleeping='true'] .betrayals-cine__tile {
@@ -586,16 +815,6 @@
   text-shadow: 0 2px 15px #000;
 }
 
-.betrayals-cine__ballot-box {
-  align-self: end;
-  width: min(50cqw, 42cqh, 16rem);
-  max-height: 43%;
-  margin-bottom: 9%;
-  object-fit: contain;
-  filter: drop-shadow(0 0.75rem 1rem #000d);
-  animation: betrayals-cine-caption 1.35s 450ms both;
-}
-
 .betrayals-cine__verdict {
   position: relative;
   display: grid;
@@ -616,6 +835,7 @@
 }
 
 .betrayals-cine__verdict-photo {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 0;
@@ -668,115 +888,87 @@
   pointer-events: none;
 }
 
-.betrayals-cine__corridor-plane {
-  position: absolute;
-  z-index: 1;
-  inset: 50% auto auto 50%;
-  /* Match the centered, cover-cropped 720 × 1279 corridor plate. */
-  width: max(100cqw, calc(100cqh * 720 / 1279));
-  aspect-ratio: 720 / 1279;
-  transform: translate(-50%, -50%) scale(var(--corridor-zoom, 1));
+.betrayals-cine[data-handoff] {
+  background: transparent;
+}
+
+.betrayals-cine[data-handoff] .cinematic-skip-button {
+  background: #11121a;
+}
+
+.betrayals-cine[data-handoff]::backdrop,
+.betrayals-cine[data-handoff] .betrayals-cine__frame {
+  animation: betrayals-cine-handoff-clear 590ms ease both;
+}
+
+.betrayals-cine[data-handoff] .betrayals-cine__frame {
   pointer-events: none;
 }
 
-.betrayals-cine[data-angle='door'] {
-  --corridor-zoom: 1.12;
+.betrayals-cine__handoff {
+  position: fixed;
+  pointer-events: none;
+  animation: betrayals-cine-handoff var(--exit-handoff-duration) cubic-bezier(0.5, 0.03, 0.25, 1)
+    both;
 }
 
-.betrayals-cine[data-scene='departure'] .betrayals-cine__camera {
-  transform: scale(var(--corridor-zoom, 1));
-}
-
-.betrayals-cine__departing {
-  position: absolute;
-  left: 46.9%;
-  width: 25%;
-  transform-origin: center bottom;
-  animation: betrayals-cine-walk-to-door var(--walk-time) linear both;
-}
-
-.betrayals-cine__corridor-plane {
-  --walk-time: 2.55s;
-  --close-at: 1.65s;
-  --close-time: 880ms;
-}
-
-.betrayals-cine__corridor-plane[data-repeat='true'] {
-  --walk-time: 1.92s;
-  --close-at: 1.17s;
-  --close-time: 730ms;
-}
-
-.betrayals-cine__corridor-plane[data-repeat='true'] .betrayals-cine__departing {
-  animation-name: betrayals-cine-walk-short;
-}
-
-.betrayals-cine__walk-shadow {
-  position: absolute;
-  inset: auto 28% -1.5%;
-  height: 5%;
-  border-radius: 50%;
-  background: #03090bce;
-  filter: blur(3px);
-}
-
-.betrayals-cine__walker {
-  aspect-ratio: 2 / 3;
-  translate: 0 5.2%;
-  background-image: var(--walk-src);
-  background-size: calc(var(--walk-frames) * 100%) 100%;
-  filter: brightness(0.73) saturate(0.55);
-  animation: betrayals-cine-walk var(--walk-loop) steps(var(--walk-frames)) infinite;
-}
-
-.betrayals-cine__doorway {
-  position: absolute;
-  inset: 24.4% 29% 30.7% 30.4%;
-  clip-path: polygon(
-    0 100%,
-    0 24%,
-    5% 16%,
-    14% 9%,
-    24% 4%,
-    38% 1%,
-    52% 0,
-    68% 3%,
-    81% 9%,
-    92% 16%,
-    99% 25%,
-    100% 100%
-  );
-  perspective: 530px;
-}
-
-.betrayals-cine__door-leaf {
-  position: absolute;
-  inset: 0;
-  border: 3px solid #4b3526;
-  border-right-width: 8px;
-  background:
-    radial-gradient(circle at 18% 54%, #c08b51 0 1%, #573e27 1.8% 3%, transparent 3.5%),
-    radial-gradient(ellipse at 20% 39%, #8c583b33, #0f1513ad 70%),
-    repeating-linear-gradient(90deg, #402b22 0 16%, #160e0b 16.5%, #603e27 17.5%, #4d311f 18%);
-  box-shadow: inset 0 0 1.5rem #050807ee;
-  transform-origin: right center;
-  animation: betrayals-cine-door-close var(--close-time) var(--close-at)
-    cubic-bezier(0.45, 0.1, 0.65, 1) both;
-}
-
-.betrayals-cine__door-leaf::before {
-  position: absolute;
-  inset: 0;
-  background-image: var(--door-grain);
-  background-position: 63% 50%;
-  background-size: 540% 273%;
-  mask-image: radial-gradient(ellipse at 61% 55%, #000 18%, transparent 96%);
-  mix-blend-mode: soft-light;
-  content: '';
-}
-
-.betrayals-cine__corridor-plane[data-closed='true'] .betrayals-cine__door-leaf {
+.betrayals-cine__handoff .betrayals-cine__verdict {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  box-sizing: border-box;
   animation: none;
+}
+
+.betrayals-cine__handoff :is(.betrayals-cine__verdict-photo, .betrayals-cine__verdict-copy) {
+  position: absolute;
+  inset: 0;
+}
+
+.betrayals-cine__handoff .betrayals-cine__verdict-copy {
+  inset-block-start: auto;
+}
+
+.betrayals-cine__handoff :is(.betrayals-cine__verdict-stamp, .betrayals-cine__verdict-copy) {
+  animation: betrayals-cine-handoff-clear 430ms 390ms ease both;
+}
+
+.betrayals-cine__handoff .betrayals-cine__verdict-photo {
+  animation: betrayals-cine-handoff-photo var(--exit-handoff-duration) ease-out both;
+}
+
+@keyframes betrayals-cine-handoff-photo {
+  from {
+    bottom: var(--exit-caption-height);
+  }
+  to {
+    bottom: 0;
+    filter: grayscale(0.8) brightness(0.61) contrast(0.97);
+  }
+}
+
+@keyframes betrayals-cine-handoff-clear {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes betrayals-cine-handoff {
+  from {
+    inset: var(--exit-from-y) auto auto var(--exit-from-x);
+    width: var(--exit-from-w);
+    height: var(--exit-from-h);
+  }
+  84% {
+    opacity: 1;
+  }
+  to {
+    inset: var(--exit-to-y) auto auto var(--exit-to-x);
+    width: var(--exit-to-w);
+    height: var(--exit-to-h);
+    opacity: 0;
+  }
 }
 
 .betrayals-cine[data-reduced='true'] *,
@@ -819,15 +1011,6 @@
   }
   to {
     transform: scale(1.13) translateY(1.7%);
-  }
-}
-
-@keyframes betrayals-cine-table {
-  from {
-    transform: scale(1.18) translate(4%, 4%);
-  }
-  to {
-    transform: scale(1.04) translate(0, -2%);
   }
 }
 
@@ -891,24 +1074,6 @@
   }
 }
 
-@keyframes betrayals-cine-mist {
-  from {
-    transform: translateX(-8%);
-  }
-  to {
-    transform: translateX(9%);
-  }
-}
-
-@keyframes betrayals-cine-rain {
-  from {
-    transform: translate(0, -27%);
-  }
-  to {
-    transform: translate(-3.5%, 20%);
-  }
-}
-
 @keyframes betrayals-cine-wake {
   from {
     border-color: #3b3438;
@@ -954,53 +1119,4 @@
     opacity: 1;
     scale: 1;
   }
-}
-
-@keyframes betrayals-cine-walk-to-door {
-  0% {
-    top: 75.5%;
-    transform: translate(-50%, -100%) scale(1);
-  }
-  35% {
-    top: 68.3%;
-    transform: translate(-50%, -100%) scale(0.73);
-  }
-  70% {
-    top: 60%;
-    transform: translate(-50%, -100%) scale(0.45);
-  }
-  100% {
-    top: 55.8%;
-    transform: translate(-50%, -100%) scale(0.3);
-  }
-}
-
-@keyframes betrayals-cine-walk-short {
-  0% {
-    top: 70%;
-    transform: translate(-50%, -100%) scale(0.8);
-  }
-  100% {
-    top: 55.8%;
-    transform: translate(-50%, -100%) scale(0.3);
-  }
-}
-
-@keyframes betrayals-cine-walk {
-  to {
-    background-position: calc(var(--walk-frames) * 100% / (var(--walk-frames) - 1)) 0;
-  }
-}
-
-@keyframes betrayals-cine-door-close {
-  from {
-    transform: rotateY(90deg);
-  }
-  to {
-    transform: rotateY(0deg);
-  }
-}
-
-.betrayals-cine__corridor-plane[data-empty='true'] {
-  --close-at: 220ms;
 }

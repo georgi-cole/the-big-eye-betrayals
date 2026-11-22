@@ -9,6 +9,7 @@ import {
 } from './run.ts'
 import type { Run, Seat } from './run.ts'
 import { initializeSocialWallets } from './socialResources.ts'
+import { validSeasonCheckpoint, type SeasonRewards } from './seasonRewards.ts'
 
 const SAVE_PREFIX = 'big-eye:betrayals:season:'
 
@@ -95,6 +96,45 @@ function validTableCount(value: unknown, ids: Set<string>): boolean {
   return true
 }
 
+function validConclaveVotes(value: unknown, ids: Set<string>, betrayers: ReadonlySet<string>) {
+  if (!Array.isArray(value) || value.length > betrayers.size) return false
+  const voters = new Set<string>()
+  for (const ballot of value) {
+    const row = asObject(ballot)
+    if (
+      !row ||
+      typeof row.voterId !== 'string' ||
+      !betrayers.has(row.voterId) ||
+      voters.has(row.voterId) ||
+      typeof row.targetId !== 'string' ||
+      !ids.has(row.targetId) ||
+      betrayers.has(row.targetId)
+    )
+      return false
+    voters.add(row.voterId)
+  }
+  return true
+}
+
+function validConclaveVote(
+  value: unknown,
+  phase: unknown,
+  ids: Set<string>,
+  betrayerIds: string[]
+) {
+  if (value === undefined) return true
+  if (phase !== 'night' && phase !== 'night-resolved') return false
+  const vote = asObject(value)
+  const betrayers = new Set(betrayerIds)
+  return Boolean(
+    vote &&
+    validConclaveVotes(vote.nominations, ids, betrayers) &&
+    (phase === 'night'
+      ? vote.runoff === undefined && (vote.nominations as unknown[]).length >= 2
+      : vote.runoff === undefined || validConclaveVotes(vote.runoff, ids, betrayers))
+  )
+}
+
 function validSafetyStandings(value: unknown, ids: Set<string>, day: number): boolean {
   if (value === undefined) return true
   const standings = asObject(value)
@@ -165,7 +205,9 @@ function validShieldConversations(entries: unknown[], ids: Set<string>, day: num
         (entry.declinedIds === undefined || validIds(entry.declinedIds, ids, 0, 5))
       )
     }
-    if (!entry || !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
+    if (!entry) return true
+    const isFollowUp = entry.kind === 'shield-request' || entry.kind === 'shield-plans'
+    if (!isFollowUp && !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
     if (
       typeof entry.day !== 'number' ||
       !Number.isSafeInteger(entry.day) ||
@@ -174,6 +216,18 @@ function validShieldConversations(entries: unknown[], ids: Set<string>, day: num
       !validIds([entry.actorId, entry.recipientId], ids, 2, 2)
     )
       return false
+    if (isFollowUp) {
+      return (
+        entry.shieldReply === undefined &&
+        entry.suspectId === undefined &&
+        (entry.kind === 'shield-request'
+          ? typeof entry.accepted === 'boolean' && entry.shieldPlan === undefined
+          : entry.accepted === undefined &&
+            (entry.shieldPlan === 'keep' ||
+              entry.shieldPlan === 'open-to-gift' ||
+              entry.shieldPlan === 'private'))
+      )
+    }
     if (entry.kind === 'shield-tip') {
       return (
         validIds([entry.actorId, entry.recipientId, entry.suspectId], ids, 3, 3) &&
@@ -322,6 +376,7 @@ function isRun(value: unknown): value is Run {
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
     hidden &&
     validIds(hidden.betrayers, ids, 3, 4) &&
+    validConclaveVote(hidden.conclaveVote, item.phase, ids, hidden.betrayers as string[]) &&
     (hidden.hiddenBetrayerIds === undefined ||
       validIds(hidden.hiddenBetrayerIds, new Set(hidden.betrayers as string[]), 0, 4)) &&
     validIds(hidden.nightShieldIds, ids, 0, 2, false) &&
@@ -394,6 +449,7 @@ function isRun(value: unknown): value is Run {
       ? pendingNight &&
         typeof pendingNight.blocked === 'boolean' &&
         (pendingNight.byDraw === undefined || typeof pendingNight.byDraw === 'boolean') &&
+        (pendingNight.filmPlayed === undefined || typeof pendingNight.filmPlayed === 'boolean') &&
         (pendingNight.targetId === null ||
           (typeof pendingNight.targetId === 'string' && ids.has(pendingNight.targetId)))
       : hidden.pendingNight === undefined) &&
@@ -414,6 +470,27 @@ export function saveRun(storage: StorageAdapter, profileId: string, run: Run): v
   storage.setItem(SAVE_PREFIX + profileId, JSON.stringify(run))
 }
 
+function restoreSeasonRewards(run: Run): SeasonRewards | undefined {
+  const saved = asObject(run.seasonRewards)
+  if (!saved) return
+  function restoreCheckpoint(type: 'day' | 'table') {
+    const candidate = saved?.[type]
+    if (
+      isRun(candidate) &&
+      candidate.seasonRewards === undefined &&
+      candidate.presentation === undefined &&
+      validSeasonCheckpoint(candidate, run, type)
+    ) {
+      return candidate
+    }
+  }
+  return {
+    day: restoreCheckpoint('day'),
+    table: restoreCheckpoint('table'),
+    finaleRevealed: run.phase === 'settled' && saved.finaleRevealed === true,
+  }
+}
+
 export function restoreRun(storage: StorageAdapter, profileId: string): Restore {
   let value: string | null
   try {
@@ -425,16 +502,15 @@ export function restoreRun(storage: StorageAdapter, profileId: string): Restore 
   try {
     const candidate: unknown = JSON.parse(value)
     if (!isRun(candidate)) return { status: 'incompatible' }
-    if (candidate.socialWallets) return { status: 'ready', run: candidate }
+    const seasonRewards = restoreSeasonRewards(candidate)
     return {
       status: 'ready',
       run: {
         ...candidate,
-        socialWallets: initializeSocialWallets(
-          candidate.seats,
-          candidate.day,
-          candidate.options.realityMode
-        ),
+        ...(candidate.seasonRewards !== undefined ? { seasonRewards } : {}),
+        socialWallets:
+          candidate.socialWallets ??
+          initializeSocialWallets(candidate.seats, candidate.day, candidate.options.realityMode),
       },
     }
   } catch {

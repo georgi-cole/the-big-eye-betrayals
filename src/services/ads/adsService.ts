@@ -39,6 +39,8 @@ export type AdPlacement =
   | 'big_spender_rescue'
   | 'survival_continue'
   | 'aftermath_unlock'
+  | 'betrayals_rewind'
+  | 'betrayals_reveal_roles'
 
 export const INTERSTITIAL_PLACEMENTS = new Set<AdPlacement>([
   'live_vote_auto',

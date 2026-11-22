@@ -44,6 +44,11 @@ store listings or change configured prices.
 
 ## Review log
 
+- 2026-11-22: Betrayals adds optional rewarded ads for a season rewind and the
+  finale role reveal. Its Home and Profile presentation, ceremony assets, and
+  Deck of Darkness difficulty have been reviewed. Prices, paid entitlements,
+  and marketplace offers are unchanged.
+
 - 2026-11-22: Betrayals includes The Last Light, Rock, Paper, Scissors, and
   Risk Wheel: Abyss with edition-owned presentation and artwork. Reviewed
   the Deck of Light memory recalibration and confirmed the existing Quick

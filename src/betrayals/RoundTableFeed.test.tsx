@@ -48,11 +48,12 @@ describe('Round Table broadcast', () => {
     expect(within(chat).getAllByRole('article')).toHaveLength(4)
     const candidate = run.seats[1]
     fireEvent.click(screen.getByRole('button', { name: 'Take the floor' }))
+    expect(screen.queryByRole('button', { name: 'Ask for a reason' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: candidate.name }))
-    expect(screen.getByRole('button', { name: candidate.name })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    const change = screen.getByRole('button', { name: 'Choose another guest' })
+    expect(change).toHaveFocus()
+    fireEvent.click(change)
+    fireEvent.click(screen.getByRole('button', { name: candidate.name }))
     fireEvent.click(screen.getByRole('button', { name: 'Ask for a reason' }))
     expect(onSway).toHaveBeenLastCalledWith({
       targetId: candidate.id,

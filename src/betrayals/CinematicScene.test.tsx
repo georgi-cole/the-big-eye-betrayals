@@ -1,8 +1,19 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { BETRAYALS_AI_POOL } from './cast'
 import { CinematicScene } from './CinematicScene'
+import { cinematicFor, presentationAfter } from './presentation'
+import { startRun } from './run'
 
-const known = { id: 'ash', name: 'Ash', portrait: '/ash.webp' }
+vi.mock('./BanishmentExitFilm', () => ({
+  BanishmentExitFilm: ({ castId, onComplete }: { castId: string; onComplete: () => void }) => (
+    <button type="button" data-cast={castId} onClick={onComplete}>
+      Finish shared exit
+    </button>
+  ),
+}))
+
+const known = { id: 'ash', name: 'Ash', portrait: '/assets/skins/Ash_avatar.webp' }
 const hidden = { id: 'alien', name: 'Hidden identity', portrait: '/hidden.webp', concealed: true }
 
 describe('Betrayals cinematic scenes', () => {
@@ -13,22 +24,96 @@ describe('Betrayals cinematic scenes', () => {
     const onComplete = vi.fn()
     const { container } = render(
       <CinematicScene
-        scene={{ id: 'conclave', kind: 'conclave-arrival', cast: [known, hidden] }}
+        scene={{
+          id: 'conclave',
+          kind: 'conclave-arrival',
+          conclaveOpening: true,
+          cast: [known, hidden],
+        }}
         onComplete={onComplete}
       />
     )
     expect(screen.queryByText(known.name)).not.toBeInTheDocument()
-    act(() => vi.advanceTimersByTime(680))
+    const camera = container.querySelector('.conclave-film__canvas')
+    expect(container.querySelector('[data-group="2"]')).toHaveAttribute('data-entering', 'true')
+    act(() => vi.advanceTimersByTime(3450))
+    expect(container.querySelector('[data-group="2"]')).not.toHaveAttribute('data-entering')
+    act(() => vi.advanceTimersByTime(970))
+    expect(screen.getByText('The hoods come down')).toBeInTheDocument()
+    expect(container.querySelector('[data-group="2"]')).toHaveAttribute('data-focus', known.id)
+    expect(container.querySelector('.conclave-film__canvas')).toBe(camera)
+    act(() => vi.advanceTimersByTime(1980))
     expect(screen.getByText(known.name)).toBeInTheDocument()
-    expect(container.querySelector('.betrayals-cine__guest img')).toHaveAttribute(
-      'src',
-      expect.stringContaining('Ash_informal.webp')
-    )
+    expect(container.querySelector('.conclave-film__canvas')).toBe(camera)
     expect(screen.queryByText(hidden.name)).not.toBeInTheDocument()
     expect(container.querySelector(`[src="${hidden.portrait}"]`)).not.toBeInTheDocument()
     expect(onComplete).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1120))
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     expect(onComplete).toHaveBeenCalledOnce()
+  })
+
+  it('opens later conclaves with the current guests already unmasked', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <CinematicScene
+        scene={{
+          id: 'later-conclave',
+          kind: 'conclave-arrival',
+          conclaveOpening: false,
+          cast: [known, { id: 'finn', name: 'Finn' }, { id: 'rune', name: 'Rune' }],
+        }}
+        onComplete={vi.fn()}
+      />
+    )
+    expect(container.querySelector('[data-group="3"]')).not.toHaveAttribute('data-entering')
+    act(() => vi.advanceTimersByTime(1800))
+    expect(screen.getByText('Ash · Finn · Rune')).toBeVisible()
+  })
+
+  it('queues every night’s conclave for active Betrayers and omits secret and banished identities', () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'conclave-replay', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, ash, hidden, banished, loyal] = run.seats
+    const before = {
+      ...run,
+      day: 2,
+      phase: 'table-reveal' as const,
+      private: {
+        ...run.private,
+        betrayers: [run.humanId, ash.id, hidden.id, banished.id],
+        hiddenBetrayerIds: [hidden.id],
+      },
+    }
+    const night = {
+      ...before,
+      phase: 'night' as const,
+      seats: run.seats.map((seat) =>
+        seat.id === banished.id ? { ...seat, exit: { cause: 'banished' as const, day: 2 } } : seat
+      ),
+    }
+    expect(presentationAfter(before, night)).toEqual(['departure', 'conclave-arrival'])
+    expect(presentationAfter(before, night, false)).toEqual(['departure'])
+    expect(
+      presentationAfter({ ...before, humanId: loyal.id }, { ...night, humanId: loyal.id })
+    ).toEqual(['departure'])
+    const scene = cinematicFor(night, 'conclave-arrival', night.humanId, '')
+    expect(scene.conclaveOpening).toBe(false)
+    expect(scene.cast?.filter(({ concealed }) => !concealed).map(({ id }) => id)).toEqual([
+      night.humanId,
+      ash.id,
+    ])
+    expect(scene.cast?.find(({ concealed }) => concealed)).toEqual({
+      id: expect.stringMatching(/^hooded-/),
+      name: 'Hooded guest',
+      concealed: true,
+    })
+    expect(cinematicFor(night, 'conclave-arrival', loyal.id, '').cast).toEqual([])
+    expect(cinematicFor(night, 'conclave-arrival', banished.id, '').cast).toEqual([])
   })
 
   it('keeps a concealed shield recipient absent even when the animation is reduced', () => {
@@ -50,7 +135,12 @@ describe('Betrayals cinematic scenes', () => {
         scene={{
           id: 'wake',
           kind: 'awakening',
-          cast: [known, { id: 'finn', name: 'Finn' }],
+          cast: [
+            known,
+            { id: 'finn', name: 'Finn' },
+            { id: 'nova', name: 'Nova', portrait: '/assets/skins/Nova_avatar.webp' },
+            { id: 'human', name: 'Player', portrait: '/custom-portrait.webp' },
+          ],
           darkSeatId: 'finn',
         }}
         reducedMotion
@@ -59,38 +149,47 @@ describe('Betrayals cinematic scenes', () => {
     )
     const roster = within(screen.getByRole('list', { name: 'Morning roll call' }))
     expect(roster.getByText('Ash').closest('li')).toHaveAttribute('data-awake', 'true')
+    expect(
+      roster.getByText('Ash').closest('li')?.querySelector('.betrayals-sleep-mask img')
+    ).toHaveAttribute('src', expect.stringContaining('assets/betrayals/sleep-mask.webp'))
+    const mask = (name: string) =>
+      roster.getByText(name).closest('li')?.querySelector<HTMLElement>('.betrayals-sleep-mask')
+    expect(mask('Ash')?.style.getPropertyValue('--sleep-eye-y')).toBe('0.33')
+    expect(mask('Nova')?.style.getPropertyValue('--sleep-eye-y')).toBe('0.365')
+    expect(mask('Player')).toHaveAttribute('data-symbolic', 'true')
     expect(roster.getByText('Finn').closest('li')).toHaveAttribute('data-awake', 'false')
     expect(
-      roster.getByText('Finn').closest('li')?.querySelector('.betrayals-sleep-mask')
+      roster.getByText('Finn').closest('li')?.querySelector('.betrayals-cine__dark-mark')
     ).toBeInTheDocument()
   })
 
-  it.each([
-    ['elimination', 'Murdered'],
-    ['departure', 'Evicted'],
-  ] as const)('uses the correct verdict stamp for %s with reduced motion', (kind, name) => {
-    const { container } = render(
-      <CinematicScene
-        scene={{ id: kind, kind, subject: known }}
-        reducedMotion
-        onComplete={vi.fn()}
-      />
-    )
-    expect(screen.getByRole('img', { name })).toHaveAttribute(
-      'src',
-      expect.stringContaining('verdict-' + name.toLowerCase() + '.png')
-    )
-    expect(container.querySelector('[src*="cracked_glass"]')).not.toBeInTheDocument()
-  })
+  it.each(['elimination', 'death-letter'] as const)(
+    'shows the murder verdict for %s with reduced motion',
+    (kind) => {
+      render(
+        <CinematicScene
+          scene={{ id: kind, kind, subject: known }}
+          reducedMotion
+          onComplete={vi.fn()}
+        />
+      )
+      expect(screen.getByRole('img', { name: 'Murdered' })).toHaveAttribute(
+        'src',
+        expect.stringContaining('verdict-murdered.png')
+      )
+    }
+  )
 
-  it('walks backstage in the saved casual look and then closes the door', () => {
+  it('holds the full figure and role before handing off to the shared exit film', () => {
     vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const playEffect = vi.fn()
     const { container } = render(
       <CinematicScene
         scene={{
           id: 'exit',
           kind: 'departure',
-          angle: 'door',
+          role: 'Betrayer',
           subject: {
             id: 'human',
             human: true,
@@ -98,22 +197,138 @@ describe('Betrayals cinematic scenes', () => {
             portrait: '/assets/player_characters/character%2015/main.webp',
           },
         }}
+        onComplete={onComplete}
+        playEffect={playEffect}
+      />
+    )
+    expect(container.querySelector('.betrayals-cine__reveal-actor img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('character-15/ceremony-front.webp')
+    )
+    expect(screen.getByText(/Now that my game is over/)).toBeVisible()
+    expect(screen.queryByText(/I was a/)).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(2100))
+    expect(screen.getByText(/I was a Betrayer/)).toBeVisible()
+    expect(container.querySelectorAll('.betrayals-cine__curtains img')).toHaveLength(2)
+    expect(playEffect).toHaveBeenCalledWith('tv:betrayer_laugh', 0.72)
+    act(() => vi.advanceTimersByTime(3099))
+    expect(container.querySelector('.betrayals-cine__reveal-actor img')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(1))
+    const film = screen.getByRole('button', { name: 'Finish shared exit' })
+    expect(film).toHaveAttribute('data-cast', 'character-15')
+    expect(screen.getByRole('button', { name: 'Skip cinematic' })).toBeVisible()
+    fireEvent.click(film)
+    expect(screen.getByText('The Big Eye')).toBeInTheDocument()
+    expect(container.querySelector('.banishment-ident__envelope')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(3350))
+    expect(onComplete).toHaveBeenCalledWith('played')
+  })
+
+  it('lights the Loyal reveal with wings and a separate sound cue', () => {
+    vi.useFakeTimers()
+    const playEffect = vi.fn()
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: 'loyal-exit', kind: 'departure', role: 'Loyal', subject: known }}
+        playEffect={playEffect}
         onComplete={vi.fn()}
       />
     )
-    act(() => vi.advanceTimersByTime(670))
-    act(() => vi.advanceTimersByTime(740))
-    expect(container.querySelector('[data-walk="character-15"]')).toBeInTheDocument()
-    expect(container.querySelector('.betrayals-cine__corridor-plane')).toHaveAttribute(
-      'data-closed',
-      'false'
+    expect(container.querySelector('.betrayals-cine__loyal-light')).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(2100))
+    expect(container.querySelector('.betrayals-cine__loyal-wings')).toBeInTheDocument()
+    expect(container.querySelector('.betrayals-cine__loyal-halo')).toBeInTheDocument()
+    expect(playEffect).toHaveBeenCalledWith('tv:loyal_light', 0.72)
+    act(() => vi.advanceTimersByTime(3100))
+    expect(container.querySelector('.betrayals-cine__loyal-light')).not.toBeInTheDocument()
+  })
+
+  it('plays the hotel shots, opens the letter, then stamps the victim’s portrait', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const seat = document.createElement('button')
+    vi.spyOn(seat, 'getBoundingClientRect').mockReturnValue(new DOMRect(16, 400, 67, 77))
+    const { container } = render(
+      <CinematicScene
+        scene={{
+          id: 'hotel',
+          kind: 'death-letter',
+          subject: known,
+          nightRoom: { sky: 'storm', silhouette: 'broad' },
+        }}
+        onComplete={onComplete}
+        getRosterSeat={() => seat}
+      />
     )
-    act(() => vi.advanceTimersByTime(2550))
-    expect(container.querySelector('.betrayals-cine__corridor-plane')).toHaveAttribute(
-      'data-closed',
-      'true'
+    const backdrop = () => container.querySelector('.betrayals-cine__backdrop')
+    expect(backdrop()).toHaveAttribute('src', expect.stringContaining('hotel-night/arrival.webp'))
+    act(() => vi.advanceTimersByTime(2200))
+    expect(backdrop()).toHaveAttribute(
+      'src',
+      expect.stringContaining('hotel-night/asleep-broad-storm.webp')
     )
-    expect(container.querySelector('[data-walk]')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Asleep inside' })).toBeVisible()
+    expect(screen.queryByText(/Ash/)).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(2450))
+    expect(backdrop()).toHaveAttribute('src', expect.stringContaining('hotel-night/executor.webp'))
+    act(() => vi.advanceTimersByTime(2650))
+    expect(backdrop()).toHaveAttribute(
+      'src',
+      expect.stringContaining('hotel-night/ash-sealed.webp')
+    )
+    act(() => vi.advanceTimersByTime(3600))
+    expect(screen.getByText('Ash has been murdered.')).toBeVisible()
+    expect(backdrop()).toHaveAttribute('src', expect.stringContaining('hotel-night/ash-open.webp'))
+    act(() => vi.advanceTimersByTime(5000))
+    expect(screen.getByRole('img', { name: 'Murdered' })).toBeVisible()
+    expect(onComplete).not.toHaveBeenCalled()
+    vi.spyOn(
+      container.querySelector('.betrayals-cine__verdict')!,
+      'getBoundingClientRect'
+    ).mockReturnValue(new DOMRect(80, 230, 180, 210))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(container.querySelector('.betrayals-cine__handoff')).toHaveStyle('--exit-to-y: 400px')
+    act(() => vi.advanceTimersByTime(1100))
+    expect(onComplete).toHaveBeenCalledExactlyOnceWith('played')
+  })
+
+  it('cycles through six night skies and keeps the bedroom anonymous across dawn', () => {
+    const season = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'hotel-skies', roleSeed: 32, publicSeed: 12 }
+    )
+    const days = Array.from({ length: 12 }, (_, index) => index + 1)
+    const rooms = days.map((day) => {
+      const night = { ...season, day, phase: 'night-resolved' as const }
+      const dawn = {
+        ...night,
+        day: day + 1,
+        phase: 'dawn' as const,
+        lastDawn: { day: day + 1, eliminatedId: season.seats[1].id },
+      }
+      const sleeping = cinematicFor(night, 'death-letter', null, '')
+      const recalled = cinematicFor(dawn, 'death-letter', null, '')
+      expect(sleeping.subject?.id).not.toBe(recalled.subject?.id)
+      expect(sleeping.nightRoom).toEqual(recalled.nightRoom)
+      return sleeping.nightRoom!
+    })
+    expect(new Set(rooms.map(({ sky }) => sky)).size).toBe(6)
+    expect(new Set(rooms.map(({ sky, silhouette }) => sky + ':' + silhouette)).size).toBe(12)
+  })
+
+  it('reports an interrupted hotel film as skipped', () => {
+    const onComplete = vi.fn()
+    render(
+      <CinematicScene
+        scene={{ id: 'skip-hotel', kind: 'death-letter', subject: known }}
+        onComplete={onComplete}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Skip cinematic' }))
+    expect(onComplete).toHaveBeenCalledExactlyOnceWith('skipped')
   })
 
   it('hands off an intermediate scene once after its final beat', () => {

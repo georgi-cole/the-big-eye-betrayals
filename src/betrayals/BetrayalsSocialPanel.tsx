@@ -380,6 +380,14 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
       return outgoing
         ? `${person} told you they have ${entry.shieldReply === 'has' ? 'a' : 'no'} Night Shield.`
         : `You told ${person} you have ${entry.shieldReply === 'has' ? 'a' : 'no'} Night Shield.`
+    case 'shield-request':
+      return entry.accepted
+        ? `${person} accepted your request and gave you a Night Shield.`
+        : `${person} declined your request for a Night Shield.`
+    case 'shield-plans':
+      if (entry.shieldPlan === 'keep') return `${person} plans to keep the Night Shield.`
+      if (entry.shieldPlan === 'open-to-gift') return `${person} might give the Night Shield away.`
+      return `${person} kept their shield plans private.`
     case 'shield-tip': {
       const claim = `${subject} might ${entry.shieldReply === 'has' ? 'have' : 'be without'} a Night Shield.`
       return outgoing ? `You told ${person} that ${claim}` : `${person} told you that ${claim}`
@@ -713,9 +721,10 @@ export function BetrayalsSocialPanel({
         <div
           id="betrayals-social-body"
           className={'sp2-body' + (peer && canAct ? ' sp2-body--focused-target' : '')}
+          data-can-act={canAct || undefined}
         >
           {!peer && contacts.length > 0 && (
-            <section className="sp2-hubmates" aria-label="Player roster">
+            <section className="sp2-hubmates betrayals-social-roster" aria-label="Player roster">
               <div className="sp2-section-heading">
                 <span className="sp2-section-heading__title">Choose a guest</span>
               </div>

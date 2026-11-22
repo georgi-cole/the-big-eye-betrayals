@@ -9,16 +9,20 @@ import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 
 type ConclaveProposal = {
+  speakerId: string
   speakerName: string
   portrait?: string
   nomineeName: string
   argument: string
 }
 
+export type ConclaveLine = Omit<ConclaveProposal, 'nomineeName'> & { nomineeName?: string }
+
 export type ConclaveView = {
   targetIds: string[]
   proposals: ConclaveProposal[]
-  shieldBriefing?: { speakerName: string; portrait?: string; argument: string }[]
+  shieldBriefing?: ConclaveLine[]
+  runoff?: string
   ownArgument?: string
 }
 
@@ -63,6 +67,42 @@ function majorityTarget(tally: ReadonlyMap<string, number>, ballotCount: number)
   return [...tally].find(([, count]) => count > ballotCount / 2)?.[0]
 }
 
+function leadingTargets(tally: ReadonlyMap<string, number>) {
+  const highest = Math.max(...tally.values())
+  return [...tally].filter(([, count]) => count === highest).map(([id]) => id)
+}
+
+function countVotes(ballots: readonly Ballot[]) {
+  const tally = new Map<string, number>()
+  for (const { targetId } of ballots) tally.set(targetId, (tally.get(targetId) ?? 0) + 1)
+  return tally
+}
+
+function ballotLine(run: Run, ballots: readonly Ballot[]) {
+  return [...countVotes(ballots)]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id, count]) => `${run.seats.find((seat) => seat.id === id)?.name ?? 'Guest'} ${count}`)
+    .join(' · ')
+}
+
+function runoffTargets(nominations: readonly Ballot[]) {
+  const tally = countVotes(nominations)
+  const leaders = leadingTargets(tally)
+  return leaders.length > 1 ? leaders : [...tally.keys()]
+}
+
+export function conclaveGuests(run: Run, actorId: string | null) {
+  if (!actorId || !isActiveBetrayer(run, actorId)) return []
+  const known = new Set([actorId, ...knownTeammateIds(run, actorId)])
+  return run.seats
+    .filter(({ id, exit }) => !exit && run.private.betrayers.includes(id))
+    .map(({ id, name, portrait }, index) =>
+      known.has(id)
+        ? { id, name, portrait, human: id === run.humanId }
+        : { id: 'hooded-' + index, name: 'Hooded guest', concealed: true }
+    )
+}
+
 export function resolveNight(
   run: Run,
   token: CommandToken,
@@ -74,10 +114,11 @@ export function resolveNight(
   const nominated = choices === nominations ? tally : tallyNightBallots(run, nominations)
   if (!tally || !nominated || [...tally.keys()].some((id) => !nominated.has(id))) return run
 
-  const majority = majorityTarget(tally, choices.length)
-  const fallback = [...nominated.keys()].sort()
-  const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 1229))
-  const targetId = majority ?? (fallback.length ? seededPick(random, fallback) : null)
+  const leaders = leadingTargets(tally)
+  const byDraw = leaders.length > 1
+  const targetId = byDraw
+    ? seededPick(mulberry32(run.publicSeed ^ Math.imul(run.day, 1229)), leaders.sort())
+    : (leaders[0] ?? null)
   return {
     ...run,
     revision: run.revision + 1,
@@ -87,7 +128,7 @@ export function resolveNight(
       pendingNight: {
         targetId,
         blocked: Boolean(targetId && run.private.nightShieldIds.includes(targetId)),
-        byDraw: !majority && Boolean(targetId),
+        byDraw,
       },
     },
   }
@@ -222,7 +263,23 @@ export function getConclaveView(
 
   const known = new Set(knownTeammateIds(run, actorId))
   const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
-  const targetIds = projectedTargets(run, actorId, known)
+  const vote = run.private.conclaveVote
+  const targetIds = vote ? runoffTargets(vote.nominations) : projectedTargets(run, actorId, known)
+  if (vote) {
+    const unchanged = (id: string) => vote.nominations.find((ballot) => ballot.voterId === id)
+    return {
+      targetIds,
+      proposals: [],
+      runoff: ballotLine(run, vote.nominations),
+      ownArgument:
+        selectedId === unchanged(actorId)?.targetId ? 'You are keeping your vote.' : undefined,
+    }
+  }
+  const guests = conclaveGuests(run, actorId)
+  const participants = run.seats.filter(
+    ({ id, exit }) => !exit && run.private.betrayers.includes(id)
+  )
+  const speakerIdFor = (id: string) => guests[participants.findIndex((seat) => seat.id === id)].id
   const briefing = discussShields(run)
   const proposals = nominate(run, briefing).flatMap(({ voterId, targetId }) => {
     if (voterId === actorId) return []
@@ -231,6 +288,7 @@ export function getConclaveView(
     if (!nominee) return []
     return [
       {
+        speakerId: speakerIdFor(voterId),
         speakerName: speaker?.name ?? 'Hooded voice',
         portrait: speaker?.portrait,
         nomineeName: nominee.name,
@@ -256,7 +314,14 @@ export function getConclaveView(
         : read.firsthand
           ? `${subject} says they have no shield. They could be trying to draw us in.`
           : `I heard ${subject} might be open tonight. I wouldn't take a rumor as proof.`
-    return [{ speakerName: speaker?.name ?? 'Hooded voice', portrait: speaker?.portrait, argument }]
+    return [
+      {
+        speakerId: speakerIdFor(speakerId),
+        speakerName: speaker?.name ?? 'Hooded voice',
+        portrait: speaker?.portrait,
+        argument,
+      },
+    ]
   })
   return { targetIds, proposals, ownArgument, shieldBriefing }
 }
@@ -267,9 +332,46 @@ export function getConclaveVerdict(run: Run, actorId: string | null) {
   return pending ? { targetId: pending.targetId, byDraw: pending.byDraw } : null
 }
 
+export function describeConclaveVerdict(run: Run, actorId: string | null) {
+  const verdict = getConclaveVerdict(run, actorId)
+  if (!verdict) return
+  if (!verdict.targetId) return 'The Conclave chose no one.'
+  const name = run.seats.find(({ id }) => id === verdict.targetId)?.name ?? 'A guest'
+  const vote = run.private.conclaveVote
+  const finalBallots = vote?.runoff ?? vote?.nominations
+  const tally =
+    finalBallots && `${vote?.runoff ? 'Runoff' : 'Ballot'}: ${ballotLine(run, finalBallots)}.`
+  const changes = vote?.runoff?.filter(
+    ({ voterId, targetId }) =>
+      vote.nominations.find((ballot) => ballot.voterId === voterId)?.targetId !== targetId
+  ).length
+  const changeLine =
+    changes === undefined
+      ? undefined
+      : changes === 0
+        ? 'No votes changed.'
+        : changes === 1
+          ? 'One vote changed.'
+          : `${changes} votes changed.`
+  const majority = finalBallots && majorityTarget(countVotes(finalBallots), finalBallots.length)
+  const decision = verdict.byDraw
+    ? `${name} was chosen by draw.`
+    : majority === verdict.targetId
+      ? `${name} was chosen by majority vote.`
+      : `${name} was chosen with the most votes.`
+  return [tally, changeLine, decision].filter(Boolean).join(' ')
+}
+
 export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: string): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
   const humanIsBetrayer = isActiveBetrayer(run, run.humanId)
+  const pending = run.private.conclaveVote
+  const briefing = discussShields(run)
+  if (pending) {
+    const targets = runoffTargets(pending.nominations)
+    if (humanIsBetrayer && (!humanTargetId || !targets.includes(humanTargetId))) return run
+    return resolveConclaveRunoff(run, token, pending.nominations, targets, briefing, humanTargetId)
+  }
   if (humanIsBetrayer) {
     const known = new Set(knownTeammateIds(run, run.humanId))
     const targetIds = projectedTargets(run, run.humanId, known)
@@ -277,27 +379,51 @@ export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: s
   }
 
   // An unknown Betrayer can appear to be a viable target. The private votes move to a backup.
-  const briefing = discussShields(run)
   const nominations = nominate(run, briefing, humanIsBetrayer ? humanTargetId : undefined)
   const tally = tallyNightBallots(run, nominations)
-  if (!tally || nominations.length === 0 || majorityTarget(tally, nominations.length)) {
-    return resolveNight(run, token, nominations)
+  if (!tally) return run
+  if (!nominations.length || majorityTarget(tally, nominations.length)) {
+    const resolved = resolveNight(run, token, nominations)
+    return { ...resolved, private: { ...resolved.private, conclaveVote: { nominations } } }
   }
+  if (humanIsBetrayer) {
+    return {
+      ...run,
+      revision: run.revision + 1,
+      private: { ...run.private, conclaveVote: { nominations } },
+    }
+  }
+  return resolveConclaveRunoff(run, token, nominations, runoffTargets(nominations), briefing)
+}
 
+function resolveConclaveRunoff(
+  run: Run,
+  token: CommandToken,
+  nominations: Ballot[],
+  targets: string[],
+  briefing: readonly ShieldBriefing[],
+  humanTargetId?: string
+) {
+  const tally = countVotes(nominations)
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 4261))
-  const choices = nominations.map((nomination) => {
-    if (nomination.voterId === run.humanId) return nomination
-    const alternatives = [...tally.keys()].filter((id) => id !== nomination.targetId)
+  const runoff = nominations.map((nomination) => {
+    if (nomination.voterId === run.humanId && humanTargetId)
+      return { ...nomination, targetId: humanTargetId }
+    const alternatives = targets.filter((id) => id !== nomination.targetId)
     const preferred = chooseNominee(run, nomination.voterId, alternatives, briefing)
     if (!preferred) return nomination
 
     // The closer a proposal is to passing, the easier it is to compromise on it.
     const support = tally.get(preferred) ?? 0
-    return random() < 0.2 + support / (nominations.length * 2)
+    return !targets.includes(nomination.targetId) ||
+      random() < 0.2 + support / (nominations.length * 2)
       ? { ...nomination, targetId: preferred }
       : nomination
   })
-  return resolveNight(run, token, choices, nominations)
+  const resolved = resolveNight(run, token, runoff, nominations)
+  return resolved === run
+    ? run
+    : { ...resolved, private: { ...resolved.private, conclaveVote: { nominations, runoff } } }
 }
 
 export function revealDawn(run: Run, token: CommandToken): Run {
@@ -321,6 +447,7 @@ export function revealDawn(run: Run, token: CommandToken): Run {
       nightShieldIds: [],
       nightShieldAwardIds: undefined,
       lastShieldSave: night.blocked && night.targetId ? { day, id: night.targetId } : undefined,
+      conclaveVote: undefined,
       pendingNight: undefined,
     },
   }

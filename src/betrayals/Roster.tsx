@@ -1,8 +1,9 @@
 import { CastSigil } from './CastSigil'
+import { SleepMask } from './SleepMask'
+import { sadBetrayalsPortrait } from './betrayalsAppearance'
 import houseguestGridStyles from '../components/HouseguestGrid/HouseguestGrid.module.css'
 import type { viewFor } from './run'
 import './roster.css'
-import './sleep-mask.css'
 
 type CastView = ReturnType<typeof viewFor>
 type Props = {
@@ -12,6 +13,9 @@ type Props = {
   sleeping?: boolean
   selectableIds?: readonly string[]
   runoffIds?: readonly string[]
+  announcedNightId?: string
+  compactExitId?: string
+  mourning?: boolean
   onSelect: (id: string) => void
 }
 
@@ -22,13 +26,18 @@ export function Roster({
   sleeping,
   selectableIds,
   runoffIds,
+  announcedNightId,
+  compactExitId,
+  mourning,
   onSelect,
 }: Props) {
   return (
     <ul className="betrayals-roster" aria-label="Contestant roster">
       {view.seats.map((seat) => {
-        const cause = seat.exit?.cause
+        const cause = seat.exit?.cause ?? (seat.id === announcedNightId ? 'night' : undefined)
+        const compactExit = seat.id === compactExitId
         const asleep = sleeping && !cause
+        const sadPortrait = mourning && !cause ? sadBetrayalsPortrait(seat.portrait) : undefined
         const nightShield =
           !seat.exit &&
           view.knownNightShieldIds.includes(seat.id) &&
@@ -70,17 +79,44 @@ export function Roster({
             >
               <span className="betrayals-roster__portrait" aria-hidden="true">
                 {seat.portrait ? (
-                  <img src={seat.portrait} alt="" decoding="async" draggable={false} />
+                  <img
+                    key={sadPortrait || seat.portrait}
+                    src={sadPortrait || seat.portrait}
+                    data-mourning={
+                      Boolean(sadPortrait && sadPortrait !== seat.portrait) || undefined
+                    }
+                    alt=""
+                    decoding="async"
+                    draggable={false}
+                    onError={(event) => {
+                      const image = event.currentTarget
+                      if (image.hasAttribute('data-mourning') && seat.portrait) {
+                        image.removeAttribute('data-mourning')
+                        image.src = seat.portrait
+                      }
+                    }}
+                  />
                 ) : (
                   <span className="betrayals-roster__initial">{seat.name[0]}</span>
                 )}
-                {asleep && (
+                {asleep && <SleepMask portrait={seat.portrait} />}
+                {compactExit && (
                   <span
-                    className="betrayals-sleep-mask"
-                    data-symbolic={!seat.portrait || undefined}
-                  />
+                    aria-hidden="true"
+                    className={
+                      houseguestGridStyles.cross + ' ' + houseguestGridStyles.crossAnimated
+                    }
+                    data-brief-exit-mark
+                  >
+                    <img
+                      className={houseguestGridStyles.crossArtwork}
+                      src={import.meta.env.BASE_URL + 'evictionmark/evictionmark.png'}
+                      alt=""
+                      draggable={false}
+                    />
+                  </span>
                 )}
-                {cause && (
+                {cause && !compactExit && (
                   <span
                     className="betrayals-roster__seal"
                     data-seal={cause}

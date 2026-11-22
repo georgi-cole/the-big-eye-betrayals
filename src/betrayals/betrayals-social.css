@@ -1,19 +1,21 @@
-.betrayals-social-dialog {
+.sp2-backdrop.betrayals-social-dialog {
   --color-accent: #d5aa7e;
   --social-metal: #685646;
   --social-surface: linear-gradient(150deg, #29221d, #171718 72%);
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   max-width: none;
   max-height: none;
   margin: 0;
   padding: 0;
   overflow: hidden;
   border: 0;
+  background: #111215;
+  backdrop-filter: none;
   color: inherit;
 }
 
-.betrayals-social-dialog:not([open]) {
+.sp2-backdrop.betrayals-social-dialog:not([open]) {
   display: none;
 }
 
@@ -21,7 +23,14 @@
   background: transparent;
 }
 
-.betrayals-social-dialog .sp2-modal {
+.sp2-backdrop.betrayals-social-dialog > .sp2-modal {
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   background:
     radial-gradient(ellipse at 12% 0%, #58413073, transparent 47%),
     linear-gradient(155deg, #201b18, #111215 62%, #0e1013);
@@ -30,6 +39,11 @@
 .betrayals-social-dialog :is(.sp2-header, .sp2-footer) {
   background: linear-gradient(105deg, #2c231d, #151618);
   border-color: #58483a;
+}
+
+.betrayals-social-dialog .sp2-header {
+  padding-top: max(0.48rem, var(--app-safe-area-top, 0px));
+  padding-inline: max(0.74rem, env(safe-area-inset-left)) max(0.74rem, env(safe-area-inset-right));
 }
 
 .betrayals-social-dialog
@@ -48,7 +62,71 @@
 }
 
 .betrayals-social-dialog .sp2-body {
+  width: min(100%, 68rem);
+  margin-inline: auto;
+  padding-inline: max(0.56rem, env(safe-area-inset-left)) max(0.56rem, env(safe-area-inset-right));
   background: linear-gradient(180deg, #14141866, #0e1013b3);
+}
+
+.betrayals-social-dialog .sp2-body:not(.sp2-body--focused-target) {
+  display: flex;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.betrayals-social-dialog .sp2-body:not(.sp2-body--focused-target) > * {
+  flex: 0 0 auto;
+}
+
+.betrayals-social-dialog .sp2-body:not(.sp2-body--focused-target) > .sp2-focus {
+  align-self: stretch;
+}
+
+.betrayals-social-dialog .sp2-hubmates {
+  padding-bottom: 0.46rem;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.15rem, 1fr));
+  gap: 0.36rem;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .pc {
+  min-height: 3.15rem;
+  height: auto;
+  margin: 0;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .pc__row {
+  justify-content: flex-start;
+  gap: 0.33rem;
+  padding: 0.35rem;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .pc__row .pa {
+  width: 1.65rem;
+  height: 1.65rem;
+  flex-basis: 1.65rem;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .pc__name {
+  font-size: 0.76rem;
+}
+
+.betrayals-social-dialog .betrayals-social-roster .pc__status--active,
+.betrayals-social-dialog
+  .sp2-body[data-can-act]:has(.betrayals-social-roster)
+  > .sp2-focus:not(.sp2-focus--active) {
+  display: none;
+}
+
+@media (min-width: 680px) {
+  .betrayals-social-dialog .betrayals-social-roster .player-list {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  }
 }
 
 .betrayals-social-dialog .sp2-body .sp2-moves__top {

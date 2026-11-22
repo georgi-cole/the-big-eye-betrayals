@@ -837,6 +837,8 @@ export function createClip() {
       const leadIn = details.authorityIntro ? 2200 : 0
       host = document.createElement('div')
       host.className = 'game-sample-film'
+      const betrayalsExit = id === 'exit' && details.edition === 'betrayals'
+      if (betrayalsExit) host.dataset.edition = 'betrayals'
       parent.append(host)
       const shadow = host.attachShadow({ mode: 'open' }),
         style = document.createElement('style')
@@ -936,6 +938,12 @@ export function createClip() {
         root.append(intro)
       }
       if (id === 'nominations') removeNominationOrdinalLabels(root)
+      if (betrayalsExit) {
+        const brand = root.querySelector('.exit-brand-title')
+        if (brand) brand.textContent = 'THE BIG EYE BETRAYALS'
+        root.querySelector('.exit-caption p').textContent = 'BANISHED FROM THE CASTLE'
+        root.querySelector('.cine-sequence').firstChild.textContent = 'THE BIG EYE BETRAYALS '
+      }
       if (sceneId === 'nominations' && !coOutcome)
         stagePublicNomination(root, cast, details.publicNomination)
       stage.append(root)

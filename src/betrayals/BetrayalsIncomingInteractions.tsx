@@ -5,13 +5,13 @@ import {
 } from '../components/IncomingInteractionsInbox/IncomingInboxChrome'
 import type { IncomingInteractionIconName } from '../components/IncomingInteractionsInbox/IncomingInteractionIcon'
 import PlayerAvatar from '../components/PlayerAvatar/PlayerAvatar'
-import type { IncomingInteraction } from './incoming'
+import type { IncomingAction, IncomingInteraction } from './incoming'
 import type { IncomingAnswer } from './run'
 import './betrayals-incoming.css'
 
 type Props = {
   interactions: readonly IncomingInteraction[]
-  onRespond: (id: string, answer: IncomingAnswer) => void
+  onRespond: (id: string, answer: IncomingAction) => void
   onClose: () => void
   readIds?: ReadonlySet<string>
   onRead?: (id: string) => void
@@ -64,6 +64,15 @@ const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
 }
 
 const answerStyles = { engage: 'positive', listen: 'neutral', dismiss: 'dismiss' } as const
+const shieldPlanReplies = {
+  keep: "I'm holding on to it for tonight.",
+  'open-to-gift': 'I might pass it on if someone I trust needs it.',
+  private: "I'm keeping my plans to myself.",
+}
+
+function hasOpenFollowUp({ response, shieldFollowUp }: IncomingInteraction) {
+  return response !== 'dismiss' && (shieldFollowUp?.canRequest || shieldFollowUp?.canAskPlans)
+}
 
 function outcome({ response, kind, speaker, target }: IncomingInteraction) {
   if (kind === 'shield-question') {
@@ -98,9 +107,18 @@ function InboxMessage({
   onRespond: Props['onRespond']
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const { id, kind, speaker, response, text } = interaction
+  const { id, kind, speaker, response, text, shieldFollowUp } = interaction
   const { icon, label, choices, priority } = cards[kind]
   const unread = !read && !response
+  const replies = []
+  if (shieldFollowUp?.requestAccepted !== undefined) {
+    replies.push(
+      shieldFollowUp.requestAccepted
+        ? "Here. Take it. You're covered tonight."
+        : "I'm not handing it over."
+    )
+  }
+  if (shieldFollowUp?.plan) replies.push(shieldPlanReplies[shieldFollowUp.plan])
 
   useEffect(() => {
     const element = cardRef.current
@@ -158,24 +176,52 @@ function InboxMessage({
         unread={unread}
       />
       <p className="inbox-item__text">{text}</p>
-      {response ? (
+      {(response || replies.length > 0) && (
         <div className="inbox-item__feedback" aria-label="Response" aria-live="polite">
-          <p className="inbox-item__outcome">{outcome(interaction)}</p>
-        </div>
-      ) : (
-        <div className="inbox-item__actions">
-          {(['engage', 'listen', 'dismiss'] as const).map((answer) =>
-            choices[answer] ? (
-              <button
-                key={answer}
-                type="button"
-                className={`inbox-action inbox-action--${answerStyles[answer]}`}
-                onClick={() => onRespond(id, answer)}
-              >
-                {choices[answer]}
-              </button>
-            ) : null
+          {replies.length > 0 ? (
+            replies.map((reply) => (
+              <p className="inbox-item__outcome" key={reply}>
+                {reply}
+              </p>
+            ))
+          ) : (
+            <p className="inbox-item__outcome">{outcome(interaction)}</p>
           )}
+        </div>
+      )}
+      {(!response || hasOpenFollowUp(interaction)) && (
+        <div className="inbox-item__actions">
+          {response !== 'dismiss' && shieldFollowUp?.canRequest && (
+            <button
+              type="button"
+              className="inbox-action inbox-action--positive"
+              onClick={() => onRespond(id, 'request-shield')}
+            >
+              Request the shield
+            </button>
+          )}
+          {response !== 'dismiss' && shieldFollowUp?.canAskPlans && (
+            <button
+              type="button"
+              className="inbox-action inbox-action--neutral"
+              onClick={() => onRespond(id, 'ask-shield-plans')}
+            >
+              Ask about shield plans
+            </button>
+          )}
+          {!response &&
+            (['engage', 'listen', 'dismiss'] as const).map((answer) =>
+              choices[answer] ? (
+                <button
+                  key={answer}
+                  type="button"
+                  className={`inbox-action inbox-action--${answerStyles[answer]}`}
+                  onClick={() => onRespond(id, answer)}
+                >
+                  {choices[answer]}
+                </button>
+              ) : null
+            )}
         </div>
       )}
     </div>
@@ -211,16 +257,18 @@ export function BetrayalsIncomingInteractions({
     return () => dialog.removeAttribute('open')
   }, [])
 
-  function respond(id: string, answer: IncomingAnswer) {
+  function respond(id: string, answer: IncomingAction) {
     setRecentIds((current) => new Set([...current, id]))
     onRespond(id, answer)
   }
 
   const pendingCount = interactions.filter(({ response }) => !response).length
-  const current = interactions.filter(({ id, response }) => !response || recentIds.has(id))
+  const current = interactions.filter(
+    (entry) => !entry.response || recentIds.has(entry.id) || hasOpenFollowUp(entry)
+  )
   const alliances = current.filter(({ kind }) => kind === 'alliance')
   const messages = current.filter(({ kind }) => kind !== 'alliance')
-  const history = interactions.filter(({ id, response }) => response && !recentIds.has(id))
+  const history = interactions.filter((entry) => !current.includes(entry))
   const renderMessage = (interaction: IncomingInteraction) => (
     <InboxMessage
       key={interaction.id}

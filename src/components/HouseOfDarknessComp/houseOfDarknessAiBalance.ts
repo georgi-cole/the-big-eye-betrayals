@@ -9,10 +9,18 @@ import {
   type MinigameStrategicContext,
 } from '../../ai/competition/allianceMinigameStrategy'
 
+export type HouseOfDarknessAiDifficulty = 'standard' | 'competitive'
+
+const MEMORY_TUNING = {
+  standard: { baseAbility: 43, fatiguePerRound: 2.6, maxAbility: 56 },
+  competitive: { baseAbility: 48, fatiguePerRound: 2.4, maxAbility: 60 },
+}
+
 export interface HouseOfDarknessAiAbilityParams {
   baseAbility: number
   round: number
   health: number
+  difficulty?: HouseOfDarknessAiDifficulty
 }
 
 /** Darkness AI receives a private card peek only when it selected Peek. */
@@ -46,12 +54,16 @@ export function getHouseOfDarknessAiAbility({
   baseAbility,
   round,
   health,
+  difficulty = 'standard',
 }: HouseOfDarknessAiAbilityParams): number {
-  const compressedAbility = 43 + (baseAbility - 55) * 0.3
-  const fatiguePenalty = Math.min(34, Math.max(0, round - 1) * 2.6)
+  const tuning = MEMORY_TUNING[difficulty]
+  const compressedAbility = tuning.baseAbility + (baseAbility - 55) * 0.3
+  const fatiguePenalty = Math.min(34, Math.max(0, round - 1) * tuning.fatiguePerRound)
   const pressurePenalty = health < 75 ? Math.min(8, (75 - health) * 0.14) : 0
 
-  return Math.round(clamp(compressedAbility - fatiguePenalty - pressurePenalty, 18, 56))
+  return Math.round(
+    clamp(compressedAbility - fatiguePenalty - pressurePenalty, 18, tuning.maxAbility)
+  )
 }
 export interface HouseOfDarknessAiCharmContext {
   playerId: string
