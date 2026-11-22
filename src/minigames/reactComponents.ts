@@ -50,6 +50,8 @@ export interface GenericMinigameProps {
   autoStart?: boolean
   /** Host-selected VIP visual treatment; it must not change game state or RNG. */
   premiumPresentation?: boolean
+  /** Edition-owned artwork for the small-roster social challenges. */
+  challengeArtwork?: 'betrayals'
   /** Explicit Quick Tap / Seasons rules variant, selected at session start. */
   vipQuickTap?: boolean
   /** Development-only preview override; a real session variant otherwise stays frozen. */
@@ -115,6 +117,9 @@ const reactComponents: Record<string, LazyGenericMinigame> = {
       })
     )
   ),
+  LastLight: lazyMinigame(() => import('./socialChallenges/lastLight/LastLight')),
+  RiskWheelAbyss: lazyMinigame(() => import('./socialChallenges/abyss/RiskWheelAbyss')),
+  RockPaperScissors: lazyMinigame(() => import('./socialChallenges/rps/RockPaperScissors')),
   QuickTapRace: lazyMinigame(() => import('../components/QuickTapRace/QuickTapRace')),
   QuickTapSeasons: lazyMinigame(() => import('../screens/QuickTapSeasons/QuickTapSeasonsEntry')),
   TravelingDots: lazyMinigame(() => import('../components/TravelingDots/TravelingDots')),

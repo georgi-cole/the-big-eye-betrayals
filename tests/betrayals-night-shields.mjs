@@ -134,6 +134,43 @@ test('handoffs stay private and the standings and teammate badges reflect who or
   assert.deepEqual(nightShieldReads(onward, winner), nightShieldReads(passed, winner))
 })
 
+test('public awards inform Night strategy without revealing later owners', () => {
+  const run = table()
+  run.private.safetyStandings = {
+    day: 1,
+    publicResults: true,
+    rows: [
+      { contestantId: human, score: 12 },
+      { contestantId: winner, score: 10 },
+      { contestantId: ally, score: 8 },
+    ],
+  }
+  const passed = reload(speak(run, human, ally, 'shield-gift'))
+  const question = (state) =>
+    getIncomingInteractions(state).find(({ kind }) => kind === 'shield-question')
+  assert.match(question(run).text, /\b(won|win)\b/)
+  assert.deepEqual(question(passed), question(run))
+  assert.deepEqual(viewFor(passed, outsider).knownNightShieldIds, [human, winner])
+  assert.deepEqual(viewFor(passed, null), viewFor(run, null))
+  assert.equal(viewFor(passed, human).nightShieldCount, 0)
+  assert.equal(viewFor(passed, ally).nightShieldCount, 1)
+  assert.deepEqual(safetyResultsFor(passed, null), safetyResultsFor(run, null))
+  assert.deepEqual(nightShieldReads(passed, outsider), nightShieldReads(run, outsider))
+  assert.ok(nightShieldReads(passed, outsider).get(human).protected > 0)
+  assert.equal(nightShieldReads(passed, outsider).has(ally), false)
+  assert.ok(
+    nightShieldReads(passed, ally).get(human).protected <
+      nightShieldReads(passed, outsider).get(human).protected
+  )
+
+  const night = { ...passed, phase: 'night' }
+  assert.ok(nightTargets(night, betrayer).includes(human))
+  const perspective = resolutionPerspective(night, betrayer, [human, ally])
+  assert.equal(chooseTarget(perspective, 'night'), ally)
+  assert.deepEqual(viewFor({ ...passed, day: 2 }, outsider).knownNightShieldIds, [])
+  assert.equal(nightShieldReads({ ...passed, day: 2 }, outsider).size, 0)
+})
+
 test('contradictions strain trust, only firsthand reports can travel, and old claims expire', () => {
   const run = { ...table([winner, ally]), social: trust(human, betrayer) }
   const claimed = speak(run, human, betrayer, 'shield-claim')

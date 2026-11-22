@@ -26,7 +26,8 @@ import type { Run, Phase, RealityPreset } from './run'
 import { acknowledgeRole, commandToken, eligibleBanishmentTargets, startRun, viewFor } from './run'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
-import { challengeBriefing, challengeGame, challengeSeed, scoreField } from './challengeRotation'
+import { challengeGame, scoreField } from './challengeRotation'
+import type { ReactMinigameCompletion } from '../minigames/competitionResult'
 import { CinematicScene } from './CinematicScene'
 import { getIncomingInteractions, respondToIncomingInteraction } from './incoming'
 import { getConclaveView, resolveConclave, revealDawn } from './night'
@@ -56,8 +57,7 @@ import { restoreRun, saveRun } from './persistence'
 import { Roster } from './Roster'
 import './season.css'
 
-const ColorMatch = lazy(() => import('../components/ColorMatchComp/ColorMatchComp'))
-const QuickTap = lazy(() => import('../minigames/quickTapRace/QuickTapRaceCanvasGame'))
+const ChallengeGame = lazy(() => import('./BetrayalsChallengeGame'))
 const saveId = 'edition-local'
 const artBase = import.meta.env.BASE_URL + 'assets/betrayals/'
 const hero = artBase + 'observatory.jpg'
@@ -220,6 +220,7 @@ export default function BetrayalsScreen() {
       setIncomingOpen(false)
     }
     setPlaying(false)
+    return true
   }
 
   if (!run || homeOpen) {
@@ -327,9 +328,8 @@ export default function BetrayalsScreen() {
       : (conclave?.targetIds ?? [])
   const field = challengeContestantIds(run)
   const canPlay = field.includes(run.humanId)
-  const gameId = challengeGame(run)
-  const briefing = challengeBriefing[gameId]
-  const challengeName = briefing.title
+  const game = challengeGame(run)
+  const challengeName = game?.title ?? 'Challenge'
   const activeCast = view.seats.filter(({ exit }) => !exit)
   const countKey = [run.id, run.day, stage, activeCast.length, run.tableCount?.round].join(':')
   const selectedSeat = view.seats.find(({ id }) => id === selected)
@@ -370,7 +370,7 @@ export default function BetrayalsScreen() {
       return
     }
     const next = transform(active)
-    if (next !== active) void commit(next)
+    if (next !== active) return commit(next)
   }
 
   function end(continueVoting: boolean) {
@@ -394,32 +394,40 @@ export default function BetrayalsScreen() {
     })
   }
 
-  if (playing && canPlay) {
+  async function finishChallenge(
+    score?: number,
+    tieBreak?: number,
+    completion?: ReactMinigameCompletion
+  ) {
+    if (!game) return false
+    return (
+      (await apply((active) =>
+        resolveChallenge(
+          active,
+          token,
+          scoreField(
+            active,
+            game,
+            score === undefined ? undefined : { score, tieBreak, completion }
+          ),
+          game.key,
+          game.publicResults
+        )
+      )) ?? false
+    )
+  }
+
+  if (playing && canPlay && game) {
     return (
       <BetrayalsChallengeStage
+        key={run.id + ':' + run.revision}
         title={phaseLabel[stage]}
-        game={briefing}
+        game={game}
         motion={motion}
-        onForfeit={() => apply((active) => resolveChallenge(active, token, scoreField(active)))}
+        onForfeit={() => finishChallenge()}
       >
-        <Suspense fallback={<p role="status">Loading {challengeName}ΓÇª</p>}>
-          {gameId === 'quick-tap' ? (
-            <QuickTap
-              autoStart
-              onFinish={(score) =>
-                apply((active) => resolveChallenge(active, token, scoreField(active, { score })))
-              }
-            />
-          ) : (
-            <ColorMatch
-              seed={challengeSeed(run)}
-              onFinish={(score, tieBreak) =>
-                apply((active) =>
-                  resolveChallenge(active, token, scoreField(active, { score, tieBreak }))
-                )
-              }
-            />
-          )}
+        <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
+          <ChallengeGame run={run} game={game} onFinish={finishChallenge} />
         </Suspense>
       </BetrayalsChallengeStage>
     )
@@ -446,6 +454,7 @@ export default function BetrayalsScreen() {
       : 'Everyone returned.'
     : 'The observatory opens.'
   const publicShieldId = run.publicShield?.day === run.day ? run.publicShield.id : undefined
+  const visibleShieldResults = view.publicNightShieldWinnerIds.length > 0
   const tableFeed =
     !cue && (counting || (stage === 'round-table' && !run.runoffIds && run.tableSway)) ? (
       <RoundTableFeed
@@ -504,7 +513,7 @@ export default function BetrayalsScreen() {
         : {
             label: 'See results',
             faceLabel: 'Results',
-            onClick: () => apply((active) => resolveChallenge(active, token, scoreField(active))),
+            onClick: () => finishChallenge(),
           }
       break
     case 'round-table':
@@ -640,6 +649,15 @@ export default function BetrayalsScreen() {
         },
       }
       break
+  }
+
+  if (stage === 'round-table' && visibleShieldResults && !counting) {
+    detail = (
+      <>
+        {detail}
+        <p>Night Shield winners are marked. They may have passed their shields on in secret.</p>
+      </>
+    )
   }
 
   const council =
@@ -853,6 +871,7 @@ export default function BetrayalsScreen() {
             canAct={canSocialize}
             phase={stage}
             nightShieldCount={view.nightShieldCount}
+            publicNightShieldWinnerIds={view.publicNightShieldWinnerIds}
             moveKinds={moveKinds}
             voteTargetIds={eligibleBanishmentTargets(run, run.humanId)}
             day={run.day}
@@ -938,7 +957,12 @@ export default function BetrayalsScreen() {
         />
       )}
       {cue === 'safety-results' && (
-        <SafetyResults rows={safetyResultsFor(run, viewerId)} onComplete={finishCue} />
+        <SafetyResults
+          rows={safetyResultsFor(run, viewerId)}
+          publicResults={visibleShieldResults}
+          gameKey={run.challengeHistory?.at(-1)}
+          onComplete={finishCue}
+        />
       )}
       {cinematic && (
         <CinematicScene

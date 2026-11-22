@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,7 +34,11 @@ function pairIndexes(seed: number, round: number, pairCount: number): number[][]
 }
 
 async function finishRound(seed: number, round: number, pairCount: number) {
-  fireEvent.click(screen.getByRole('button', { name: /^Peek/ }))
+  fireEvent.click(
+    within(screen.getByRole('group', { name: 'Choose one tool for this round' })).getAllByRole(
+      'button'
+    )[0]
+  )
   for (const [first, second] of pairIndexes(seed, round, pairCount)) {
     await act(async () => {
       fireEvent.click(screen.getAllByRole('gridcell')[first])
@@ -95,5 +99,44 @@ describe('HouseOfCardsComp spectator skip', () => {
 
     expect(screen.getByLabelText('Final standings')).toBeInTheDocument()
     expect(screen.getByText(/wins Deck of Light/)).toBeInTheDocument()
+  })
+
+  it('finishes four independent Betrayals boards and reports every placement', async () => {
+    const store = configureStore({ reducer: { houseOfCards: houseOfCardsReducer } })
+    const onComplete = vi.fn()
+    const participantIds = ['human', ...Array.from({ length: 8 }, (_, i) => `ai-${i}`)]
+    render(
+      <Provider store={store}>
+        <HouseOfCardsComp
+          participantIds={participantIds}
+          participants={participantIds.map((id) => ({ id, name: id, isHuman: id === 'human' }))}
+          prizeType="LOH"
+          seed={42}
+          parallelBoards
+          onComplete={onComplete}
+        />
+      </Provider>
+    )
+
+    for (const [round, pairCount] of [
+      [1, 4],
+      [2, 6],
+      [3, 8],
+      [4, 10],
+    ]) {
+      await finishRound(42, round, pairCount)
+      fireEvent.click(
+        screen.getByRole('button', { name: round < 4 ? 'Next round' : 'See results' })
+      )
+    }
+
+    expect(screen.getByText('Four boards complete')).toBeInTheDocument()
+    expect(screen.getByLabelText('Final standings').children).toHaveLength(9)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authoritativeRankedIds: [...participantIds.slice(1), 'human'],
+      })
+    )
   })
 })

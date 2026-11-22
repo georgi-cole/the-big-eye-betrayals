@@ -53,7 +53,7 @@ import MinigameTurnDemo, { TURN_DEMO_KEYS } from '../MinigameTurnDemo/MinigameTu
 import MinigameUtilityDock from '../MinigameUtilityDock/MinigameUtilityDock'
 import LegacyMinigameWrapper from '../../minigames/LegacyMinigameWrapper'
 import type { LegacyRawResult } from '../../minigames/LegacyMinigameWrapper'
-import { SoundManager } from '../../services/sound/SoundManager'
+import { MinigameReadyCountdown } from './MinigameReadyCountdown'
 import {
   PRESENTATION_PRIORITY,
   usePresentationOwner,
@@ -82,8 +82,6 @@ import { resetHostedMinigameState } from '../../minigames/resetHostedMinigameSta
 import { completeRetryMetrics, selectCompetitionLastPlaceIds } from './competitionRetryEligibility'
 import { lazyWithChunkRecovery } from '../../utils/lazyWithChunkRecovery'
 import './MinigameHost.css'
-
-const COUNTDOWN_TIMER_KEY = 'minigame:all_3_seconds_timer'
 
 const ClosestWithoutGoingOverComp = lazyWithChunkRecovery(
   () => import('../ClosestWithoutGoingOverComp')
@@ -325,7 +323,6 @@ export default function MinigameHost({
   const hostPhaseRef = useRef(phase)
   hostPhaseRef.current = phase
   const [utilityView, setUtilityView] = useState<UtilityView>(null)
-  const [countdown, setCountdown] = useState(3)
   const [finalValue, setFinalValue] = useState<number | null>(initialResult?.rawValue ?? null)
   const [finalTiebreakerMs, setFinalTiebreakerMs] = useState<number | null>(
     initialResult?.completion?.tiebreakerMs ?? null
@@ -525,7 +522,6 @@ export default function MinigameHost({
     resetHostedMinigameState(store.dispatch, launchedGame.reactComponentKey)
     completionReportedRef.current = false
     setUtilityView(null)
-    setCountdown(3)
     setFinalValue(null)
     setFinalTiebreakerMs(null)
     setFinalCompletion(null)
@@ -602,16 +598,9 @@ export default function MinigameHost({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [utilityView])
 
-  useEffect(() => {
-    if (phase === 'countdown' && utilityView !== null) {
-      setCountdown(3)
-    }
-  }, [phase, utilityView])
-
   const enterCountdown = useCallback(() => {
     setShowPremiumOffer(false)
     setUtilityView(null)
-    setCountdown(3)
     setPhase('countdown')
   }, [])
 
@@ -716,51 +705,6 @@ export default function MinigameHost({
     setPhase('results')
     void checkpointResult({ rawValue: 0, partial: true })
   }, [checkpointResult, phase, sessionId, store])
-
-  // Pause the host-owned countdown while the menu, rules, or warning is open.
-  useEffect(() => {
-    if (
-      !isOwner ||
-      phase !== 'countdown' ||
-      utilityView !== null ||
-      checkoutPending ||
-      resumingCheckout
-    )
-      return
-    if (skipCountdown) {
-      const t = setTimeout(beginGameplay, 0)
-      return () => clearTimeout(t)
-    }
-    // The utility dock intentionally restarts the ready sequence. While active,
-    // elapsed wall time must advance it even if a callback/frame was stalled.
-    const deadline = Date.now() + 3600
-    let timer: ReturnType<typeof setTimeout>
-    const update = () => {
-      const remaining = deadline - Date.now()
-      setCountdown(Math.max(0, Math.ceil((remaining - 600) / 1000)))
-      if (remaining <= 0) beginGameplay()
-      else timer = setTimeout(update, Math.min(100, remaining))
-    }
-    timer = setTimeout(update, 0)
-    return () => clearTimeout(timer)
-  }, [beginGameplay, checkoutPending, isOwner, phase, resumingCheckout, skipCountdown, utilityView])
-
-  // Keep the countdown SFX synchronized with the reset/paused visual countdown.
-  useEffect(() => {
-    if (
-      !isOwner ||
-      phase !== 'countdown' ||
-      skipCountdown ||
-      utilityView !== null ||
-      checkoutPending ||
-      resumingCheckout
-    ) {
-      SoundManager.stop(COUNTDOWN_TIMER_KEY)
-      return
-    }
-    void SoundManager.play(COUNTDOWN_TIMER_KEY)
-    return () => SoundManager.stop(COUNTDOWN_TIMER_KEY)
-  }, [checkoutPending, isOwner, phase, resumingCheckout, skipCountdown, utilityView])
 
   const handleComplete = useCallback(
     (result: LegacyRawResult) => {
@@ -988,7 +932,6 @@ export default function MinigameHost({
     setFinalTiebreakerMs(null)
     setFinalCompletion(null)
     setWasPartial(false)
-    setCountdown(3)
     activeAttemptTokenRef.current = `${sessionId}:${nextAttempt}`
     checkpointWorkRef.current = null
     setAttempt(nextAttempt)
@@ -1612,17 +1555,13 @@ export default function MinigameHost({
         )}
 
         {phase === 'countdown' && !resumingCheckout && (
-          <div className="minigame-host-ready">
-            <span className="minigame-host-ready-label">Get Ready</span>
-            <span className="minigame-host-ready-game">{launchedGame.title}</span>
-            {countdown > 0 ? (
-              <span className="minigame-host-ready-count" key={countdown}>
-                {countdown}
-              </span>
-            ) : (
-              <span className="minigame-host-ready-go">GO!</span>
-            )}
-          </div>
+          <MinigameReadyCountdown
+            key={attemptToken}
+            title={launchedGame.title}
+            paused={utilityView !== null || checkoutPending}
+            skip={skipCountdown}
+            onComplete={beginGameplay}
+          />
         )}
 
         {phase === 'playing' && (

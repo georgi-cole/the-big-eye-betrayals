@@ -167,12 +167,13 @@ export type Run = {
     nightShieldIds: string[]
     nightShieldAwardIds?: string[]
     lastShieldSave?: { day: number; id: string }
-    safetyStandings?: { day: number; rows: SafetyStanding[] }
+    safetyStandings?: { day: number; publicResults?: boolean; rows: SafetyStanding[] }
     pendingTable?: TableReceipt
     pendingNight?: { targetId: string | null; blocked: boolean; byDraw?: boolean }
   }
   publicSeed: number
   pot: number
+  challengeHistory?: string[]
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
   witnessLead?: import('./intel.ts').WitnessLead
@@ -312,6 +313,11 @@ export function nightShieldWinners(run: Run): readonly string[] {
     : (run.private.nightShieldAwardIds ?? run.private.nightShieldIds)
 }
 
+export function publicNightShieldWinners(run: Run): readonly string[] {
+  const standings = run.private.safetyStandings
+  return standings?.day === run.day && standings.publicResults ? nightShieldWinners(run) : []
+}
+
 export function viewFor(run: Run, actorId: string | null) {
   const actor = actorId ? run.seats.find(({ id }) => id === actorId) : undefined
   const role: Role | null = actor
@@ -330,18 +336,22 @@ export function viewFor(run: Run, actorId: string | null) {
     (run.phase === 'table-reveal' && !run.private.pendingTable?.blind) ||
     run.phase === 'night' ||
     run.phase === 'night-resolved'
-  const knownNightShieldIds = shieldCycle
-    ? nightShieldWinners(run).filter((id) => teammateIds.includes(id))
-    : []
-
-  if (activeActor && nightShieldCount) knownNightShieldIds.push(actor.id)
+  const publicNightShieldWinnerIds = shieldCycle ? publicNightShieldWinners(run) : []
+  const knownNightShieldIds = new Set(publicNightShieldWinnerIds)
+  if (shieldCycle) {
+    for (const id of nightShieldWinners(run)) {
+      if (teammateIds.includes(id)) knownNightShieldIds.add(id)
+    }
+  }
+  if (activeActor && nightShieldCount) knownNightShieldIds.add(actor.id)
 
   return {
     phase: run.phase,
     day: run.day,
     role,
     teammateIds,
-    knownNightShieldIds,
+    knownNightShieldIds: [...knownNightShieldIds],
+    publicNightShieldWinnerIds,
     hasNightShield: nightShieldCount > 0,
     nightShieldCount,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({

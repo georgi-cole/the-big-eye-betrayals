@@ -101,7 +101,10 @@ function discussShields(run: Run): ShieldBriefing[] {
     if (speakerId === run.humanId || !isActiveBetrayer(run, speakerId)) return []
     const teammates = knownTeammateIds(run, speakerId)
     const ranked = [...nightShieldReads(run, speakerId)]
-      .filter(([id]) => id !== speakerId && candidates.has(id) && !teammates.includes(id))
+      .filter(
+        ([id, read]) =>
+          id !== speakerId && candidates.has(id) && !teammates.includes(id) && !read.publicAwardOnly
+      )
       .sort(
         ([, a], [, b]) =>
           Math.max(b.protected, b.exposed * 0.6) - Math.max(a.protected, a.exposed * 0.6)
@@ -162,6 +165,7 @@ function caseFor(run: Run, voterId: string, targetId: string) {
   const ownConversations = getSocialView(run, voterId)
   const read = nightShieldReads(run, voterId).get(targetId)
   if (voterId === run.humanId && read) {
+    if (read.publicAwardOnly) return 'They won a Night Shield. They could have passed it on.'
     if (read.conflicting) return 'The stories about their Night Shield don’t agree.'
     if (read.witnessedGift) return 'You gave them a shield earlier. They could have passed it on.'
     if (read.protected) return 'You’ve heard they might have a Night Shield.'

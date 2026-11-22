@@ -1,7 +1,7 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32 } from '../store/rng.ts'
 import { getSocialView, rapport } from './perception.ts'
-import { hashId, NIGHT_SHIELD_MOVES } from './run.ts'
+import { hashId, NIGHT_SHIELD_MOVES, publicNightShieldWinners } from './run.ts'
 import type { NightShieldClaim, Run, SocialEntry } from './run.ts'
 
 type ShieldWindow = Pick<Run, 'phase' | 'tableCount' | 'runoffIds' | 'result'> &
@@ -120,6 +120,7 @@ export type ShieldRead = {
   conflicting: boolean
   witnessedGift: boolean
   firsthand: boolean
+  publicAwardOnly?: boolean
 }
 
 export function nightShieldReads(run: Run, observerId: string): Map<string, ShieldRead> {
@@ -172,6 +173,18 @@ export function nightShieldReads(run: Run, observerId: string): Map<string, Shie
     }
     read.conflicting ||= read.protected > 0 && read.exposed > 0
     reads.set(id, read)
+  }
+  for (const id of publicNightShieldWinners(run)) {
+    if (id === observerId || reads.has(id)) continue
+    // Everyone saw the award. Only the recipient could have seen this private handoff.
+    reads.set(id, {
+      protected: gaveNightShieldToday(notes, id, observerId, run.day) ? 0.16 : 0.58,
+      exposed: 0,
+      conflicting: false,
+      witnessedGift: false,
+      firsthand: false,
+      publicAwardOnly: true,
+    })
   }
   return reads
 }

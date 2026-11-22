@@ -31,6 +31,7 @@ import { resolveTiltLabyrinthOutcome } from '../../features/tiltLabyrinth/thunks
 import { getDefaultCompetitionProfile } from '../../ai/competition/index'
 import { mulberry32 } from '../../store/rng'
 import MinigameCompleteWrapper from '../MinigameHost/MinigameCompleteWrapper'
+import { formatTiltLabyrinthScore } from './formatTiltLabyrinthScore'
 import type { MinigameParticipant } from '../MinigameHost/MinigameHost'
 import type { ReactMinigameCompletion } from '../MinigameHost/MinigameHost'
 import type {
@@ -50,6 +51,7 @@ import {
   tiltLabyrinthFrameScale,
 } from './tiltLabyrinthInput'
 import { simulateTiltLabyrinthAiRun } from './tiltLabyrinthAi'
+import { minigameCanvasPaint, type MinigameCanvasPaint } from '../../minigames/minigameCanvasPaint'
 import './TiltLabyrinthComp.css'
 
 const EMPTY_GAME_PLAYERS: RootState['game']['players'] = []
@@ -182,13 +184,6 @@ function cellCenter(col: number, row: number): FeaturePoint {
 
 function randomInt(rng: () => number, min: number, max: number): number {
   return Math.floor(rng() * (max - min + 1)) + min
-}
-
-function formatTiltLabyrinthScore(timeMs: number): string {
-  const totalSeconds = timeMs / 1000
-  if (totalSeconds < 60) return `${totalSeconds.toFixed(2)}s`
-  const minutes = Math.floor(totalSeconds / 60)
-  return `${minutes}:${(totalSeconds % 60).toFixed(2).padStart(5, '0')}`
 }
 
 function pickFeaturePoint(
@@ -478,12 +473,13 @@ function drawMaze(
   ctx: CanvasRenderingContext2D,
   maze: MazeCell[][],
   game: GameState,
-  elapsed: number
+  elapsed: number,
+  paint: MinigameCanvasPaint
 ) {
   const { ball, finishTime, hasKey, lockOpen, keyPos, doorPos, goalPos, hazards } = game
 
   // Background
-  ctx.fillStyle = '#120d1e'
+  ctx.fillStyle = paint('#120d1e')
   ctx.fillRect(0, 0, MAZE_W, MAZE_H)
 
   const vignette = ctx.createRadialGradient(
@@ -494,15 +490,15 @@ function drawMaze(
     MAZE_H * VIGNETTE_CENTER_Y_RATIO,
     MAZE_W * VIGNETTE_OUTER_RADIUS_WIDTH_RATIO
   )
-  vignette.addColorStop(0, 'rgba(57, 35, 84, 0.2)')
-  vignette.addColorStop(1, 'rgba(8, 5, 15, 0.3)')
+  vignette.addColorStop(0, paint('rgba(57, 35, 84, 0.2)'))
+  vignette.addColorStop(1, paint('rgba(8, 5, 15, 0.3)'))
   ctx.fillStyle = vignette
   ctx.fillRect(0, 0, MAZE_W, MAZE_H)
 
   const sheen = ctx.createLinearGradient(0, 0, 0, MAZE_H)
-  sheen.addColorStop(0, `rgba(192, 132, 252, ${BOARD_SHEEN_ALPHA})`)
-  sheen.addColorStop(0.2, 'rgba(192, 132, 252, 0.035)')
-  sheen.addColorStop(1, 'rgba(18, 13, 30, 0)')
+  sheen.addColorStop(0, paint(`rgba(192, 132, 252, ${BOARD_SHEEN_ALPHA})`))
+  sheen.addColorStop(0.2, paint('rgba(192, 132, 252, 0.035)'))
+  sheen.addColorStop(1, paint('rgba(18, 13, 30, 0)'))
   ctx.fillStyle = sheen
   ctx.fillRect(0, 0, MAZE_W, MAZE_H)
 
@@ -514,8 +510,8 @@ function drawMaze(
     MAZE_H * 0.24,
     CELL_PX * 6
   )
-  ambientOrb.addColorStop(0, 'rgba(168, 85, 247, 0.13)')
-  ambientOrb.addColorStop(1, 'rgba(168, 85, 247, 0)')
+  ambientOrb.addColorStop(0, paint('rgba(168, 85, 247, 0.13)'))
+  ambientOrb.addColorStop(1, paint('rgba(168, 85, 247, 0)'))
   ctx.fillStyle = ambientOrb
   ctx.fillRect(0, 0, MAZE_W, MAZE_H)
 
@@ -597,18 +593,18 @@ function drawMaze(
 
   // Walls
   ctx.save()
-  ctx.strokeStyle = 'rgba(192, 132, 252, 0.2)'
+  ctx.strokeStyle = paint('rgba(192, 132, 252, 0.2)')
   ctx.lineWidth = WALL_GLOW_WIDTH
   ctx.lineCap = 'round'
   traceMazeWalls(ctx, maze)
   ctx.stroke()
 
-  ctx.strokeStyle = '#c4a4ff'
+  ctx.strokeStyle = paint('#c4a4ff')
   ctx.lineWidth = WALL_THICKNESS
   ctx.lineCap = 'square'
   traceMazeWalls(ctx, maze)
   ctx.stroke()
-  ctx.strokeStyle = 'rgba(192, 132, 252, 0.22)'
+  ctx.strokeStyle = paint('rgba(192, 132, 252, 0.22)')
   ctx.lineWidth = MAZE_BORDER_WIDTH
   ctx.strokeRect(
     MAZE_BORDER_OFFSET,
@@ -852,6 +848,7 @@ export default function TiltLabyrinthComp({
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    const paint = minigameCanvasPaint(canvas)
 
     let animId = 0
     let lastFrameTime = performance.now()
@@ -995,13 +992,13 @@ export default function TiltLabyrinthComp({
             gs.finishTime = Math.round(gs.elapsed)
             handleFinish(gs.finishTime)
             // Draw final frame then stop â€” no RAF after goal reached
-            drawMaze(ctx, maze, gs, gs.elapsed)
+            drawMaze(ctx, maze, gs, gs.elapsed, paint)
             return
           }
         }
       }
 
-      drawMaze(ctx, maze, gs, gs.elapsed)
+      drawMaze(ctx, maze, gs, gs.elapsed, paint)
       // Only continue the loop while playing; stop once finished
       if (!gs.finished) {
         animId = requestAnimationFrame(tick)

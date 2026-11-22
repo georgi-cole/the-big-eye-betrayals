@@ -104,6 +104,7 @@ function validSafetyStandings(value: unknown, ids: Set<string>, day: number): bo
     !Number.isSafeInteger(standings.day) ||
     standings.day < 1 ||
     standings.day > day ||
+    (standings.publicResults !== undefined && typeof standings.publicResults !== 'boolean') ||
     !Array.isArray(standings.rows)
   ) {
     return false
@@ -357,6 +358,9 @@ function isRun(value: unknown): value is Run {
             (sway.evidence !== 'call-witness' ||
               asObject(item.witnessLead)?.promised === true))))) &&
     validSafetyStandings(hidden.safetyStandings, ids, item.day) &&
+    (item.challengeHistory === undefined ||
+      (Array.isArray(item.challengeHistory) &&
+        item.challengeHistory.every((key) => typeof key === 'string'))) &&
     validIncomingResponses(item.incomingResponses, item.day) &&
     (item.activity === undefined ||
       (Array.isArray(item.activity) &&

@@ -1,5 +1,6 @@
 import { selectBoosterPrompts } from '../../../ai/competition/quickTapSimulation';
 import type { ScheduledBoosterPrompt } from '../../../ai/competition/quickTapSimulation';
+import { minigameCanvasPaint, type MinigameCanvasPaint } from '../../minigameCanvasPaint';
 import type {
   QTREngineOptions,
   QTREnginePhase,
@@ -130,6 +131,8 @@ export class QuickTapRaceCanvasEngine {
 
   private readonly options: QTREngineOptions;
 
+  private readonly paint: MinigameCanvasPaint;
+
   private phase: QTREnginePhase = 'idle';
 
   private countdown = READY_COUNT;
@@ -220,6 +223,7 @@ export class QuickTapRaceCanvasEngine {
     this.canvas = canvas;
     this.ctx = ctx;
     this.options = options;
+    this.paint = minigameCanvasPaint(canvas);
     this.timeLeftMs = (options.duration ?? DEFAULT_DURATION) * 1000;
     this.layout = makeLayout(canvas.clientWidth || 320, canvas.clientHeight || 400, 1);
   }
@@ -629,14 +633,14 @@ export class QuickTapRaceCanvasEngine {
 
     ctx.clearRect(0, 0, width, height);
 
-    ctx.fillStyle = 'rgba(15, 15, 25, 0.98)';
+    ctx.fillStyle = this.paint('rgba(15, 15, 25, 0.98)');
     ctx.fillRect(0, 0, width, height);
 
     // Countdown number.
     const label = this.countdown === 0 ? 'GO!' : String(this.countdown);
     const fontSize = Math.round(Math.min(width, height) * 0.32);
     ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`;
-    ctx.fillStyle = '#7c3aed';
+    ctx.fillStyle = this.paint('#7c3aed');
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, width / 2, height * 0.44);
@@ -644,7 +648,7 @@ export class QuickTapRaceCanvasEngine {
     // Hint text.
     const hintSize = Math.max(13, Math.round(width * 0.044));
     ctx.font = `600 ${hintSize}px system-ui, -apple-system, sans-serif`;
-    ctx.fillStyle = '#a0a0b8';
+    ctx.fillStyle = this.paint('#a0a0b8');
     ctx.fillText('Get ready to tap!', width / 2, height * 0.63);
   }
 
@@ -655,7 +659,7 @@ export class QuickTapRaceCanvasEngine {
     ctx.clearRect(0, 0, width, height);
 
     // Background — heat-tinted.
-    ctx.fillStyle = atOrLast(HEAT_BG_COLORS, this.heatLevel);
+    ctx.fillStyle = this.paint(atOrLast(HEAT_BG_COLORS, this.heatLevel));
     ctx.fillRect(0, 0, width, height);
 
     this.renderHeatDots();
@@ -684,7 +688,7 @@ export class QuickTapRaceCanvasEngine {
       ctx.beginPath();
       ctx.arc(cx, heatDotsY, dotRadius, 0, Math.PI * 2);
       if (i <= this.heatLevel) {
-        ctx.fillStyle = HEAT_DOT_COLORS[i] ?? '#fff';
+        ctx.fillStyle = this.paint(HEAT_DOT_COLORS[i] ?? '#fff');
       } else {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       }
@@ -759,7 +763,7 @@ export class QuickTapRaceCanvasEngine {
 
   private renderTapButton(cx: number, cy: number, radius: number): void {
     const { ctx } = this;
-    const btnColor = atOrLast(HEAT_BTN_COLORS, this.heatLevel);
+    const btnColor = this.paint(atOrLast(HEAT_BTN_COLORS, this.heatLevel));
 
     // Brief press-scale feedback: shrink the button for 120ms after each tap.
     const msSinceTap = this.gameElapsedMs - this.lastTapMs;
@@ -769,7 +773,9 @@ export class QuickTapRaceCanvasEngine {
 
     // Outer glow — more intense at high heat or when pressed.
     ctx.save();
-    const glowColor = this.heatLevel >= 4 ? 'rgba(244, 63, 94, 0.5)' : 'rgba(124, 92, 255, 0.48)';
+    const glowColor = this.heatLevel >= 4
+      ? 'rgba(244, 63, 94, 0.5)'
+      : this.paint('rgba(124, 92, 255, 0.48)');
     ctx.shadowColor = glowColor;
     ctx.shadowBlur = (16 + this.heatLevel * 8) * (1 - 0.4 * pressFraction);
     ctx.beginPath();

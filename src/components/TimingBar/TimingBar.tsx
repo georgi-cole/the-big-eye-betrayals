@@ -13,14 +13,13 @@ import { runtimeCompetitionProfile } from '../../ai/competition/seasonAiDifficul
  *     screen so MinigameHost can advance straight to the ceremony.
  */
 
-import { CompetitionResultContext } from '../../minigames/competitionResultContext'
+import { useCompetitionResultCheckpoint } from '../../minigames/competitionResultContext'
 import {
   useState,
   useEffect,
   useRef,
   useCallback,
   useMemo,
-  useContext,
 } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { completeMinigame } from '../../store/gameSlice';
@@ -691,17 +690,16 @@ export default function TimingBar({
     };
   }, [challengeParticipantId, effectiveHumanId, finalResults, roundResult]);
 
-  const checkpoint = useContext(CompetitionResultContext);
-  useEffect(() => {
-    if (!checkpoint) return;
+  const readFinalCheckpoint = useCallback(() => {
     if (
       gamePhase !== 'final_results' &&
       !(gamePhase === 'round_results' && roundResult?.isFinalRound)
     )
-      return;
+      return null;
     const completion = buildFinalCompletion();
-    void checkpoint({ rawValue: completion.rawValue, partial: false, completion });
-  }, [buildFinalCompletion, checkpoint, gamePhase, roundResult?.isFinalRound]);
+    return { rawValue: completion.rawValue, partial: false, completion };
+  }, [buildFinalCompletion, gamePhase, roundResult?.isFinalRound]);
+  useCompetitionResultCheckpoint(readFinalCheckpoint);
 
   /** Done — dispatch outcome or call onFinish. */
   const handleDone = useCallback(() => {

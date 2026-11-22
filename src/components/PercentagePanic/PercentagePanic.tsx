@@ -2,6 +2,7 @@ import { useSeasonAiCapability } from '../../ai/competition/SeasonAiContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { ReactMinigameCompletion } from '../MinigameHost/MinigameHost'
+import { useCompetitionResultCheckpoint } from '../../minigames/competitionResultContext'
 import { cryptoSeed } from '../../features/riskWheel/cryptoSpin'
 import { preloadImages } from '../../utils/preloadImages'
 import studioBackdrop from '../../assets/percentage-panic/studio.webp'
@@ -281,23 +282,27 @@ export default function PercentagePanic({
     queueDuelAnswer(state.duelTurnId, value)
   }
 
+  const completion =
+    state.phase === 'winner' && state.winnerId
+      ? {
+          authoritativeWinnerId: state.winnerId,
+          authoritativeLastPlaceId: percentagePanicLastPlaceIds(state)[0] ?? null,
+          authoritativeLastPlaceIds: percentagePanicLastPlaceIds(state),
+          authoritativeTiedGroups: percentagePanicRankedGroups(state).filter(
+            (group) => group.length > 1
+          ),
+          authoritativeRankedIds: percentagePanicRankedIds(state),
+          rawResults: { ...state.scores },
+          rawValue: state.humanId ? state.scores[state.humanId] : 0,
+        }
+      : null
+  useCompetitionResultCheckpoint(
+    completion && { rawValue: completion.rawValue, partial: false, completion }
+  )
   const finish = () => {
-    if (completionRef.current || !state.winnerId) return
+    if (completionRef.current || !completion) return
     completionRef.current = true
-    onComplete?.(
-      {
-        authoritativeWinnerId: state.winnerId,
-        authoritativeLastPlaceId: percentagePanicLastPlaceIds(state)[0] ?? null,
-        authoritativeLastPlaceIds: percentagePanicLastPlaceIds(state),
-        authoritativeTiedGroups: percentagePanicRankedGroups(state).filter(
-          (group) => group.length > 1
-        ),
-        authoritativeRankedIds: percentagePanicRankedIds(state),
-        rawResults: { ...state.scores },
-        rawValue: state.humanId ? state.scores[state.humanId] : 0,
-      },
-      state.humanId ? state.scores[state.humanId] : 0
-    )
+    onComplete?.(completion, completion.rawValue)
   }
 
   const result = state.lastRound

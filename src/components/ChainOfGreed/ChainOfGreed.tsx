@@ -583,7 +583,7 @@ function buildInitialState(props: GenericMinigameProps): ChainOfGreedState {
   }
 }
 
-export default function ChainOfGreed(props: GenericMinigameProps) {
+export default function ChainOfGreed(props: GenericMinigameProps & { soloRushOnly?: boolean }) {
   const aiCapability = useSeasonAiCapability()
   const t = useTranslate()
   const [state, setState] = useState<ChainOfGreedState>(() => buildInitialState(props))
@@ -1625,10 +1625,19 @@ export default function ChainOfGreed(props: GenericMinigameProps) {
       state.winnerId ??
       activePlayers[0]?.id ??
       (state.gameMode === 'solo' ? null : (humanPlayer?.id ?? null))
-    const rawResults = winnerId
-      ? buildFinalRawResults(state.players, winnerId, state.securedTotal)
-      : Object.fromEntries(state.players.map((player) => [player.id, 0]))
-    const rawValue = winnerId ? (rawResults[humanPlayer?.id ?? winnerId] ?? state.securedTotal) : 0
+    const rawResults = props.soloRushOnly
+      ? Object.fromEntries(
+          state.players.map((player) => [
+            player.id,
+            state.finalScores[player.id] ?? player.finalScore,
+          ])
+        )
+      : winnerId
+        ? buildFinalRawResults(state.players, winnerId, state.securedTotal)
+        : Object.fromEntries(state.players.map((player) => [player.id, 0]))
+    const rawValue =
+      rawResults[humanPlayer?.id ?? winnerId ?? ''] ??
+      (winnerId && !props.soloRushOnly ? state.securedTotal : 0)
     return {
       rawValue,
       partial: false,
@@ -2366,7 +2375,29 @@ export default function ChainOfGreed(props: GenericMinigameProps) {
       data-presentation={props.premiumPresentation ? 'vip' : 'standard'}
     >
       <div className="chain-of-greed__backdrop" />
-      {state.phase === 'modeSelect' && (
+      {state.phase === 'modeSelect' && props.soloRushOnly && (
+        <div className="chain-of-greed__overlay chain-of-greed__mode-overlay">
+          <section
+            className="chain-of-greed__modal chain-of-greed__mode-select"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chain-solo-title"
+          >
+            <h2 id="chain-solo-title">Solo Rush</h2>
+            <p>
+              Build your own bank in one minute per round. Risk it to double it on a correct guess.
+            </p>
+            <button
+              type="button"
+              className="chain-of-greed__continue"
+              onClick={() => selectGameMode('solo')}
+            >
+              Start Solo Rush
+            </button>
+          </section>
+        </div>
+      )}
+      {state.phase === 'modeSelect' && !props.soloRushOnly && (
         <div className="chain-of-greed__overlay chain-of-greed__mode-overlay">
           <section
             className="chain-of-greed__modal chain-of-greed__mode-select"
