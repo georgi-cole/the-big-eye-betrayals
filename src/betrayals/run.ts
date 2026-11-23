@@ -139,6 +139,7 @@ export type TableSway = {
   targetId: string
   tone: 'careful' | 'forceful'
   evidence?: import('./intel.ts').TableEvidence
+  investigation?: import('./investigationEvidence.ts').InvestigationCase
   stance?: 'question' | 'defend'
 }
 
@@ -187,6 +188,7 @@ export type Run = {
   seasonRewards?: import('./seasonRewards.ts').SeasonRewards
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
+  investigation?: import('./investigationRecords.ts').Investigation
   witnessLead?: import('./intel.ts').WitnessLead
   socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>

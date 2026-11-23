@@ -1,0 +1,407 @@
+.betrayals-pulse,
+.guest-profile,
+.round-table-accounts {
+  --journal-ink: #f5ead9;
+  --journal-muted: #c0b0a0;
+  --journal-accent: #edcf8e;
+  --journal-line: rgb(222 180 117 / 23%);
+  --journal-inset: #19131e;
+  color: var(--journal-ink);
+}
+
+.betrayals-pulse {
+  width: min(100% - 24px, 520px);
+  max-width: none;
+  max-height: min(86dvh, 760px);
+  padding: 0;
+  background: radial-gradient(ellipse at top right, #383046, #201925 58%, #17121b);
+  border: 1px solid var(--journal-line);
+  border-radius: 19px;
+  box-shadow: 0 24px 90px rgb(0 0 0 / 72%);
+  overflow: hidden;
+}
+
+.betrayals-pulse::backdrop {
+  background: rgb(10 6 13 / 75%);
+}
+
+.betrayals-pulse__sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: min(86dvh, 760px);
+}
+
+.betrayals-pulse__header {
+  padding: 19px 19px 15px;
+}
+
+.betrayals-pulse__header,
+.pulse-new > header,
+.pulse-comparison > header,
+.guest-profile__section > header,
+.investigation-account > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.betrayals-pulse__header h2 {
+  margin: 3px 0 0;
+  color: var(--journal-ink);
+  font-family: Georgia, serif;
+  font-size: clamp(26px, 6vw, 34px);
+  line-height: 1;
+}
+
+.betrayals-pulse__header span,
+.investigation-account > header span:first-child {
+  color: var(--journal-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+}
+
+.betrayals-pulse button,
+.guest-profile button,
+.round-table-accounts button {
+  padding: 6px 10px;
+  min-height: 38px;
+  color: var(--journal-ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  background: #282132;
+  border: 1px solid var(--journal-line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.betrayals-pulse button:disabled,
+.guest-profile button:disabled,
+.round-table-accounts button:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
+.betrayals-pulse button:focus-visible,
+.guest-profile :is(button, summary, select, textarea):focus-visible,
+.round-table-accounts :is(button, summary):focus-visible {
+  outline: 2px solid var(--journal-accent);
+  outline-offset: 2px;
+}
+
+.betrayals-pulse button[aria-pressed='true'],
+.guest-profile button[aria-pressed='true'] {
+  color: var(--journal-accent);
+  border-color: #987547;
+  background: #342635;
+}
+
+.pulse-close svg {
+  width: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  display: block;
+}
+
+.betrayals-pulse__tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 16px 13px;
+  border-bottom: 1px solid var(--journal-line);
+}
+
+.betrayals-pulse__body {
+  min-height: min(365px, 55dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 18px;
+  scrollbar-color: #806a68 transparent;
+}
+
+.pulse-timeline,
+.pulse-new,
+.pulse-accounts,
+.guest-profile__body,
+.guest-profile__accounts,
+.round-table-accounts {
+  display: grid;
+  gap: 9px;
+}
+
+.pulse-new,
+.pulse-ballots,
+.pulse-comparison {
+  margin-bottom: 12px;
+}
+
+.pulse-timeline details,
+.pulse-ballots,
+.pulse-comparison,
+.pulse-commitments li,
+.investigation-account,
+.guest-profile__section,
+.guest-profile__read {
+  background: var(--journal-inset);
+  border: 1px solid var(--journal-line);
+  border-radius: 10px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.pulse-timeline summary,
+.pulse-ballots summary,
+.guest-profile summary,
+.round-table-accounts summary {
+  color: var(--journal-accent);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pulse-timeline summary > span,
+.guest-profile > summary > span {
+  float: right;
+  color: var(--journal-muted);
+  font-weight: 500;
+}
+
+.pulse-timeline ol,
+.pulse-ballots ul,
+.pulse-commitments {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pulse-timeline ol {
+  margin: 7px 0 0 3px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--journal-line);
+}
+
+.pulse-timeline li,
+.pulse-ballots li {
+  padding: 6px 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.pulse-timeline li[data-kind='departure'] {
+  color: #efcab5;
+}
+
+.pulse-commitments li {
+  margin-bottom: 8px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.84rem;
+}
+
+.pulse-commitments li > span,
+.investigation-account small,
+.investigation-account > header span:last-child,
+.guest-profile__section small,
+.guest-profile__section > header > span,
+.pulse-empty {
+  color: var(--journal-muted);
+  font-size: 0.75rem;
+}
+
+.investigation-account {
+  border-left: 2px solid #947451;
+}
+
+.investigation-account[data-access='hearsay'],
+.investigation-account[data-access='impression'] {
+  border-left-color: #82708c;
+}
+
+.investigation-account[data-access='withheld'],
+.investigation-account[data-access='unavailable'] {
+  border-left-color: #695a63;
+}
+
+.investigation-account p,
+.pulse-comparison p {
+  margin: 6px 0 0;
+  font-size: 0.87rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.investigation-account small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  margin-top: 5px;
+}
+
+.investigation-account__actions,
+.guest-profile__fields,
+.guest-profile__actions,
+.pulse-tools {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.investigation-account__actions,
+.guest-profile__actions,
+.guest-profile__accounts {
+  margin-top: 7px;
+}
+
+.pulse-tools {
+  margin-bottom: 12px;
+}
+
+.pulse-tools label,
+.guest-profile label {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 120px;
+  min-width: 0;
+  color: var(--journal-muted);
+  font-size: 0.75rem;
+}
+
+.pulse-tools select,
+.guest-profile :is(select, textarea) {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 8px;
+  color: var(--journal-ink);
+  background: #261e2c;
+  border: 1px solid var(--journal-line);
+  border-radius: 7px;
+  font-size: 0.85rem;
+}
+
+.pulse-comparison > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pulse-comparison > p {
+  color: var(--journal-accent);
+}
+
+.guest-profile {
+  grid-area: profile;
+  flex: 0 0 auto;
+  margin: 8px 0 0;
+  background: #211a28;
+  border: 1px solid var(--journal-line);
+  border-radius: 11px;
+}
+
+.betrayals-social-dialog .sp2-body.sp2-body--focused-target:has(> .guest-profile) {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: 'focus' 'profile' 'moves';
+}
+
+.betrayals-social-dialog .sp2-body:has(> .guest-profile[open]) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+.betrayals-social-dialog .sp2-body:has(> .guest-profile[open]) > .sp2-focus {
+  flex: 0 0 auto;
+}
+
+.betrayals-social-dialog .sp2-body:has(> .guest-profile[open]) > .sp2-moves {
+  display: none;
+}
+
+.guest-profile > summary {
+  padding: 10px 12px;
+}
+
+.guest-profile__body {
+  padding: 0 9px 9px;
+}
+
+.guest-profile__observe {
+  background: linear-gradient(120deg, #352637, var(--journal-inset));
+}
+
+.guest-profile__section > header {
+  margin-bottom: 6px;
+}
+
+.guest-profile__section h3,
+.pulse-new h3,
+.pulse-comparison h3,
+.pulse-ballots h3 {
+  margin: 0;
+  font-size: 0.91rem;
+}
+
+.guest-profile__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 12px;
+  margin: 10px 0 0;
+}
+
+.guest-profile__metrics dt {
+  color: var(--journal-accent);
+  font-size: 0.74rem;
+}
+
+.guest-profile__metrics dd {
+  margin: 3px 0 0;
+  font-size: 0.79rem;
+  overflow-wrap: anywhere;
+}
+
+.guest-profile__metrics small {
+  display: block;
+  margin-top: 3px;
+}
+
+.guest-profile__read {
+  display: grid;
+  gap: 7px;
+}
+
+.guest-profile__share {
+  margin-top: 10px;
+}
+
+.guest-profile__trait-read > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 7px;
+}
+
+.guest-profile__metric-account {
+  margin-top: 4px;
+}
+
+.guest-profile__metric-account summary,
+.guest-profile__metrics .guest-profile__personal {
+  color: #dbbc9c;
+  font-size: 0.72rem;
+}
+
+.round-table-accounts {
+  margin: 8px 0;
+}
+
+.round-table-accounts > div {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+}

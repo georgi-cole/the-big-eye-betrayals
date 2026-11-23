@@ -17,6 +17,12 @@ import { finishShieldConversations } from './shieldSocial.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { activeLead, canPresentEvidence, evidenceSpeech, voluntaryWitness } from './intel.ts'
 import { tableDialogue } from './tableDialogue.ts'
+import {
+  canPresentInvestigation,
+  investigationSpeech,
+  publicCaseWeight,
+} from './investigationEvidence.ts'
+import { archiveInvestigationVotes, guestName } from './investigationRecords.ts'
 
 export type { Ballot } from './run.ts'
 
@@ -119,7 +125,11 @@ export function recordTableSway(run: Run, token: CommandToken, choice: TableSway
       (choice.stance !== undefined && choice.stance !== 'question' && choice.stance !== 'defend') ||
       (choice.evidence !== undefined &&
         (choice.stance !== undefined ||
-          !canPresentEvidence(run, choice.targetId, choice.evidence))))
+          !canPresentEvidence(run, choice.targetId, choice.evidence))) ||
+      (choice.investigation !== undefined &&
+        (choice.stance !== undefined ||
+          choice.evidence !== undefined ||
+          !canPresentInvestigation(run, choice.targetId, choice.investigation))))
   )
     return run
 
@@ -164,7 +174,9 @@ export function tableArgumentPressure(
   const opposing = new Map<string, number>()
   for (const argument of statements) {
     if (argument.evidence) continue // The incident is scored once through the witness logic.
-    const effect = hearArgument(run, voterId, argument)
+    const effect = argument.investigation
+      ? publicCaseWeight(run, voterId, argument)
+      : hearArgument(run, voterId, argument)
     if (effect > 0) {
       supporting.set(argument.targetId, Math.max(effect, supporting.get(argument.targetId) ?? 0))
     } else if (effect < 0) {
@@ -181,7 +193,14 @@ export function tableArgumentPressure(
 
 export function tableDiscussion(run: Run): TableSpeech[] {
   const tableArguments = argumentsAtTable(run)
-  return [...evidenceSpeech({ ...run, tableArguments }), ...tableDialogue(run, tableArguments)]
+  return [
+    ...evidenceSpeech({ ...run, tableArguments }),
+    ...tableDialogue(
+      run,
+      tableArguments.filter((argument) => !argument.investigation)
+    ),
+    ...investigationSpeech(run, tableArguments),
+  ]
 }
 
 export function tableSwayResponse(run: Run): string | undefined {
@@ -189,6 +208,14 @@ export function tableSwayResponse(run: Run): string | undefined {
   const tableArguments = argumentsAtTable(run)
   if (run.tableSway.evidence) {
     return evidenceSpeech({ ...run, tableArguments }).at(-1)?.argument
+  }
+  if (run.tableSway.investigation) {
+    const exchange = investigationSpeech(run, tableArguments)
+    if (run.tableSway.investigation.witness && exchange[1]) {
+      const testimony = exchange[1]
+      return `${guestName(run.seats, testimony.speakerId)}: “${testimony.argument}”`
+    }
+    return exchange.at(-1)?.argument
   }
   const claim = tableArguments.find(({ speakerId }) => speakerId === run.humanId)
   if (!claim) return
@@ -379,6 +406,7 @@ export function revealTable(run: Run, token: CommandToken): Run {
     revision: run.revision + 1,
     seats,
     lastTable: { ...outcome, revealedBallots: run.tableCount?.ballots, campaigns },
+    investigation: archiveInvestigationVotes(run, outcome.blind, run.tableCount?.ballots),
     caseReviews: revealedRole
       ? reviewCases(run, campaigns, outcome.banishedId, revealedRole)
       : run.caseReviews,

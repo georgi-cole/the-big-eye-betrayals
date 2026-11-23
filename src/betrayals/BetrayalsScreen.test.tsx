@@ -18,6 +18,10 @@ vi.mock('../services/sound/SoundManager', () => ({
     setMusicVolume: vi.fn(),
     setMusicMuted: vi.fn(),
     setDesiredMusic: vi.fn(),
+    syncMusic: vi.fn(),
+    claimExternalMusic: vi.fn(),
+    setExternalMusicVolume: vi.fn(),
+    releaseExternalMusic: vi.fn(),
     setCategoryEnabled: vi.fn(),
     setCategoryVolume: vi.fn(),
     play: vi.fn(),
@@ -150,6 +154,49 @@ describe('Betrayals season review', () => {
     const store = within(screen.getByRole('dialog', { name: 'Store' }))
     fireEvent.click(store.getByRole('button', { name: 'The Heiress' }))
     expect(openDressingRoom).toHaveBeenCalledWith('pc-015')
+  })
+
+  it('opens the guest profile, saves an observation and personal read, and finds them in My Pulse after reload', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'pulse-profile', roleSeed: 28, publicSeed: 823 }
+    )
+    const guest = run.seats[1]
+    saveRun(localStorage, 'edition-local', { ...run, phase: 'social' })
+    const app = render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(guest.name),
+      })
+    )
+    fireEvent.click(social.getByText('View Profile', { exact: true }))
+    await clickAndSave(social.getByRole('button', { name: 'Observe · 1 Energy' }))
+    expect(social.getByText('You observed')).toBeVisible()
+    expect(social.getByText('Steady focus · 2 left today')).toBeVisible()
+    await clickAndSave(social.getByRole('button', { name: 'Save to Intel' }))
+    fireEvent.change(social.getByLabelText('My read'), { target: { value: 'suspect' } })
+    fireEvent.change(social.getByLabelText('Private note'), {
+      target: { value: 'Check their version tomorrow.' },
+    })
+    await clickAndSave(social.getByRole('button', { name: 'Save my read' }))
+    fireEvent.click(social.getByRole('button', { name: 'Open Intel' }))
+    const intel = within(screen.getByRole('dialog', { name: 'My Pulse' }))
+    expect(intel.getByRole('button', { name: 'Intel' })).toHaveAttribute('aria-pressed', 'true')
+    expect(intel.getByLabelText('Guest')).toHaveValue(guest.id)
+    expect(intel.getByRole('button', { name: 'Saved' })).toBeVisible()
+    app.unmount()
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open My Pulse' }))
+    const restored = within(screen.getByRole('dialog', { name: 'My Pulse' }))
+    expect(restored.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(restored.getByRole('button', { name: 'Intel' }))
+    fireEvent.click(restored.getByText('My reads', { exact: true }))
+    expect(restored.getByText(/Check their version tomorrow/)).toBeVisible()
+    expect(restored.getByText('You observed')).toBeVisible()
   })
 
   it('takes over Tilt Labyrinth results once, preserving the time, ranking and shields', async () => {

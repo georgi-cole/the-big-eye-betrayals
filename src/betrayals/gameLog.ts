@@ -115,6 +115,12 @@ export function recordGameActivity(previous: Run | null, next: Run): Run {
   if (next.pot > previous.pot) {
     add(`${(next.pot - previous.pot).toLocaleString()} was added to the pot.`)
   }
+  if (next.tableSway?.investigation && next.tableSway !== previous.tableSway) {
+    add(
+      `You brought an account about ${guestName(next, next.tableSway.targetId)} to the Round Table.`,
+      'conversation'
+    )
+  }
   if (previous.tableCount && next.runoffIds && next.tableRound !== previous.tableRound) {
     add(`A tie sent ${next.runoffIds.length} guests to a runoff.`, 'vote')
   }

@@ -7,6 +7,10 @@ import { leadForPlayer } from './intel'
 import { RoundTableShot } from './RoundTableShot'
 import { PortraitGallery } from './PortraitGallery'
 import { WitnessLeadCard } from './WitnessLeadCard'
+import { caseReports } from './investigationEvidence'
+import { InvestigationAccountCard } from './InvestigationAccountCard'
+import { InvestigationButton, type InvestigationControls } from './BetrayalsGuestProfile'
+import './betrayals-pulse.css'
 import './RoundTableDiscussion.css'
 
 type Props = {
@@ -17,6 +21,7 @@ type Props = {
   reducedMotion?: boolean
   onBack: () => void
   onAskWitness: () => void
+  investigation?: Pick<InvestigationControls, 'act' | 'reason'>
   onSway: (choice: TableSway | null) => void
 }
 
@@ -38,6 +43,7 @@ export function RoundTableDiscussion({
   reducedMotion,
   onBack,
   onAskWitness,
+  investigation,
   onSway,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -47,7 +53,13 @@ export function RoundTableDiscussion({
   const speeches = useMemo(() => tableDiscussion(run), [run])
   const [caseOpen, setCaseOpen] = useState(false)
   const lead = leadForPlayer(run)
-  const [targetId, setTargetId] = useState(() => lead?.suspectId ?? '')
+  const [targetId, setTargetId] = useState(
+    () =>
+      lead?.suspectId ??
+      caseReports(run).find(({ report }) => tableTargets(run, run.humanId).includes(report.guestId))
+        ?.report.guestId ??
+      ''
+  )
   const [behind, setBehind] = useState(false)
   const prefersReducedMotion = usePresentationReducedMotion()
   const motionReduced = reducedMotion || prefersReducedMotion
@@ -65,6 +77,8 @@ export function RoundTableDiscussion({
   const speakerId = !transcriptOpen && visible > 0 ? speeches[visible - 1]?.speakerId : undefined
   const candidates = tableTargets(run, run.humanId)
   const target = candidates.includes(targetId) ? seats.get(targetId) : undefined
+  const accounts = target ? caseReports(run, target.id) : []
+  const name = (id: string) => seats.get(id)?.name ?? 'Guest'
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -197,6 +211,53 @@ export function RoundTableDiscussion({
                 reducedMotion={motionReduced}
                 onSelect={setTargetId}
               />
+              {target && accounts.length > 0 && (
+                <details className="round-table-accounts">
+                  <summary>Present an account ({accounts.length})</summary>
+                  <div>
+                    {accounts.map(({ report, witness, witnessAsked }) => (
+                      <InvestigationAccountCard key={report.id} account={report} name={name}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onSway({
+                              targetId,
+                              tone: 'careful',
+                              investigation: { reportId: report.id },
+                            })
+                          }
+                        >
+                          Cite account
+                        </button>
+                        {witness &&
+                          (witnessAsked?.accepted ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onSway({
+                                  targetId,
+                                  tone: 'careful',
+                                  investigation: { reportId: report.id, witness: true },
+                                })
+                              }
+                            >
+                              Call {name(witness)}
+                            </button>
+                          ) : witnessAsked ? (
+                            <small>{name(witness)} declined to speak.</small>
+                          ) : (
+                            investigation && (
+                              <InvestigationButton
+                                investigation={investigation}
+                                action={{ kind: 'witness', reportId: report.id }}
+                              >{`Ask ${name(witness)} to testify · 1 Energy`}</InvestigationButton>
+                            )
+                          ))}
+                      </InvestigationAccountCard>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
         </section>
