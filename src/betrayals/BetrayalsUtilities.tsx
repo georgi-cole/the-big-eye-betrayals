@@ -6,17 +6,22 @@ import {
   isSeasonRealityMode,
 } from './betrayalsPreferences'
 import type { BetrayalsUtilities } from './betrayalsPreferences'
+import type { BetrayalsLookId } from './betrayalsAppearance'
 import './betrayalsUtilities.css'
 
 export type BetrayalsProfileControls = {
   player?: { id: string; name: string; portrait?: string }
   openProfile: () => void
-  openDressingRoom: () => void
+  openDressingRoom: (initialLookId?: BetrayalsLookId) => void
   openAccount: () => void
   openAdvertisingPrivacy?: () => void
 }
 
+export type BetrayalsMilestones = { dayReached: number; won: boolean }
+
 const utilityGlyphs = {
+  achievements:
+    'M5 3h6v3a3 3 0 0 1-6 0V3Zm0 1H3v2a2 2 0 0 0 2 2m6-4h2v2a2 2 0 0 1-2 2M8 9v4m-3 0h6',
   profile:
     'M10.5 5.2a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0m2 8v-.9c0-2.1-2-3.5-4.5-3.5s-4.5 1.4-4.5 3.5v.9',
   music:
@@ -26,7 +31,7 @@ const utilityGlyphs = {
   store: 'M8 1.8 14.2 8 8 14.2 1.8 8 8 1.8Zm0 2.7L11.5 8 8 11.5 4.5 8 8 4.5Z',
 }
 
-function UtilityIcon({ kind }: { kind: keyof typeof utilityGlyphs }) {
+export function UtilityIcon({ kind }: { kind: keyof typeof utilityGlyphs }) {
   return (
     <svg className="betrayals-utility-icon" viewBox="0 0 16 16" aria-hidden="true">
       <path d={utilityGlyphs[kind]} />
@@ -37,10 +42,12 @@ function UtilityIcon({ kind }: { kind: keyof typeof utilityGlyphs }) {
 export function BetrayalsUtilityChips({
   utilities,
   showSettings = true,
+  showStore = true,
   profiles,
 }: {
   utilities: BetrayalsUtilities
   showSettings?: boolean
+  showStore?: boolean
   profiles?: BetrayalsProfileControls
 }) {
   const { preferences, openPanel, playEffect, toggleMusic } = utilities
@@ -85,7 +92,7 @@ export function BetrayalsUtilityChips({
           <span className="betrayals-utility-chip__label">Settings</span>
         </button>
       )}
-      {!profiles && (
+      {showStore && !profiles && (
         <button
           type="button"
           aria-haspopup="dialog"
@@ -236,53 +243,95 @@ function Settings({
   )
 }
 
-function Store({ utilities }: { utilities: BetrayalsUtilities }) {
-  const { preferences, updatePreferences, playEffect } = utilities
-  return (
-    <div className="betrayals-store">
-      <p>Choose a free portrait for your next season.</p>
-      <div className="betrayals-store__portraits" role="group" aria-label="Season portraits">
-        {BETRAYALS_PORTRAITS.map(({ id, name }) => (
-          <button
-            key={id}
-            type="button"
-            aria-label={name}
-            aria-pressed={preferences.lookId === id}
-            className="betrayals-store__portrait"
-            onClick={() => {
-              playEffect('ui:confirm', 0.45)
-              updatePreferences({ lookId: id })
-            }}
-          >
-            <img src={getBetrayalsPortrait(id)} alt="" width="256" height="256" />
-            <strong>{name}</strong>
-            <span>{preferences.lookId === id ? 'Equipped' : 'Equip'}</span>
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="betrayals-store__default"
-        aria-label="Default portrait"
-        aria-pressed={preferences.lookId === null}
-        onClick={() => updatePreferences({ lookId: null })}
-      >
-        {preferences.lookId === null ? 'Default equipped' : 'Use default portrait'}
-      </button>
-    </div>
-  )
-}
-
-function UtilityDialog({
+function Store({
   utilities,
   profiles,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
 }) {
+  const { preferences, updatePreferences, playEffect } = utilities
+  return (
+    <div className="betrayals-store">
+      <p>Choose a free portrait for your next season.</p>
+      <div className="betrayals-store__portraits" role="group" aria-label="Season portraits">
+        {BETRAYALS_PORTRAITS.map(({ id, name }) => {
+          const portrait = getBetrayalsPortrait(id)
+          const equipped = profiles
+            ? profiles.player?.portrait === portrait
+            : preferences.lookId === id
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-label={name}
+              aria-pressed={equipped}
+              className="betrayals-store__portrait"
+              onClick={() => {
+                playEffect('ui:confirm', 0.45)
+                if (profiles) {
+                  utilities.closePanel()
+                  profiles.openDressingRoom(id)
+                } else updatePreferences({ lookId: id })
+              }}
+            >
+              <img src={portrait} alt="" width="256" height="256" />
+              <strong>{name}</strong>
+              <span>{equipped ? 'Equipped' : profiles ? 'Preview' : 'Equip'}</span>
+            </button>
+          )
+        })}
+      </div>
+      {!profiles && (
+        <button
+          type="button"
+          className="betrayals-store__default"
+          aria-label="Default portrait"
+          aria-pressed={preferences.lookId === null}
+          onClick={() => updatePreferences({ lookId: null })}
+        >
+          {preferences.lookId === null ? 'Default equipped' : 'Use default portrait'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function Achievements({ milestones }: { milestones?: BetrayalsMilestones }) {
+  const goals = [
+    { label: 'Enter the castle', achieved: (milestones?.dayReached ?? 0) >= 1 },
+    { label: 'Reach Day 2', achieved: (milestones?.dayReached ?? 0) >= 2 },
+    { label: 'Win the season', achieved: milestones?.won ?? false },
+  ]
+  return (
+    <section className="betrayals-achievements">
+      <p>Milestones from your current or most recent season.</p>
+      <ul>
+        {goals.map(({ label, achieved }) => (
+          <li key={label} data-achieved={achieved}>
+            <span>{label}</span>
+            <small>{achieved ? 'Unlocked' : 'Locked'}</small>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+const panelTitles = { settings: 'Settings', store: 'Store', achievements: 'Achievements' }
+
+function UtilityDialog({
+  utilities,
+  profiles,
+  milestones,
+}: {
+  utilities: BetrayalsUtilities
+  profiles?: BetrayalsProfileControls
+  milestones?: BetrayalsMilestones
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const { panel, preferences, closePanel } = utilities
-  const title = panel === 'settings' ? 'Settings' : 'Store'
+  const title = panelTitles[panel ?? 'settings']
 
   useEffect(() => {
     const node = dialogRef.current
@@ -325,8 +374,10 @@ function UtilityDialog({
             utilities={utilities}
             openAdvertisingPrivacy={profiles?.openAdvertisingPrivacy}
           />
+        ) : panel === 'store' ? (
+          <Store utilities={utilities} profiles={profiles} />
         ) : (
-          <Store utilities={utilities} />
+          <Achievements milestones={milestones} />
         )}
       </div>
     </dialog>
@@ -336,9 +387,13 @@ function UtilityDialog({
 export function BetrayalsUtilityPanel({
   utilities,
   profiles,
+  milestones,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
+  milestones?: BetrayalsMilestones
 }) {
-  return utilities.panel ? <UtilityDialog utilities={utilities} profiles={profiles} /> : null
+  return utilities.panel ? (
+    <UtilityDialog utilities={utilities} profiles={profiles} milestones={milestones} />
+  ) : null
 }

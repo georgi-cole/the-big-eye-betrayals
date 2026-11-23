@@ -29,8 +29,10 @@ export default function BetrayalsRoute() {
         player: profile ? { id: profile.id, name: profile.name, portrait } : undefined,
         openProfile: () =>
           navigate(profile ? '/profile' : '/profile-picker', { state: { from: '/' } }),
-        openDressingRoom: () =>
-          navigate('/profile/dressing-room', { state: { from: '/', createProfile: !profile } }),
+        openDressingRoom: (initialLookId) =>
+          navigate('/profile/dressing-room', {
+            state: { from: '/', createProfile: !profile, initialLookId },
+          }),
         openAccount: () => navigate('/profile/account', { state: { entryFrom: '/' } }),
         openAdvertisingPrivacy: () =>
           navigate('/player-privacy', { state: { fromSettings: true } }),
