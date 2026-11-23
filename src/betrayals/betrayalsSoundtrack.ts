@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { SoundManager } from '../services/sound/SoundManager'
 import type { PresentationCue, Run } from './run'
 
@@ -13,56 +14,40 @@ export type BetrayalsMusicScene =
 
 type SoundtrackDefinition = {
   source: string
+  remoteSource: string
+  fallbackSource: string
   startAtSec: number
   loop: boolean
   volume: number
 }
 
 const soundtrackBase = `${import.meta.env.BASE_URL}assets/betrayals/music/`
+const streamedBase = `${soundtrackBase}streamed/`
+const offlineBase = `${soundtrackBase}offline/`
+const hostedStreamedBase = new URL(
+  'assets/betrayals/music/streamed/',
+  'https://georgi-cole.github.io/the-big-eye-betrayals/'
+).toString()
+
+function soundtrack(file: string, startAtSec: number, loop: boolean, volume: number) {
+  return {
+    source: `${streamedBase}${file}`,
+    remoteSource: `${hostedStreamedBase}${file}`,
+    fallbackSource: `${offlineBase}${file}`,
+    startAtSec,
+    loop,
+    volume,
+  }
+}
 
 export const BETRAYALS_SOUNDTRACKS: Readonly<Record<BetrayalsMusicScene, SoundtrackDefinition>> = {
-  'intro-hub': {
-    source: `${soundtrackBase}introhub-main-the-four-note-motif.mp3`,
-    startAtSec: 0,
-    loop: true,
-    volume: 0.62,
-  },
-  'inside-castle': {
-    source: `${soundtrackBase}inside-the-castle-quietly-suspenseful.mp3`,
-    startAtSec: 0,
-    loop: true,
-    volume: 0.58,
-  },
-  'round-table': {
-    source: `${soundtrackBase}the-round-table-candlelit-intrigue.mp3`,
-    startAtSec: 0,
-    loop: true,
-    volume: 0.58,
-  },
-  conclave: {
-    source: `${soundtrackBase}the-conclave-the-hollow-withdrawal.mp3`,
-    startAtSec: 0,
-    loop: true,
-    volume: 0.58,
-  },
-  murder: {
-    source: `${soundtrackBase}the-murder-the-castles-final-bell.mp3`,
-    startAtSec: 210,
-    loop: true,
-    volume: 0.66,
-  },
-  'loyals-win': {
-    source: `${soundtrackBase}loyals-win-the-final-chord.mp3`,
-    startAtSec: 0,
-    loop: false,
-    volume: 0.72,
-  },
-  'betrayers-win': {
-    source: `${soundtrackBase}the-betrayers-win-the-hollow-withdrawal.mp3`,
-    startAtSec: 90,
-    loop: false,
-    volume: 0.72,
-  },
+  'intro-hub': soundtrack('introhub-main-the-four-note-motif.mp3', 0, true, 0.62),
+  'inside-castle': soundtrack('inside-the-castle-quietly-suspenseful.mp3', 0, true, 0.58),
+  'round-table': soundtrack('the-round-table-candlelit-intrigue.mp3', 0, true, 0.58),
+  conclave: soundtrack('the-conclave-the-hollow-withdrawal.mp3', 0, true, 0.58),
+  murder: soundtrack('the-murder-the-castles-final-bell.mp3', 210, true, 0.66),
+  'loyals-win': soundtrack('loyals-win-the-final-chord.mp3', 0, false, 0.72),
+  'betrayers-win': soundtrack('the-betrayers-win-the-hollow-withdrawal.mp3', 90, false, 0.72),
 }
 
 export function resolveBetrayalsSoundtrackScene(
@@ -101,13 +86,18 @@ export function resolveBetrayalsSoundtrackScene(
 const MUSIC_OWNER = 'betrayals:scene-soundtrack'
 const FADE_OUT_MS = 650
 const FADE_IN_MS = 850
+const STREAM_START_TIMEOUT_MS = 12_000
 
 type ActiveSoundtrack = {
   audio: HTMLAudioElement
   scene: BetrayalsMusicScene
   baseVolume: number
   ready: boolean
+  fallback: boolean
   endedHandler: () => void
+  errorHandler: () => void
+  startupTimer: number | null
+  fallbackRequested: boolean
 }
 
 export class BetrayalsSoundtrackController {
@@ -117,17 +107,20 @@ export class BetrayalsSoundtrackController {
   private finishFade: (() => void) | null = null
   private pendingSeekCleanup: (() => void) | null = null
 
-  transition(scene: BetrayalsMusicScene | null): Promise<void> {
+  transition(scene: BetrayalsMusicScene | null, fallbackOnly = false): Promise<void> {
     const generation = ++this.generation
     this.cancelFade()
     this.cancelPendingSeek()
-    return this.applyTransition(generation, scene)
+    return this.applyTransition(generation, scene, fallbackOnly)
   }
 
   resumeFromGesture(): void {
     const active = this.active
     if (!active?.ready || active.audio.ended || !active.audio.paused) return
-    void this.playAndFade(active, this.generation)
+    const generation = this.generation
+    void this.playAndFade(active, generation).then((result) => {
+      if (result === 'failed') void this.switchToFallback(active, generation)
+    })
   }
 
   dispose(): Promise<void> {
@@ -136,7 +129,8 @@ export class BetrayalsSoundtrackController {
 
   private async applyTransition(
     generation: number,
-    scene: BetrayalsMusicScene | null
+    scene: BetrayalsMusicScene | null,
+    fallbackOnly: boolean
   ): Promise<void> {
     const previous = this.active
     if (previous) {
@@ -151,43 +145,109 @@ export class BetrayalsSoundtrackController {
       return
     }
 
+    await this.startScene(scene, generation, fallbackOnly)
+  }
+
+  private async startScene(
+    scene: BetrayalsMusicScene,
+    generation: number,
+    fallbackOnly: boolean
+  ): Promise<void> {
+    if (generation !== this.generation) return
     const definition = BETRAYALS_SOUNDTRACKS[scene]
-    const audio = new Audio(new URL(definition.source, document.baseURI).toString())
-    audio.preload = 'auto'
-    audio.loop = definition.loop && definition.startAtSec === 0
+    const remote = Capacitor.isNativePlatform()
+    const useFallback =
+      fallbackOnly || (remote && typeof navigator !== 'undefined' && navigator.onLine === false)
+    const startAtSec = useFallback ? 0 : definition.startAtSec
+    const source = useFallback
+      ? definition.fallbackSource
+      : remote
+        ? definition.remoteSource
+        : definition.source
+    const audio = new Audio(new URL(source, document.baseURI).toString())
+    audio.preload = 'metadata'
+    audio.loop = definition.loop && startAtSec === 0
     audio.volume = 0
 
     const active: ActiveSoundtrack = {
       audio,
       scene,
       baseVolume: 0,
-      ready: definition.startAtSec === 0,
+      ready: startAtSec === 0,
+      fallback: useFallback,
       endedHandler: () => {},
+      errorHandler: () => {},
+      startupTimer: null,
+      fallbackRequested: false,
     }
     active.endedHandler = () => {
       if (
         !definition.loop ||
-        definition.startAtSec === 0 ||
+        startAtSec === 0 ||
         this.active !== active ||
         generation !== this.generation
       ) {
         return
       }
-      audio.currentTime = definition.startAtSec
+      audio.currentTime = startAtSec
       void audio.play().catch(() => undefined)
+    }
+    active.errorHandler = () => {
+      void this.switchToFallback(active, generation)
     }
 
     this.active = active
     SoundManager.claimExternalMusic(MUSIC_OWNER, audio, 0)
+    if (!useFallback) {
+      audio.addEventListener('error', active.errorHandler)
+      if (remote) {
+        active.startupTimer = window.setTimeout(active.errorHandler, STREAM_START_TIMEOUT_MS)
+      }
+    }
 
-    const seekReady = await this.seekToStart(active, definition.startAtSec, generation)
+    const seekReady = await this.seekToStart(active, startAtSec, generation)
     if (!seekReady || generation !== this.generation) {
-      if (generation === this.generation && this.active === active) this.release(active, true)
+      if (generation !== this.generation || this.active !== active || active.fallbackRequested) {
+        return
+      }
+      if (!useFallback) {
+        this.release(active, true)
+        await this.startScene(scene, generation, true)
+        return
+      }
+      this.release(active, true)
       return
     }
     active.ready = true
     audio.addEventListener('ended', active.endedHandler)
-    await this.playAndFade(active, generation)
+    const playback = await this.playAndFade(active, generation)
+    if (
+      playback === 'failed' &&
+      !useFallback &&
+      !active.fallbackRequested &&
+      generation === this.generation &&
+      this.active === active
+    ) {
+      this.release(active, true)
+      await this.startScene(scene, generation, true)
+    }
+  }
+
+  private async switchToFallback(active: ActiveSoundtrack, generation: number): Promise<void> {
+    if (
+      active.fallback ||
+      active.fallbackRequested ||
+      this.active !== active ||
+      generation !== this.generation
+    ) {
+      return
+    }
+    active.fallbackRequested = true
+    this.cancelPendingSeek()
+    await this.fade(active, 0, FADE_OUT_MS, generation)
+    if (generation !== this.generation || this.active !== active) return
+    this.release(active, false)
+    await this.startScene(active.scene, generation, true)
   }
 
   private async seekToStart(
@@ -230,26 +290,29 @@ export class BetrayalsSoundtrackController {
     })
   }
 
-  private async playAndFade(active: ActiveSoundtrack, generation: number): Promise<void> {
+  private async playAndFade(
+    active: ActiveSoundtrack,
+    generation: number
+  ): Promise<'played' | 'blocked' | 'failed'> {
     try {
       await active.audio.play()
     } catch (error) {
-      if (
-        generation === this.generation &&
-        this.active === active &&
-        (error as DOMException).name !== 'NotAllowedError'
-      ) {
-        this.release(active, true)
+      if (generation !== this.generation || this.active !== active) return 'failed'
+      if ((error as DOMException).name === 'NotAllowedError') {
+        this.clearStartupTimer(active)
+        return 'blocked'
       }
-      return
+      return 'failed'
     }
 
     if (generation !== this.generation || this.active !== active) {
       active.audio.pause()
-      return
+      return 'failed'
     }
 
+    this.clearStartupTimer(active)
     await this.fade(active, BETRAYALS_SOUNDTRACKS[active.scene].volume, FADE_IN_MS, generation)
+    return 'played'
   }
 
   private fade(
@@ -291,10 +354,18 @@ export class BetrayalsSoundtrackController {
   }
 
   private release(active: ActiveSoundtrack, restore: boolean): void {
+    this.clearStartupTimer(active)
     active.audio.pause()
     active.audio.removeEventListener('ended', active.endedHandler)
+    active.audio.removeEventListener('error', active.errorHandler)
     if (this.active === active) this.active = null
     SoundManager.releaseExternalMusic(MUSIC_OWNER, active.audio, restore)
+  }
+
+  private clearStartupTimer(active: ActiveSoundtrack): void {
+    if (active.startupTimer === null) return
+    window.clearTimeout(active.startupTimer)
+    active.startupTimer = null
   }
 
   private cancelFade(): void {
