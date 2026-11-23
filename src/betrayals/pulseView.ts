@@ -53,6 +53,10 @@ export function accountText(account: PlayerAccount, name: (id: string) => string
     : 'The moment passed before you could see what happened.'
 }
 
+function observedShare(count: number, total: number) {
+  return total ? Math.round((count / total) * 100) : undefined
+}
+
 export function profileForGuest(run: Run, guestId: string) {
   const state = investigationFor(run)
   const accounts = knownAccounts(run).filter((report) => report.guestId === guestId)
@@ -70,6 +74,7 @@ export function profileForGuest(run: Run, guestId: string) {
   const visits = observed.filter(
     ({ behavior }) => behavior && behavior !== 'alone' && behavior !== 'avoided'
   ).length
+  const behaviorCount = observed.filter(({ behavior }) => behavior).length
   const alone = observed.filter(({ behavior }) => behavior === 'alone').length
   const openedUp = others.filter(
     ({ access, claim }) => access === 'statement' && claim && !claim.denies
@@ -82,10 +87,12 @@ export function profileForGuest(run: Run, guestId: string) {
   const voteTalk = observed.filter(
     ({ behavior }) => behavior === 'defended' || behavior === 'lobbied'
   ).length
-  const quickReactions = observed.filter(
+  const reactions = observed.filter(({ behavior, mood }) => behavior || mood)
+  const quickReactions = reactions.filter(
     ({ behavior, mood }) => behavior === 'avoided' || mood === 'hurried'
   ).length
   const moods = observed.filter(({ mood }) => mood)
+  const calm = moods.filter(({ mood }) => mood === 'at ease').length
   const firstMood = moods[0]
   const pastMood = moods.find(({ day }) => day < (firstMood?.day ?? 0))
   const heard = others.filter(({ speakerId }) => speakerId && speakerId !== guestId)
@@ -105,11 +112,11 @@ export function profileForGuest(run: Run, guestId: string) {
     ),
     composure: heard.find(({ claim }) => Boolean(claim?.mood)),
   }
-  const notes = Object.hasOwn(state.notes, guestId) ? state.notes[guestId] : undefined
   const metrics = (
     [
       {
         id: 'sociability',
+        level: observedShare(visits, visits + alone),
         value: visits
           ? `${visits} contact${visits === 1 ? '' : 's'} observed`
           : alone
@@ -121,6 +128,7 @@ export function profileForGuest(run: Run, guestId: string) {
       },
       {
         id: 'openness',
+        level: observedShare(openedUp, openedUp + turnedAway),
         value: openedUp
           ? 'Discussed their own choices'
           : turnedAway
@@ -133,6 +141,7 @@ export function profileForGuest(run: Run, guestId: string) {
       },
       {
         id: 'influence',
+        level: observedShare(support, votePacts.length),
         value: support
           ? 'Has secured support'
           : votePacts.length
@@ -144,20 +153,32 @@ export function profileForGuest(run: Run, guestId: string) {
       },
       {
         id: 'impulsiveness',
-        value: quickReactions ? 'Seen cutting an exchange short' : undefined,
+        level: observedShare(quickReactions, reactions.length),
+        value: quickReactions
+          ? 'Seen reacting quickly'
+          : reactions.length
+            ? 'No quick reactions seen'
+            : undefined,
         detail: quickReactions
           ? `Observed in ${quickReactions} moment${quickReactions === 1 ? '' : 's'}.`
           : undefined,
       },
       {
         id: 'strategy',
-        value: voteTalk || votePacts.length ? 'Has worked on the vote in private' : undefined,
+        level: observedShare(voteTalk + votePacts.length, behaviorCount + votePacts.length),
+        value:
+          voteTalk || votePacts.length
+            ? 'Has worked on the vote in private'
+            : behaviorCount
+              ? 'No vote work seen'
+              : undefined,
         detail: voteTalk
           ? `You saw ${voteTalk} voting discussion${voteTalk === 1 ? '' : 's'}.`
           : undefined,
       },
       {
         id: 'composure',
+        level: observedShare(calm, moods.length),
         value: firstMood?.mood ? `Seemed ${firstMood.mood}` : undefined,
         detail: firstMood
           ? `Day ${firstMood.day}${pastMood?.mood ? ` · Previously ${pastMood.mood}` : ''}`
@@ -168,14 +189,12 @@ export function profileForGuest(run: Run, guestId: string) {
     ...metric,
     label: PROFILE_TRAITS[metric.id],
     reported: otherEvidence[metric.id],
-    personal: notes?.traits?.[metric.id],
   }))
   return {
     guestId,
     name: guestName(run.seats, guestId),
     metrics,
     accounts,
-    note: notes,
     saved: state.saved,
     watches: state.watches.filter(({ guestId: id }) => id === guestId),
     witnessRequests: state.witnesses.filter(({ day }) => day === run.day),

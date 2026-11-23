@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
+import '../components/HousePulse/HousePulse.css'
 import { compareReportAccounts } from './investigationEvidence'
 import type { InvestigationAction } from './investigation'
 import type { GameLogEntry } from './gameLog'
@@ -177,9 +180,9 @@ export function BetrayalsPulse({
     return account ? [account] : []
   })
   const recent = view.accounts.filter((report) => report.day === day && report.claim).slice(0, 2)
-  const reads = guestId
-    ? [[guestId, view.notes[guestId]] as const].filter(([, note]) => note)
-    : Object.entries(view.notes)
+  const notes = Object.entries(view.notes).filter(
+    ([id, note]) => (!guestId || id === guestId) && note.text
+  )
 
   useEffect(() => {
     const element = dialog.current
@@ -201,7 +204,7 @@ export function BetrayalsPulse({
   return (
     <dialog
       ref={dialog}
-      className="betrayals-pulse"
+      className="house-pulse__sheet betrayals-pulse"
       aria-labelledby="betrayals-pulse-title"
       onCancel={(event) => {
         event.preventDefault()
@@ -211,171 +214,182 @@ export function BetrayalsPulse({
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="betrayals-pulse__sheet">
-        <header className="betrayals-pulse__header">
-          <div>
-            <span>Day {day}</span>
-            <h2 id="betrayals-pulse-title">My Pulse</h2>
-          </div>
+      <header className="house-pulse__header">
+        <div>
+          <span className="house-pulse__eyebrow">Day {day}</span>
+          <h2 id="betrayals-pulse-title">My Pulse</h2>
+          <p>Your latest developments, learned intel and commitments.</p>
+        </div>
+        <GameBackButton className="house-pulse__back" label="Close My Pulse" onClick={onClose} />
+      </header>
+      <nav className="house-pulse__tabs" aria-label="My Pulse sections">
+        {tabs.map((item) => (
           <button
             type="button"
-            className="pulse-close"
-            aria-label="Close My Pulse"
-            onClick={onClose}
+            key={item}
+            className={tab === item ? 'is-active' : undefined}
+            aria-pressed={tab === item}
+            onClick={() => setTab(item)}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
+            {item}
           </button>
-        </header>
-        <nav className="betrayals-pulse__tabs" aria-label="My Pulse sections">
-          {tabs.map((item) => (
-            <button
-              type="button"
-              key={item}
-              aria-pressed={tab === item}
-              onClick={() => setTab(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
-        <div className="betrayals-pulse__body" key={tab}>
-          {tab === 'Today' && (
-            <>
-              {recent.length > 0 && (
-                <section className="pulse-new" aria-label="New intel today">
-                  <header>
-                    <h3>New intel</h3>
-                    <button type="button" onClick={() => setTab('Intel')}>
-                      Open Intel
-                    </button>
-                  </header>
-                  {recent.map((account) => (
-                    <InvestigationAccountCard key={account.id} account={account} name={name} />
-                  ))}
-                </section>
-              )}
-              <Timelines entries={entries} day={day} />
-            </>
-          )}
-          {tab === 'Intel' && (
-            <>
-              <div className="pulse-tools">
-                <label>
-                  Guest
-                  <select value={guestId} onChange={(event) => setGuestId(event.target.value)}>
-                    <option value="">All guests</option>
-                    {view.guests.map(({ id, name }) => (
-                      <option key={id} value={id}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+        ))}
+      </nav>
+      <div className="house-pulse__content" key={tab}>
+        {tab === 'Today' && (
+          <>
+            {recent.length > 0 && (
+              <section className="pulse-new" aria-label="New intel today">
+                <header>
+                  <h3>New intel</h3>
+                  <button type="button" onClick={() => setTab('Intel')}>
+                    Open Intel
+                  </button>
+                </header>
+                {recent.map((account) => (
+                  <InvestigationAccountCard
+                    key={account.id}
+                    account={account}
+                    name={name}
+                    inPulse
+                  />
+                ))}
+              </section>
+            )}
+            <Timelines entries={entries} day={day} />
+          </>
+        )}
+        {tab === 'Intel' && (
+          <>
+            <div className="pulse-tools">
+              <div className="pulse-tools__top">
+                <span>{guestId ? name(guestId) : 'All guests'}</span>
                 <button
                   type="button"
+                  className="house-pulse__link"
                   aria-pressed={savedOnly}
                   onClick={() => setSavedOnly(!savedOnly)}
                 >
                   Saved only
                 </button>
               </div>
-              {selected.length > 0 && (
-                <section className="pulse-comparison" aria-label="Compare accounts">
-                  <header>
-                    <h3>Compare accounts</h3>
-                    <button type="button" onClick={() => setCompareIds([])}>
-                      Clear
-                    </button>
-                  </header>
-                  <div>
-                    {selected.map((account) => (
-                      <InvestigationAccountCard key={account.id} account={account} name={name} />
-                    ))}
-                  </div>
-                  <p role="status">
-                    {selected.length === 2
-                      ? compareReportAccounts(selected[0], selected[1])
-                      : 'Choose another account.'}
-                  </p>
-                </section>
-              )}
-              {reads.length > 0 && (
-                <details className="pulse-ballots">
-                  <summary>My reads</summary>
-                  <ul>
-                    {reads.map(([id, note]) => (
-                      <li key={id}>
-                        <strong>{name(id)}</strong> ·{' '}
-                        {note.leaning === 'open'
-                          ? 'Undecided'
-                          : note.leaning === 'trust'
-                            ? 'Trust'
-                            : 'Suspect'}
-                        {note.text ? ` — ${note.text}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-              {view.votes.length > 0 && (
-                <details className="pulse-ballots">
-                  <summary>Public ballots</summary>
-                  {view.votes.map(({ day, ballots }) => (
-                    <section key={day}>
-                      <h3>Day {day}</h3>
-                      <ul>
-                        {ballots
-                          .filter(
-                            ({ voterId, targetId }) =>
-                              !guestId || guestId === voterId || guestId === targetId
-                          )
-                          .map(({ voterId, targetId }) => (
-                            <li key={voterId}>
-                              {name(voterId)} voted for {name(targetId)}.
-                            </li>
-                          ))}
-                      </ul>
-                    </section>
+              <div
+                className="investigation-choices investigation-choices--scroll"
+                role="group"
+                aria-label="Filter intel by guest"
+              >
+                <button
+                  type="button"
+                  className="hubmate-choice-chip"
+                  aria-pressed={!guestId}
+                  onClick={() => setGuestId('')}
+                >
+                  All guests
+                </button>
+                {view.guests.map(({ id, name, portrait }) => (
+                  <HubmateChoiceChip
+                    key={id}
+                    player={{ id, name, avatar: portrait ?? '', status: 'active' }}
+                    label={name}
+                    selected={guestId === id}
+                    onClick={() => setGuestId(id)}
+                  />
+                ))}
+              </div>
+            </div>
+            {selected.length > 0 && (
+              <section className="pulse-comparison" aria-label="Compare accounts">
+                <header>
+                  <h3>Compare accounts</h3>
+                  <button type="button" onClick={() => setCompareIds([])}>
+                    Clear
+                  </button>
+                </header>
+                <div>
+                  {selected.map((account) => (
+                    <InvestigationAccountCard
+                      key={account.id}
+                      account={account}
+                      name={name}
+                      inPulse
+                    />
                   ))}
-                </details>
-              )}
-              <div className="pulse-accounts">
-                {accounts.map((account) => (
-                  <InvestigationAccountCard key={account.id} account={account} name={name}>
+                </div>
+                <p role="status">
+                  {selected.length === 2
+                    ? compareReportAccounts(selected[0], selected[1])
+                    : 'Choose another account.'}
+                </p>
+              </section>
+            )}
+            {notes.length > 0 && (
+              <details className="pulse-ballots">
+                <summary>Private notes</summary>
+                <ul>
+                  {notes.map(([id, note]) => (
+                    <li key={id}>
+                      <strong>{name(id)}</strong> {'\u00b7'} {note.text}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {view.votes.length > 0 && (
+              <details className="pulse-ballots">
+                <summary>Public ballots</summary>
+                {view.votes.map(({ day, ballots }) => (
+                  <section key={day}>
+                    <h3>Day {day}</h3>
+                    <ul>
+                      {ballots
+                        .filter(
+                          ({ voterId, targetId }) =>
+                            !guestId || guestId === voterId || guestId === targetId
+                        )
+                        .map(({ voterId, targetId }) => (
+                          <li key={voterId}>
+                            {name(voterId)} voted for {name(targetId)}.
+                          </li>
+                        ))}
+                    </ul>
+                  </section>
+                ))}
+              </details>
+            )}
+            <div className="pulse-accounts">
+              {accounts.map((account) => (
+                <InvestigationAccountCard key={account.id} account={account} name={name} inPulse>
+                  <button
+                    type="button"
+                    aria-pressed={view.saved.includes(account.id)}
+                    onClick={() => onAction({ kind: 'save', reportId: account.id })}
+                  >
+                    {view.saved.includes(account.id) ? 'Saved' : 'Save'}
+                  </button>
+                  {account.claim && (
                     <button
                       type="button"
-                      aria-pressed={view.saved.includes(account.id)}
-                      onClick={() => onAction({ kind: 'save', reportId: account.id })}
+                      aria-pressed={compareIds.includes(account.id)}
+                      onClick={() => chooseForComparison(account.id)}
                     >
-                      {view.saved.includes(account.id) ? 'Saved' : 'Save'}
+                      Compare
                     </button>
-                    {account.claim && (
-                      <button
-                        type="button"
-                        aria-pressed={compareIds.includes(account.id)}
-                        onClick={() => chooseForComparison(account.id)}
-                      >
-                        Compare
-                      </button>
-                    )}
-                  </InvestigationAccountCard>
-                ))}
-                {!accounts.length && (
-                  <p className="pulse-empty">
-                    {savedOnly
-                      ? 'No saved accounts match this guest.'
-                      : 'Observe a guest or ask what someone saw to start a case.'}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-          {tab === 'Commitments' && (
-            <Commitments view={view} day={day} humanId={humanId} name={name} />
-          )}
-        </div>
+                  )}
+                </InvestigationAccountCard>
+              ))}
+              {!accounts.length && (
+                <p className="pulse-empty">
+                  {savedOnly
+                    ? 'No saved accounts match this guest.'
+                    : 'Observe a guest or ask what someone saw to start a case.'}
+                </p>
+              )}
+            </div>
+          </>
+        )}
+        {tab === 'Commitments' && (
+          <Commitments view={view} day={day} humanId={humanId} name={name} />
+        )}
       </div>
     </dialog>
   )
