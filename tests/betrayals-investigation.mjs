@@ -225,11 +225,12 @@ test('lookouts report once on the next Social phase and personal impressions sta
       note: { leaning: 'suspect', text: '  Check their vote.  ', traits: { strategy: 'high' } },
     })
   )
-  assert.equal(profileForGuest(run, guestId).note?.text, 'Check their vote.')
-  assert.equal(
-    profileForGuest(run, guestId).metrics.find(({ id }) => id === 'strategy')?.personal,
-    'high'
-  )
+  assert.deepEqual(pulseView(run).notes[guestId], {
+    leaning: 'suspect',
+    text: 'Check their vote.',
+    traits: { strategy: 'high' },
+  })
+  assert.deepEqual(profileForGuest(run, guestId).metrics, profileForGuest(before, guestId).metrics)
   assert.deepEqual(investigationPressure(before, watcherId), investigationPressure(run, watcherId))
   const next = restore(advanceDayBeat({ ...run, day: 2, phase: 'dawn' }))
   assert.equal(next.investigation.reports.length, 1)

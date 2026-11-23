@@ -703,3 +703,8 @@ store listings or change configured prices.
   champion portrait selection. Standard and VIP use the shared ceremony and
   champion coronation. The presentation update preserves existing marketplace
   products, pricing, benefits and entitlement rules.
+
+- 2026-11-23: Reviewed the Betrayals presentation update. Round Table portraits
+  reuse the Changing Room frame, Advertising Privacy uses the Betrayals theme,
+  and hotel letter scenes use character-specific artwork for the full cast.
+  Existing age checks, ad availability, prices, rewards, and entitlements apply.

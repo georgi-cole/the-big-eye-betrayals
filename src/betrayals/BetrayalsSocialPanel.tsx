@@ -847,6 +847,15 @@ export function BetrayalsSocialPanel({
                   </div>
                   {!canAct && <p>{seasonEndedHint}</p>}
                 </div>
+                {investigation && (
+                  <BetrayalsGuestProfile
+                    key={peer.id}
+                    profile={investigation.profile(peer.id)}
+                    investigation={investigation}
+                    contacts={contacts}
+                    name={label}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -870,15 +879,6 @@ export function BetrayalsSocialPanel({
             )}
           </section>
 
-          {peer && investigation && (
-            <BetrayalsGuestProfile
-              key={peer.id}
-              profile={investigation.profile(peer.id)}
-              investigation={investigation}
-              contacts={contacts}
-              name={label}
-            />
-          )}
           {!peer && investigation && (
             <button
               className="sp2-action-button"

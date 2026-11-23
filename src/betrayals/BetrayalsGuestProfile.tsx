@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
+import type { Player } from '../types'
+import '../components/RealityLedger/RealityLedger.css'
 import { InvestigationAccountCard } from './InvestigationAccountCard'
 import type { InvestigationAction } from './investigation'
-import { isVoteClaim, PERSONAL_NOTE_LIMIT, TRAIT_READS } from './investigationRecords'
-import type { ObservationFocus, PersonalRead, ProfileTrait } from './investigationRecords'
+import { isVoteClaim } from './investigationRecords'
+import type { ObservationFocus } from './investigationRecords'
 import { accountText } from './pulseView'
 import type { GuestProfile, PlayerAccount } from './pulseView'
 import './betrayals-pulse.css'
@@ -38,85 +41,11 @@ export function InvestigationButton({
   )
 }
 
-function ReadEditor({
-  profile,
-  onSave,
-}: {
-  profile: GuestProfile
-  onSave: (note: PersonalRead) => void
-}) {
-  const [leaning, setLeaning] = useState<PersonalRead['leaning']>(profile.note?.leaning ?? 'open')
-  const [text, setText] = useState(profile.note?.text ?? '')
-  const [traits, setTraits] = useState<NonNullable<PersonalRead['traits']>>(
-    profile.note?.traits ?? {}
-  )
-  const dirty =
-    leaning !== (profile.note?.leaning ?? 'open') ||
-    text.trim() !== (profile.note?.text ?? '') ||
-    profile.metrics.some(({ id }) => traits[id] !== profile.note?.traits?.[id])
-  function setTrait(id: ProfileTrait, value: string) {
-    setTraits((current) => {
-      const next = { ...current }
-      if (value) next[id] = value as (typeof TRAIT_READS)[number]
-      else delete next[id]
-      return next
-    })
-  }
-  return (
-    <form
-      className="guest-profile__read"
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSave({ leaning, text, traits })
-      }}
-    >
-      <label>
-        My read
-        <select
-          value={leaning}
-          onChange={(event) => setLeaning(event.target.value as PersonalRead['leaning'])}
-        >
-          <option value="open">Undecided</option>
-          <option value="trust">Trust</option>
-          <option value="suspect">Suspect</option>
-        </select>
-      </label>
-      <label>
-        Private note
-        <textarea
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          maxLength={PERSONAL_NOTE_LIMIT}
-          rows={2}
-        />
-      </label>
-      <details className="guest-profile__trait-read">
-        <summary>Rate specific traits</summary>
-        <div>
-          {profile.metrics.map(({ id, label }) => (
-            <label key={id}>
-              {label}
-              <select
-                value={traits[id] ?? ''}
-                onChange={(event) => setTrait(id, event.target.value)}
-              >
-                <option value="">Undecided</option>
-                {TRAIT_READS.map((level) => (
-                  <option key={level} value={level}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </div>
-      </details>
-      <button type="submit" disabled={!dirty}>
-        Save my read
-      </button>
-    </form>
-  )
-}
+const observationChoices = [
+  ['actions', 'Actions'],
+  ['contacts', 'Contacts'],
+  ['demeanor', 'Demeanor'],
+] as const satisfies ReadonlyArray<readonly [ObservationFocus, string]>
 
 export function BetrayalsGuestProfile({
   profile,
@@ -126,7 +55,7 @@ export function BetrayalsGuestProfile({
 }: {
   profile: GuestProfile
   investigation: InvestigationControls
-  contacts: readonly { id: string; name: string }[]
+  contacts: readonly Player[]
   name: (id: string) => string
 }) {
   const [focus, setFocus] = useState<ObservationFocus>('actions')
@@ -210,112 +139,150 @@ export function BetrayalsGuestProfile({
   }
 
   return (
-    <details className="guest-profile">
-      <summary>
-        View Profile<span>{profile.name}</span>
-      </summary>
+    <details className="sp2-focus__full-read guest-profile">
+      <summary>View full profile</summary>
       <div className="guest-profile__body">
-        {investigation.open && (
+        <section
+          className="reality-ledger__relationship guest-profile__metrics"
+          aria-label={`${profile.name} profile traits`}
+        >
+          {metrics.map(({ label, value, level, detail, reported }) => (
+            <div className="guest-profile__metric" key={label}>
+              <div className="guest-profile__metric-row">
+                <span>{label}</span>
+                <span
+                  className="reality-ledger__relationship-meter"
+                  role={level === undefined ? undefined : 'meter'}
+                  aria-hidden={level === undefined || undefined}
+                  aria-label={label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={level}
+                  aria-valuetext={value}
+                >
+                  {level !== undefined && (
+                    <span
+                      className="reality-ledger__relationship-meter-fill"
+                      style={{ width: `${level}%` }}
+                    />
+                  )}
+                </span>
+                <small>{value ?? 'Too little to tell'}</small>
+              </div>
+              {detail && <small>{detail}</small>}
+              {reported && (
+                <details className="guest-profile__metric-account">
+                  <summary>
+                    {reported.speakerId ? `${name(reported.speakerId)}'s account` : 'Reported'}
+                  </summary>
+                  <small>{accountText(reported, name)}</small>
+                </details>
+              )}
+            </div>
+          ))}
+          <small>Based on what you’ve seen so far.</small>
+        </section>
+
+        {(investigation.open || lastObservation) && (
           <section
             className="guest-profile__section guest-profile__observe"
             aria-label="Observation"
           >
             <header>
               <h3>Observe</h3>
-              <span>
-                {attention} focus · {investigation.remaining} left today
-              </span>
+              {investigation.open && (
+                <span>
+                  {attention} focus · {investigation.remaining} left today
+                </span>
+              )}
             </header>
-            <div className="guest-profile__fields">
-              <label>
-                Watch for
-                <select
-                  value={focus}
-                  onChange={(event) => setFocus(event.target.value as ObservationFocus)}
-                >
-                  <option value="actions">Actions</option>
-                  <option value="contacts">Contacts</option>
-                  <option value="demeanor">Demeanor</option>
-                </select>
-              </label>
-              <InvestigationButton investigation={investigation} action={observe}>
-                Observe · 1 Energy
-              </InvestigationButton>
-            </div>
-            {reason && <small>{reason}</small>}
+            {investigation.open && (
+              <>
+                <div className="investigation-choices" role="group" aria-label="Observation focus">
+                  {observationChoices.map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="hubmate-choice-chip"
+                      aria-pressed={focus === id}
+                      onClick={() => setFocus(id)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="guest-profile__actions">
+                  <InvestigationButton investigation={investigation} action={observe}>
+                    Observe · 1 Energy
+                  </InvestigationButton>
+                </div>
+                {reason && <small>{reason}</small>}
+              </>
+            )}
+            {lastObservation && (
+              <InvestigationAccountCard account={lastObservation} name={name}>
+                {actionsFor(lastObservation)}
+              </InvestigationAccountCard>
+            )}
           </section>
         )}
-
-        <section className="guest-profile__section" aria-label="Observed behavior">
-          <header>
-            <h3>Observed behavior</h3>
-            <button type="button" onClick={() => investigation.openPulse(guestId)}>
-              Open Intel
-            </button>
-          </header>
-          {lastObservation && (
-            <InvestigationAccountCard account={lastObservation} name={name}>
-              {actionsFor(lastObservation)}
-            </InvestigationAccountCard>
-          )}
-          <dl className="guest-profile__metrics">
-            {metrics.map(({ label, value, detail, reported, personal }) => (
-              <div key={label}>
-                <dt>{label}</dt>
-                <dd>
-                  {value ?? 'Too little to tell'}
-                  {detail && <small>{detail}</small>}
-                  {reported && (
-                    <details className="guest-profile__metric-account">
-                      <summary>
-                        {reported.speakerId ? `${name(reported.speakerId)}’s account` : 'Reported'}
-                      </summary>
-                      <small>{accountText(reported, name)}</small>
-                    </details>
-                  )}
-                  {personal && (
-                    <small className="guest-profile__personal">My read · {personal}</small>
-                  )}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </section>
 
         <section className="guest-profile__section" aria-label="Other accounts">
           <header>
             <h3>Other accounts</h3>
+            <button type="button" onClick={() => investigation.openPulse(guestId)}>
+              Open Intel
+            </button>
           </header>
           {investigation.open && partners.length > 0 && (
             <>
-              <div className="guest-profile__fields">
-                <label>
-                  Speak to
-                  <select value={partner} onChange={(event) => setPartner(event.target.value)}>
-                    <option value="">Choose a guest</option>
-                    {partners.map(({ id, name }) => (
-                      <option value={id} key={id}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className="guest-profile__choices">
+                <span>Speak to{partner ? ` · ${name(partner)}` : ''}</span>
+                <div
+                  className="investigation-choices investigation-choices--scroll"
+                  role="group"
+                  aria-label="Speak to a guest"
+                >
+                  {partners.map((guest) => (
+                    <HubmateChoiceChip
+                      key={guest.id}
+                      player={guest}
+                      label={guest.name}
+                      selected={partner === guest.id}
+                      onClick={() => setPartner(guest.id)}
+                    />
+                  ))}
+                </div>
                 {recent.length > 0 && (
-                  <label>
-                    About
-                    <select
-                      value={selected?.id ?? ''}
-                      onChange={(event) => setReferenceId(event.target.value)}
+                  <>
+                    <span>Ask about</span>
+                    <div
+                      className="investigation-choices investigation-choices--scroll"
+                      role="group"
+                      aria-label="What to ask about"
                     >
-                      <option value="">General impression</option>
+                      <button
+                        type="button"
+                        className="hubmate-choice-chip"
+                        aria-pressed={!selected}
+                        onClick={() => setReferenceId('')}
+                      >
+                        General impression
+                      </button>
                       {recent.map((account) => (
-                        <option value={account.id} key={account.id}>
+                        <button
+                          key={account.id}
+                          type="button"
+                          className="hubmate-choice-chip"
+                          aria-pressed={selected?.id === account.id}
+                          onClick={() => setReferenceId(account.id)}
+                        >
                           Day {account.claim?.day} ·{' '}
                           {account.speakerId ? name(account.speakerId) : 'Your observation'}
-                        </option>
+                        </button>
                       ))}
-                    </select>
-                  </label>
+                    </div>
+                  </>
                 )}
               </div>
               <div className="guest-profile__actions">
@@ -403,11 +370,6 @@ export function BetrayalsGuestProfile({
             <p className="pulse-empty">You have no accounts about this guest yet.</p>
           )}
         </section>
-
-        <ReadEditor
-          profile={profile}
-          onSave={(note) => investigation.act({ kind: 'note', guestId, note })}
-        />
       </div>
     </details>
   )

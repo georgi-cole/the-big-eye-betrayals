@@ -85,28 +85,8 @@ const wings = sceneArt + 'loyal-wings.webp'
 const halo = assetBase + 'ceremonies/vfx/champagne-halo-v1.webp'
 const curtain = assetBase + 'ceremonies/shared/curtain.webp'
 const hotelArt = sceneArt + 'hotel-night/'
+const hotelChair = sceneArt + 'hotel-chair.webp'
 const hotelOpening = [['arrival', 'hotel-knock'], undefined, ['executor', 'hotel-door']] as const
-// Use the original illustrated letter readings where the face matches the roster.
-const hotelGuests = new Set([
-  'ash',
-  'bea',
-  'blue',
-  'echo',
-  'finn',
-  'ivy',
-  'jax',
-  'kai',
-  'kian',
-  'mimi',
-  'noa',
-  'nova',
-  'quinn',
-  'remy',
-  'rune',
-  'zed',
-  'pc-005',
-  'pc-015',
-])
 const handoffDuration = 1100
 
 const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat[] }> = {
@@ -332,17 +312,11 @@ function hotelShot(beat: number, lookId?: string, nightRoom?: NightRoom, hasSubj
   const opening = hotelOpening[beat]
   if (opening)
     return { src: hotelArt + opening[0] + '.webp', fallback: sceneArt + opening[1] + '.webp' }
-  const insert = hotelArt + 'letter.webp'
-  if (lookId && hotelGuests.has(lookId) && (beat === 3 || beat === 4)) {
-    return {
-      src: hotelArt + lookId + (beat === 3 ? '-sealed.webp' : '-open.webp'),
-      fallback: insert,
-    }
+  const room = beat === 3 && hasSubject ? hotelChair : hotelArt + 'letter.webp'
+  if (lookId && (beat === 3 || beat === 4)) {
+    return { src: hotelArt + lookId + (beat === 3 ? '-sealed.webp' : '-open.webp'), fallback: room }
   }
-  return {
-    src: beat === 3 && hasSubject ? sceneArt + 'hotel-chair.webp' : insert,
-    fallback: corridor,
-  }
+  return { src: room, fallback: corridor }
 }
 
 function HotelCamera({
@@ -360,7 +334,7 @@ function HotelCamera({
   const shot = hotelShot(beat, lookId, nightRoom, hasSubject)
   const [current, setCurrent] = useState(shot.src)
   const [cutoutFailed, setCutoutFailed] = useState(false)
-  const composeGuest = beat === 3 && hasSubject && (!lookId || !hotelGuests.has(lookId))
+  const composeGuest = beat === 3 && hasSubject && current === hotelChair
   const cutout = composeGuest && lookId && !cutoutFailed ? seatedCutout(lookId) : undefined
   const reader = composeGuest && (cutout?.src ?? portrait)
   return (
@@ -374,7 +348,9 @@ function HotelCamera({
         className="betrayals-cine__backdrop"
         src={current}
         alt=""
-        onError={() => setCurrent(current === shot.src ? shot.fallback : corridor)}
+        onError={() => {
+          if (current !== corridor) setCurrent(current === shot.src ? shot.fallback : corridor)
+        }}
       />
       {reader && (
         <div
@@ -629,7 +605,6 @@ export function CinematicScene({
     const hasSubject = Boolean(hotelLook || hotelPortrait)
     for (const shot of direction['death-letter'].beats.keys())
       void preloadImage(hotelShot(shot, hotelLook, scene.nightRoom, hasSubject).src)
-    if (hotelLook && !hotelGuests.has(hotelLook)) void preloadImage(seatedCutout(hotelLook).src)
     void preloadImage(murderedStamp)
   }, [deathLetter, motionReduced, hotelLook, hotelPortrait, scene.nightRoom])
 

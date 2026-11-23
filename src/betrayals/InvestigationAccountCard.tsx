@@ -6,14 +6,23 @@ export function InvestigationAccountCard({
   account,
   name,
   children,
+  inPulse = false,
 }: {
   account: PlayerAccount
   name: (id: string) => string
   children?: ReactNode
+  inPulse?: boolean
 }) {
   return (
-    <article className="investigation-account" data-access={account.access}>
-      <header>
+    <article
+      className={
+        inPulse
+          ? 'investigation-account house-pulse__card house-pulse__card--intel'
+          : 'investigation-account'
+      }
+      data-access={account.access}
+    >
+      <header className={inPulse ? 'house-pulse__card-top' : undefined}>
         <span>{accountLabel(account)}</span>
         <span>Day {account.claim?.day ?? account.day}</span>
       </header>

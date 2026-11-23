@@ -1,8 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion'
-import { joinPublicAssetPath } from '../../utils/avatar'
-import { PORTRAIT_FRAMING } from '../../appearance/portraitFraming'
+import { ANTIQUE_PORTRAIT_FRAME_URL, PORTRAIT_FRAMING } from '../../appearance/portraitFraming'
 import './LookLockInReveal.css'
 
 export type LockInLook = {
@@ -18,7 +17,6 @@ export type LockInLook = {
   startVeiled?: boolean
 }
 
-export const LOCK_IN_FRAME_URL = joinPublicAssetPath('assets/dressing-room/antique-gold-frame.webp')
 const REVEAL_DURATION = 1250
 const px = (value: number) => value + 'px'
 
@@ -219,7 +217,7 @@ export default function LookLockInReveal({
         </div>
         <motion.img
           className="look-lock__frame"
-          src={LOCK_IN_FRAME_URL}
+          src={ANTIQUE_PORTRAIT_FRAME_URL}
           alt=""
           style={{ opacity: progress }}
           onLoad={() => {

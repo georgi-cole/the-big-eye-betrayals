@@ -12,7 +12,8 @@ import { MAX_PROFILES, selectCurrentProfile, updateProfile } from '../../store/p
 import { selectIsVipActive } from '../../store/vipSlice'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { joinPublicAssetPath } from '../../utils/avatar'
-import LookLockInReveal, { LOCK_IN_FRAME_URL, type LockInLook } from './LookLockInReveal'
+import { ANTIQUE_PORTRAIT_FRAME_URL } from '../../appearance/portraitFraming'
+import LookLockInReveal, { type LockInLook } from './LookLockInReveal'
 import { preloadImage } from '../../utils/preload'
 import {
   BETRAYALS_LOOKS,
@@ -76,7 +77,7 @@ export default function DressingRoom() {
   }, [creatingProfile, atProfileLimit, navigate, routeState?.fromPlayerAccount, returnTo])
 
   useEffect(() => {
-    void preloadImage(LOCK_IN_FRAME_URL)
+    void preloadImage(ANTIQUE_PORTRAIT_FRAME_URL)
   }, [])
 
   useEffect(() => {

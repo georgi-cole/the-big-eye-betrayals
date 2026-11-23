@@ -1,5 +1,6 @@
 import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { appearanceFromAssetUrl, getAppearanceAsset } from '../appearance/catalog'
+import { ANTIQUE_PORTRAIT_FRAME_URL } from '../appearance/portraitFraming'
 import type { Seat } from './run'
 import './PortraitGallery.css'
 
@@ -11,11 +12,19 @@ function Painting({ guest }: { guest: Seat }) {
   const portrait = formal && !fallback ? base + formal : guest.portrait
   return (
     <div className="betrayals-painting">
-      {portrait ? (
-        <img src={portrait} alt="" draggable={false} onError={() => setFallback(true)} />
-      ) : (
-        <span aria-hidden="true">{guest.name[0]}</span>
-      )}
+      <div className="betrayals-painting__window" aria-hidden="true">
+        {portrait ? (
+          <img src={portrait} alt="" draggable={false} onError={() => setFallback(true)} />
+        ) : (
+          <span>{guest.name[0]}</span>
+        )}
+      </div>
+      <img
+        className="betrayals-painting__frame"
+        src={ANTIQUE_PORTRAIT_FRAME_URL}
+        alt=""
+        draggable={false}
+      />
       <span className="betrayals-painting__plaque">{guest.name}</span>
     </div>
   )

@@ -4,6 +4,7 @@ import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeGame } from './challengeRotation'
+import { investigationFor } from './investigationRecords'
 import { restoreRun, saveRun } from './persistence'
 import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
@@ -156,15 +157,24 @@ describe('Betrayals season review', () => {
     expect(openDressingRoom).toHaveBeenCalledWith('pc-015')
   })
 
-  it('opens the guest profile, saves an observation and personal read, and finds them in My Pulse after reload', async () => {
+  it('expands the profile, filters saved Intel with guest chips, and retains old notes after reload', async () => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
       BETRAYALS_AI_POOL,
       { publicMode: false, realityMode: 'off' },
       { id: 'pulse-profile', roleSeed: 28, publicSeed: 823 }
     )
-    const guest = run.seats[1]
-    saveRun(localStorage, 'edition-local', { ...run, phase: 'social' })
+    const [, guest, otherGuest] = run.seats
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'social',
+      investigation: {
+        ...investigationFor(run),
+        notes: {
+          [guest.id]: { leaning: 'suspect', text: 'Check their version tomorrow.' },
+        },
+      },
+    })
     const app = render(<BetrayalsScreen />)
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
     const social = within(screen.getByRole('dialog', { name: 'Social' }))
@@ -173,28 +183,34 @@ describe('Betrayals season review', () => {
         name: new RegExp(guest.name),
       })
     )
-    fireEvent.click(social.getByText('View Profile', { exact: true }))
+    fireEvent.click(social.getByText('View full profile', { exact: true }))
+    const traits = within(social.getByRole('region', { name: `${guest.name} profile traits` }))
+    expect(traits.getAllByText('Too little to tell')).toHaveLength(6)
+    expect(social.queryByRole('combobox')).toBeNull()
+    expect(social.queryByRole('textbox', { name: 'Private note' })).toBeNull()
     await clickAndSave(social.getByRole('button', { name: 'Observe · 1 Energy' }))
     expect(social.getByText('You observed')).toBeVisible()
+    expect(traits.getByRole('meter', { name: 'Strategic play' })).toBeVisible()
     expect(social.getByText('Steady focus · 2 left today')).toBeVisible()
     await clickAndSave(social.getByRole('button', { name: 'Save to Intel' }))
-    fireEvent.change(social.getByLabelText('My read'), { target: { value: 'suspect' } })
-    fireEvent.change(social.getByLabelText('Private note'), {
-      target: { value: 'Check their version tomorrow.' },
-    })
-    await clickAndSave(social.getByRole('button', { name: 'Save my read' }))
     fireEvent.click(social.getByRole('button', { name: 'Open Intel' }))
     const intel = within(screen.getByRole('dialog', { name: 'My Pulse' }))
     expect(intel.getByRole('button', { name: 'Intel' })).toHaveAttribute('aria-pressed', 'true')
-    expect(intel.getByLabelText('Guest')).toHaveValue(guest.id)
+    expect(intel.queryByRole('combobox')).toBeNull()
+    const guests = within(intel.getByRole('group', { name: 'Filter intel by guest' }))
+    expect(guests.getByRole('button', { name: guest.name })).toHaveAttribute('aria-pressed', 'true')
     expect(intel.getByRole('button', { name: 'Saved' })).toBeVisible()
+    fireEvent.click(guests.getByRole('button', { name: otherGuest.name }))
+    expect(intel.queryByText('You observed')).toBeNull()
+    fireEvent.click(guests.getByRole('button', { name: 'All guests' }))
+    expect(intel.getByText('You observed')).toBeVisible()
     app.unmount()
     render(<BetrayalsScreen />)
     fireEvent.click(screen.getByRole('button', { name: 'Open My Pulse' }))
     const restored = within(screen.getByRole('dialog', { name: 'My Pulse' }))
     expect(restored.getByRole('button', { name: 'Today' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(restored.getByRole('button', { name: 'Intel' }))
-    fireEvent.click(restored.getByText('My reads', { exact: true }))
+    fireEvent.click(restored.getByText('Private notes', { exact: true }))
     expect(restored.getByText(/Check their version tomorrow/)).toBeVisible()
     expect(restored.getByText('You observed')).toBeVisible()
   })

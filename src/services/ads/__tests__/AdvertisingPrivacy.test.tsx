@@ -12,10 +12,10 @@ import gameReducer from '../../../store/gameSlice'
 import profilesReducer from '../../../store/profilesSlice'
 import vipReducer from '../../../store/vipSlice'
 
-function renderPrivacy() {
+function renderPrivacy(betrayals = false) {
   return render(
     <MemoryRouter initialEntries={['/player-privacy']}>
-      <AdvertisingPrivacy />
+      <AdvertisingPrivacy betrayals={betrayals} />
     </MemoryRouter>
   )
 }
@@ -34,6 +34,17 @@ describe('advertising privacy controls', () => {
     privacy.check.mockResolvedValue(null)
   })
   afterEach(cleanup)
+
+  it('uses the Betrayals theme while retaining the age and privacy controls', () => {
+    const { unmount } = renderPrivacy(true)
+    expect(screen.getByRole('main')).toHaveClass('player-safety--betrayals')
+    expect(screen.getByLabelText('Your age')).toHaveAttribute('type', 'number')
+    expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to Betrayals' })).toBeInTheDocument()
+    unmount()
+    renderPrivacy()
+    expect(screen.getByRole('main')).not.toHaveClass('player-safety--betrayals')
+  })
 
   it('includes ads for an adult without a separate local opt-in and keeps Google choices accessible', () => {
     renderPrivacy()
