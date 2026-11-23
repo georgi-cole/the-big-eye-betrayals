@@ -60,6 +60,7 @@ import { awardPublicShield } from './publicShield'
 import { RoundTableDiscussion } from './RoundTableDiscussion'
 import { RoundTableFeed } from './RoundTableFeed'
 import { SafetyResults } from './SafetyResults'
+import { resolveBetrayalsSoundtrackScene, useBetrayalsSoundtrack } from './betrayalsSoundtrack'
 import { intendsToEnd, resolveEndVote } from './settlement'
 import { applySocialMove, getSocialView, socialMoveKinds } from './social'
 import { socialWalletFor } from './socialResources'
@@ -191,6 +192,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = profiles ? player?.portrait : getBetrayalsPortrait(utilities.preferences.lookId)
   const needsLook = Boolean(profiles && !portrait)
+  const soundtrackScene = resolveBetrayalsSoundtrackScene(run, homeOpen, run?.presentation?.[0])
+  useBetrayalsSoundtrack(soundtrackScene)
 
   function openIncoming() {
     utilities.playEffect('ui:navigate', 0.45)
