@@ -5,6 +5,7 @@ import { SoundManager } from '../services/sound/SoundManager'
 import type { RealityPreset, RunOptions } from './run'
 
 const STORAGE_KEY = 'betrayals.preferences.v1'
+const MUSIC_PREFERENCE_VERSION = 2
 
 export { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance'
 type UtilityPanel = 'settings' | 'store' | 'achievements'
@@ -21,7 +22,7 @@ type Preferences = {
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
-  musicOn: false,
+  musicOn: true,
   musicVolume: 0.45,
   soundOn: true,
   soundVolume: 0.55,
@@ -42,10 +43,13 @@ export function isSeasonRealityMode(value: unknown): value is 'off' | 'casual' |
 function readPreferences(): Preferences {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    const saved: Partial<Preferences> | null = raw ? JSON.parse(raw) : null
+    const saved: (Partial<Preferences> & { musicPreferenceVersion?: number }) | null = raw
+      ? JSON.parse(raw)
+      : null
     if (!saved) return DEFAULT_PREFERENCES
     return {
-      musicOn: saved.musicOn === true,
+      // The original default saved false even before the player touched the control.
+      musicOn: saved.musicPreferenceVersion !== MUSIC_PREFERENCE_VERSION || saved.musicOn !== false,
       musicVolume: validVolume(saved.musicVolume, DEFAULT_PREFERENCES.musicVolume),
       soundOn: saved.soundOn !== false,
       soundVolume: validVolume(saved.soundVolume, DEFAULT_PREFERENCES.soundVolume),
@@ -95,7 +99,10 @@ export function useBetrayalsUtilities(lastSeason?: RunOptions) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences))
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...preferences, musicPreferenceVersion: MUSIC_PREFERENCE_VERSION })
+      )
     } catch {
       // Use the current session's preferences when browser storage is unavailable.
     }

@@ -49,18 +49,30 @@ describe('Betrayals game controls', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('toggles and remembers the music preference without selecting any shared track', () => {
+  it('enables music by default and remembers when a player turns it off', () => {
     const view = render(<UtilitiesHarness />)
-    const music = screen.getByRole('button', { name: 'Music', pressed: false })
+    const music = screen.getByRole('button', { name: 'Music', pressed: true })
     fireEvent.click(music)
-    expect(music).toHaveAttribute('aria-pressed', 'true')
-    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(false)
+    expect(music).toHaveAttribute('aria-pressed', 'false')
+    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(true)
     expect(SoundManager.unlockFromGesture).toHaveBeenCalled()
     expect(vi.mocked(SoundManager.setDesiredMusic).mock.calls).toEqual([['none', 'betrayals']])
 
     view.unmount()
     render(<UtilitiesHarness />)
+    expect(screen.getByRole('button', { name: 'Music', pressed: false })).toBeInTheDocument()
+  })
+
+  it('replaces the old music default and keeps other saved preferences', () => {
+    localStorage.setItem(
+      'betrayals.preferences.v1',
+      JSON.stringify({ musicOn: false, musicVolume: 0.2, soundOn: false })
+    )
+    render(<UtilitiesHarness />)
     expect(screen.getByRole('button', { name: 'Music', pressed: true })).toBeInTheDocument()
+    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(false)
+    expect(SoundManager.setMusicVolume).toHaveBeenLastCalledWith(0.2)
+    expect(SoundManager.setCategoryEnabled).toHaveBeenCalledWith('tv', false)
   })
 
   it('applies sound and motion settings, then restores them on the next visit', () => {

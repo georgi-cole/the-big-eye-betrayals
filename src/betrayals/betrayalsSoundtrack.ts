@@ -404,10 +404,10 @@ export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene | null): void 
       SoundManager.unlockFromGesture()
       controllerRef.current?.resumeFromGesture()
     }
-    document.addEventListener('pointerdown', unlockAndResume, true)
+    document.addEventListener('click', unlockAndResume, true)
     document.addEventListener('keydown', unlockAndResume, true)
     return () => {
-      document.removeEventListener('pointerdown', unlockAndResume, true)
+      document.removeEventListener('click', unlockAndResume, true)
       document.removeEventListener('keydown', unlockAndResume, true)
     }
   }, [])
