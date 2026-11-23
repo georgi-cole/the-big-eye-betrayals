@@ -144,3 +144,58 @@
   background: #080c20;
   font: inherit;
 }
+
+.player-safety--betrayals {
+  --privacy-brass: #d6b478;
+  --privacy-line: #71583e;
+  --privacy-ink: #f3e7d1;
+  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  color: var(--privacy-ink);
+  background: radial-gradient(ellipse at top, #30241a, #171310 52%, #0d0b0a 85%);
+}
+
+.player-safety--betrayals .player-safety__card {
+  border-color: var(--privacy-line);
+  border-radius: 16px;
+  background: linear-gradient(155deg, #2a211a, #191512 65%);
+  box-shadow:
+    inset 0 1px #e2bc7730,
+    0 24px 54px #0008;
+}
+
+.player-safety--betrayals h1 {
+  color: var(--privacy-ink);
+  font-family: Georgia, serif;
+}
+
+.player-safety--betrayals .player-safety__eyebrow,
+.player-safety--betrayals a {
+  color: var(--privacy-brass);
+}
+
+.player-safety--betrayals input[type='number'] {
+  appearance: textfield;
+  background: #100e0c;
+  border-color: var(--privacy-line);
+}
+
+.player-safety--betrayals input::-webkit-inner-spin-button,
+.player-safety--betrayals input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.player-safety--betrayals button {
+  border-color: #a98756;
+  background: linear-gradient(105deg, #ae8243, #e5c994 55%, #b78e53);
+  color: #21170e;
+}
+
+.player-safety--betrayals button.player-safety__secondary {
+  color: var(--privacy-ink);
+  background: #211a14;
+}
+
+.player-safety--betrayals :focus-visible {
+  outline-color: var(--privacy-brass);
+}

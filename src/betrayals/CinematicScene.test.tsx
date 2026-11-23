@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance'
 import { BETRAYALS_AI_POOL } from './cast'
 import { CinematicScene } from './CinematicScene'
 import { cinematicFor, presentationAfter } from './presentation'
@@ -291,6 +292,33 @@ describe('Betrayals cinematic scenes', () => {
     expect(container.querySelector('.betrayals-cine__handoff')).toHaveStyle('--exit-to-y: 400px')
     act(() => vi.advanceTimersByTime(1100))
     expect(onComplete).toHaveBeenCalledExactlyOnceWith('played')
+  })
+
+  it.each([
+    ...BETRAYALS_AI_POOL,
+    ...BETRAYALS_PORTRAITS.map(({ id, name }) => ({
+      id,
+      name,
+      portrait: getBetrayalsPortrait(id),
+      human: true,
+    })),
+  ])('shows both illustrated letter shots for $name', (subject) => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: 'hotel-' + subject.id, kind: 'death-letter', subject }}
+        onComplete={vi.fn()}
+      />
+    )
+    const backdrop = () => container.querySelector('.betrayals-cine__backdrop')
+    for (const duration of [2200, 2450, 2650]) {
+      act(() => vi.advanceTimersByTime(duration))
+    }
+    const sealed = 'assets/betrayals/hotel-night/' + subject.id + '-sealed.webp'
+    expect(backdrop()).toHaveAttribute('src', expect.stringContaining(sealed))
+    act(() => vi.advanceTimersByTime(3600))
+    const reaction = 'assets/betrayals/hotel-night/' + subject.id + '-open.webp'
+    expect(backdrop()).toHaveAttribute('src', expect.stringContaining(reaction))
   })
 
   it('cycles through six night skies and keeps the bedroom anonymous across dawn', () => {

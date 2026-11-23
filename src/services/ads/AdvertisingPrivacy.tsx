@@ -31,7 +31,7 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
     setAge('')
   }
   return (
-    <main className="player-safety">
+    <main className={betrayals ? 'player-safety player-safety--betrayals' : 'player-safety'}>
       <section className="player-safety__card" aria-labelledby="advertising-privacy-title">
         <p className="player-safety__eyebrow">
           {betrayals ? 'THE BIG EYE: BETRAYALS' : 'THE BIG EYE'}
