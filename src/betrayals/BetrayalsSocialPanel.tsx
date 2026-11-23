@@ -721,10 +721,9 @@ export function BetrayalsSocialPanel({
         <div
           id="betrayals-social-body"
           className={'sp2-body' + (peer && canAct ? ' sp2-body--focused-target' : '')}
-          data-can-act={canAct || undefined}
         >
           {!peer && contacts.length > 0 && (
-            <section className="sp2-hubmates betrayals-social-roster" aria-label="Player roster">
+            <section className="sp2-hubmates" aria-label="Player roster">
               <div className="sp2-section-heading">
                 <span className="sp2-section-heading__title">Choose a guest</span>
               </div>
