@@ -16,6 +16,8 @@ import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
 import { BetrayalsGuestProfile, type InvestigationControls } from './BetrayalsGuestProfile'
+import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
+import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
 import {
@@ -231,6 +233,9 @@ type Props = {
   recent?: SocialEntry
   intel?: React.ReactNode
   investigation?: InvestigationControls
+  hasRealityMode?: boolean
+  hasMyPulse?: boolean
+  onUpgrade?: (product: 'realityMode' | 'myPulse') => void
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
   onGeneralMove?: (
@@ -529,6 +534,9 @@ export function BetrayalsSocialPanel({
   recent,
   intel,
   investigation,
+  hasRealityMode = false,
+  hasMyPulse = false,
+  onUpgrade,
   onClose,
   onMove,
   onGeneralMove,
@@ -647,6 +655,7 @@ export function BetrayalsSocialPanel({
     Boolean(
       peer &&
       selectedAction &&
+      canUseBetrayalsAction(selectedAction, hasRealityMode) &&
       moveKinds.includes(selectedAction) &&
       !unavailable(selectedAction) &&
       (!targetKind || availableTargets.some(({ id }) => id === target))
@@ -754,7 +763,7 @@ export function BetrayalsSocialPanel({
                   group={group}
                   actorId={actorId}
                   contacts={contacts}
-                  onChange={planningOpen ? onAllianceChange : undefined}
+                  onChange={planningOpen && hasRealityMode ? onAllianceChange : undefined}
                 />
               ))}
               {allies.length > 0 && (
@@ -847,13 +856,20 @@ export function BetrayalsSocialPanel({
                   </div>
                   {!canAct && <p>{seasonEndedHint}</p>}
                 </div>
-                {investigation && (
+                {investigation && hasRealityMode && (
                   <BetrayalsGuestProfile
                     key={peer.id}
                     profile={investigation.profile(peer.id)}
                     investigation={investigation}
                     contacts={contacts}
                     name={label}
+                  />
+                )}
+                {!hasRealityMode && (
+                  <BetrayalsPremiumButton
+                    title="View full profile"
+                    detail="Personality, observations and private accounts · Reality Mode or VIP"
+                    onClick={() => onUpgrade?.('realityMode')}
                   />
                 )}
               </>
@@ -885,7 +901,7 @@ export function BetrayalsSocialPanel({
               type="button"
               onClick={() => investigation.openPulse()}
             >
-              My Pulse
+              My Pulse{!hasMyPulse && <span className="betrayals-feature-badge"> · VIP</span>}
             </button>
           )}
           {!peer && intel}
@@ -898,6 +914,8 @@ export function BetrayalsSocialPanel({
               actorId={actorId}
               notes={notes}
               planningOpen={planningOpen}
+              hasRealityMode={hasRealityMode}
+              onUpgrade={() => onUpgrade?.('realityMode')}
               onMove={onGeneralMove}
             />
           )}
@@ -982,6 +1000,8 @@ export function BetrayalsSocialPanel({
                         action={{ ...action, baseCost: cost.energy }}
                         costs={cost}
                         selected={action.id === selectedAction}
+                        premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
+                        onPremiumLockedClick={() => onUpgrade?.('realityMode')}
                         disabled={Boolean(reason)}
                         disabledMessage={reason}
                         onClick={() => {

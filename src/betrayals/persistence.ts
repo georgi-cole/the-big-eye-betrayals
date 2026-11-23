@@ -10,6 +10,7 @@ import {
 import type { Run, Seat } from './run.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import { validSeasonCheckpoint, type SeasonRewards } from './seasonRewards.ts'
+import { validBetrayalsEconomy } from './economy.ts'
 import {
   CASTLE_ROOMS,
   DEMEANORS,
@@ -575,10 +576,22 @@ function isRun(value: unknown): value is Run {
   const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
   const reports = asObject(item.investigation)?.reports
+  const adBreak = asObject(item.pendingAdBreak)
   return Boolean(
     ids.size === CAST_SIZE &&
     typeof item.humanId === 'string' &&
     ids.has(item.humanId) &&
+    validBetrayalsEconomy(item.economy, item.id) &&
+    (item.pendingAdBreak === undefined ||
+      (adBreak &&
+        typeof adBreak.id === 'string' &&
+        adBreak.id.length > 0 &&
+        adBreak.runId === item.id &&
+        typeof adBreak.day === 'number' &&
+        Number.isSafeInteger(adBreak.day) &&
+        adBreak.day >= 1 &&
+        adBreak.day <= item.day &&
+        ['banishment', 'murder', 'final-vote'].includes(adBreak.kind as string))) &&
     options &&
     typeof options.publicMode === 'boolean' &&
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
@@ -691,6 +704,7 @@ function restoreSeasonRewards(run: Run): SeasonRewards | undefined {
       isRun(candidate) &&
       candidate.seasonRewards === undefined &&
       candidate.presentation === undefined &&
+      candidate.pendingAdBreak === undefined &&
       validSeasonCheckpoint(candidate, run, type)
     ) {
       return candidate

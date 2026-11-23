@@ -1,5 +1,28 @@
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { formatEyeoleans } from '../economy/eyeoleans'
+import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
+import type { BetrayalsProductKey } from './commerce/catalog'
+import type { BetrayalsStoreProps } from './BetrayalsStore'
+import {
+  canUseBetrayalsAction,
+  canUseBetrayalsTableSway,
+  investigationProductFor,
+} from './premiumAccess'
+import {
+  betrayalsRewardEvents,
+  recordBetrayalsEconomy,
+  paidNightShieldOffer,
+  preparePaidNightShieldPurchase,
+  pendingPaidNightShieldPurchase,
+  confirmPaidNightShieldPurchase,
+  cancelPendingPaidNightShieldPurchase,
+  PAID_NIGHT_SHIELD_PRICE,
+} from './economy'
+import { getBetrayalsAdBreakAfter } from './adBreakPolicy'
+import { useBetrayalsAdBreak } from './useBetrayalsAdBreak'
+import { BetrayalsAdBreak } from './BetrayalsAdBreak'
+import './betrayals-premium.css'
 import {
   flushDurablePersistence,
   getDurableItem,
@@ -175,6 +198,23 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [conclaveProgress, setConclaveProgress] = useState<{ key: string; step: number }>()
   const [saveIssue, setSaveIssue] = useState(false)
+  const [storeFocus, setStoreFocus] = useState<BetrayalsProductKey>()
+  const [shieldIssue, setShieldIssue] = useState<string>()
+  const financialBusy = useRef(false)
+  const mounted = useRef(true)
+  const adInFlight = useRef<string | undefined>(undefined)
+  const commerce = useBetrayalsCommerce()
+  const adBreak = useBetrayalsAdBreak({
+    runId: run?.id,
+    noAds: !commerce.ready || commerce.noAds,
+    enabled: !homeOpen,
+  })
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const rosterSection = useRef<HTMLElement>(null)
   const inboxReadsKey = 'big-eye:betrayals:inbox:' + saveId
   const [inboxReads, setInboxReads] = useState(() => restoreInboxReads(inboxReadsKey))
@@ -208,14 +248,33 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     setIncomingOpen(true)
   }
 
-  async function commit(updated: Run, claimLegacy = false, rewinding = false) {
+  function openUpgrade(product: BetrayalsProductKey) {
+    setStoreFocus(product)
+    setSocialOpen(false)
+    setIncomingOpen(false)
+    setPulse(undefined)
+    if (run) setClosedDiscussion(run.id + ':' + run.day)
+    utilities.openPanel('store')
+  }
+
+  async function commit(
+    updated: Run,
+    claimLegacy = false,
+    rewinding = false,
+    expected?: Run | null
+  ) {
     const before = current.current
-    if (before !== run) return false
+    if (!mounted.current || before !== (expected === undefined ? run : expected)) return false
     const cues = before && !rewinding ? presentationAfter(before, updated, playNightFilm) : []
     const presented = cues.length ? { ...updated, presentation: cues } : updated
-    const next = rewinding
+    let next = rewinding
       ? presented
-      : recordSeasonCheckpoints(before, recordGameActivity(before, presented))
+      : recordSeasonCheckpoints(
+          before,
+          recordBetrayalsEconomy(before, recordGameActivity(before, presented))
+        )
+    const ad = before && !rewinding ? getBetrayalsAdBreakAfter(before, next) : undefined
+    if (ad) next = { ...next, pendingAdBreak: ad }
     current.current = next
     let saved = false
     try {
@@ -226,6 +285,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     } catch {
       // The current visit can continue when device storage is unavailable.
     }
+    if (!mounted.current || current.current !== next) return saved
     setRun(next)
     if (before?.id !== next.id) setHomeOpen(false)
     setSaveIssue(!saved)
@@ -254,9 +314,153 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     return saved
   }
 
+  async function completeShieldPurchase(active: Run) {
+    const pending = pendingPaidNightShieldPurchase(active)
+    const wallet = profiles?.wallet
+    if (!pending || !wallet || !mounted.current || current.current !== active) return
+    // The pending run is the recovery record. Never debit unless it is durable.
+    saveRun(saveStorage, saveId, active)
+    if (!(await flushDurablePersistence()))
+      throw new Error('Could not save this purchase. Please retry.')
+    if (!mounted.current || current.current !== active) return
+    const paid = await wallet.spend(pending.transactionId, PAID_NIGHT_SHIELD_PRICE, 'Night Shield')
+    if (!mounted.current || current.current !== active) return
+    if (paid === 'unavailable')
+      throw new Error('Your Night Shield purchase is waiting for a saved wallet. Please retry.')
+    const next =
+      paid === 'paid'
+        ? confirmPaidNightShieldPurchase(active, pending.transactionId)
+        : cancelPendingPaidNightShieldPurchase(active, pending.transactionId)
+    const saved = await commit(next, false, false, active)
+    if (!saved)
+      throw new Error(
+        'Could not save the Night Shield. Your purchase will recover when you return.'
+      )
+    if (paid === 'insufficient') throw new Error('You need 3,000 Eyeros for a Night Shield.')
+    setShieldIssue(undefined)
+  }
+
+  async function buyShield() {
+    const active = current.current
+    if (
+      !active ||
+      !profiles?.wallet ||
+      financialBusy.current ||
+      active.presentation?.length ||
+      active.pendingAdBreak
+    )
+      return
+    const prepared = preparePaidNightShieldPurchase(
+      active,
+      commandToken(active),
+      profiles.wallet.balance
+    )
+    if (prepared === active) return
+    financialBusy.current = true
+    try {
+      if (!(await commit(prepared, false, false, active)))
+        throw new Error('Could not save this purchase. No Eyeros have been charged.')
+      const staged = current.current
+      if (staged?.id === active.id) await completeShieldPurchase(staged)
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Your purchase could not be completed. Please retry.'
+      if (mounted.current) setShieldIssue(message)
+      throw error
+    } finally {
+      financialBusy.current = false
+    }
+  }
+
+  async function reconcileWallet() {
+    const active = current.current
+    if (!mounted.current || !active || !profiles?.wallet || financialBusy.current) return
+    financialBusy.current = true
+    try {
+      if (pendingPaidNightShieldPurchase(active)) await completeShieldPurchase(active)
+      else if (betrayalsRewardEvents(active).length) {
+        saveRun(saveStorage, saveId, active)
+        const saved = await flushDurablePersistence()
+        if (saved) {
+          const credited = await profiles.wallet.claimRewards(betrayalsRewardEvents(active))
+          if (mounted.current) setSaveIssue(!credited)
+        }
+      }
+    } catch (error) {
+      if (mounted.current) {
+        setSaveIssue(true)
+        if (pendingPaidNightShieldPurchase(active))
+          setShieldIssue(
+            error instanceof Error ? error.message : 'Please retry your Night Shield purchase.'
+          )
+      }
+    } finally {
+      financialBusy.current = false
+      if (mounted.current && current.current !== active) void reconcileWallet()
+    }
+  }
+  const reconcileWalletEffect = useEffectEvent(reconcileWallet)
+  useEffect(() => {
+    void reconcileWalletEffect()
+  }, [run])
+
+  const finishAdBreak = useEffectEvent(async () => {
+    const active = current.current
+    const event = active?.pendingAdBreak
+    if (
+      !active ||
+      !event ||
+      active.presentation?.length ||
+      homeOpen ||
+      playing ||
+      adInFlight.current
+    )
+      return
+    adInFlight.current = event.runId + ':' + event.id
+    try {
+      const resume = await adBreak.requestBreak(event)
+      const latest = current.current
+      if (resume && latest?.id === event.runId && latest.pendingAdBreak?.id === event.id) {
+        await commit({ ...latest, pendingAdBreak: undefined }, false, false, latest)
+      }
+    } finally {
+      adInFlight.current = undefined
+    }
+  })
+  useEffect(() => {
+    void finishAdBreak()
+  }, [run, homeOpen, playing])
+
+  const shieldOffer = paidNightShieldOffer(run, profiles?.wallet?.balance ?? 0)
+  const market: BetrayalsStoreProps = {
+    profileId: player?.id,
+    balance: profiles?.wallet?.balance ?? 0,
+    onOpenLooks: profiles
+      ? () => {
+          utilities.closePanel()
+          profiles.openDressingRoom()
+        }
+      : undefined,
+    onOpenLegal: profiles?.openAdvertisingPrivacy,
+    shield: profiles?.wallet
+      ? shieldOffer
+      : { ...shieldOffer, available: false, reason: 'Select a profile to use Eyeros.' },
+    onBuyShield: buyShield,
+    focusProduct: storeFocus,
+  }
+
   async function claimSeasonReward(reward: SeasonReward) {
     const active = current.current
-    if (!active || active !== run || active.presentation?.length) return false
+    if (
+      !active ||
+      active !== run ||
+      active.presentation?.length ||
+      active.pendingAdBreak ||
+      pendingPaidNightShieldPurchase(active)
+    )
+      return false
 
     if (reward === 'roles') {
       if (!active.result || active.phase !== 'settled' || active.seasonRewards?.finaleRevealed) {
@@ -332,6 +536,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       <BetrayalsHome
         utilities={utilities}
         profiles={profiles}
+        market={market}
         name={name}
         onNameChange={setName}
         milestones={{
@@ -343,16 +548,21 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             ? { day: run.day, phase: phaseLabel[run.phase], settled: run.phase === 'settled' }
             : undefined
         }
-        onPlaySeason={() =>
+        onPlaySeason={() => {
+          if (
+            current.current &&
+            (pendingPaidNightShieldPurchase(current.current) || financialBusy.current)
+          )
+            return
           void commit(
             begin(
               player?.name ?? name,
               utilities.seasonOptions.publicMode,
-              utilities.seasonOptions.realityMode,
+              commerce.realityMode ? utilities.seasonOptions.realityMode : 'off',
               portrait
             )
           )
-        }
+        }}
         onReturnToSeason={() => setHomeOpen(false)}
         onResumeLegacy={resumeLegacy}
       />
@@ -393,6 +603,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
   const investigate = (action: InvestigationAction) => {
+    const product = investigationProductFor(action)
+    if (!commerce[product]) return openUpgrade(product)
     void apply((active) => applyInvestigationAction(active, token, action))
   }
   const investigation = {
@@ -402,6 +614,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     reason: (action: InvestigationAction) => investigationActionReason(run, action),
     act: investigate,
     openPulse: (guestId?: string) => {
+      if (!commerce.myPulse) return openUpgrade('myPulse')
       utilities.playEffect('ui:navigate', 0.45)
       setPulse({ tab: guestId ? 'Intel' : 'Today', guestId })
     },
@@ -484,6 +697,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     if (
       !active ||
       active.presentation?.length ||
+      active.pendingAdBreak ||
+      pendingPaidNightShieldPurchase(active) ||
       active.id !== token.runId ||
       active.revision !== token.revision
     ) {
@@ -551,11 +766,17 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         key={run.id + ':' + run.revision}
         title={phaseLabel[stage]}
         game={game}
+        premiumGames={commerce.premiumGames}
         motion={motion}
         onForfeit={() => finishChallenge()}
       >
         <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
-          <ChallengeGame run={run} game={game} onFinish={finishChallenge} />
+          <ChallengeGame
+            run={run}
+            game={game}
+            premiumGames={commerce.premiumGames}
+            onFinish={finishChallenge}
+          />
         </Suspense>
       </BetrayalsChallengeStage>
     )
@@ -860,7 +1081,13 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                 : undefined
             : undefined
         }
-        inert={Boolean(cue) || discussionVisible || filmDiscussion}
+        inert={
+          Boolean(cue) ||
+          discussionVisible ||
+          filmDiscussion ||
+          Boolean(run.pendingAdBreak) ||
+          adBreak.active
+        }
       >
         <div className="betrayals-room" aria-hidden="true">
           <img
@@ -879,6 +1106,15 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               <span className="betrayals-eye" aria-hidden="true" />
               Betrayals
             </div>
+            <button
+              className="betrayals-wallet-chip"
+              type="button"
+              onClick={() => openUpgrade('vip')}
+              aria-label={`Open store, ${formatEyeoleans(profiles?.wallet?.balance ?? 0)} Eyeros`}
+            >
+              Store <span aria-hidden="true">◈</span>{' '}
+              {formatEyeoleans(profiles?.wallet?.balance ?? 0)}
+            </button>
           </div>
           <div className="betrayals-phase-strip">
             <div className="betrayals-phase-strip__copy" aria-live="polite">
@@ -979,8 +1215,21 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             This device could not save your progress.
           </p>
         )}
+        {pendingPaidNightShieldPurchase(run) && (
+          <p className="betrayals-save-issue" role="status">
+            {shieldIssue ?? 'Finishing your Night Shield purchase…'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                void reconcileWallet()
+              }}
+            >
+              Retry purchase
+            </button>
+          </p>
+        )}
 
-        {pulse && (
+        {pulse && commerce.myPulse && (
           <BetrayalsPulse
             day={run.day}
             humanId={run.humanId}
@@ -993,7 +1242,10 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         )}
 
         <BetrayalsDock
-          play={play}
+          play={{
+            ...play,
+            disabled: play.disabled || Boolean(pendingPaidNightShieldPurchase(run)),
+          }}
           utility={
             (!cue && counting) ||
             (stage === 'end-vote' && participating) ||
@@ -1063,6 +1315,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             cast={view.seats}
             resources={socialResources}
             realityMode={run.options.realityMode}
+            hasRealityMode={commerce.realityMode}
+            hasMyPulse={commerce.myPulse}
+            onUpgrade={openUpgrade}
             canAct={canSocialize}
             phase={stage}
             nightShieldCount={view.nightShieldCount}
@@ -1075,6 +1330,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             investigation={investigation}
             intel={
               lead &&
+              commerce.realityMode &&
               stage === 'social' && (
                 <WitnessLeadCard
                   lead={lead}
@@ -1085,15 +1341,23 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             onClose={() => setSocialOpen(false)}
             onGeneralMove={
               generalSocialOpen(run)
-                ? (kind, guests, details) =>
-                    apply((active) => applyGeneralSocialMove(active, token, kind, guests, details))
+                ? (kind, guests, details) => {
+                    if (!canUseBetrayalsAction(kind, commerce.realityMode))
+                      return openUpgrade('realityMode')
+                    return apply((active) =>
+                      applyGeneralSocialMove(active, token, kind, guests, details)
+                    )
+                  }
                 : undefined
             }
-            onAllianceChange={(id, change, value) =>
-              apply((active) => applyCastleAllianceChange(active, token, id, change, value))
-            }
-            onMove={(kind, suspectId, recipientId) =>
-              apply((active) => {
+            onAllianceChange={(id, change, value) => {
+              if (!commerce.realityMode) return openUpgrade('realityMode')
+              return apply((active) => applyCastleAllianceChange(active, token, id, change, value))
+            }}
+            onMove={(kind, suspectId, recipientId) => {
+              if (!canUseBetrayalsAction(kind, commerce.realityMode))
+                return openUpgrade('realityMode')
+              return apply((active) => {
                 if (!canSocialize) return active
                 const choice =
                   kind === 'question'
@@ -1117,7 +1381,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                   suspectId: choice,
                 })
               })
-            }
+            }}
           />
         )}
         {incomingOpen && (
@@ -1131,7 +1395,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             }
           />
         )}
-        <BetrayalsUtilityPanel utilities={utilities} profiles={profiles} />
+        <BetrayalsUtilityPanel utilities={utilities} profiles={profiles} market={market} />
       </main>
       {filmDiscussion && (
         <ConclaveDiscussion
@@ -1167,7 +1431,11 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           }}
           onAskWitness={() => apply((active) => askWitness(active, token))}
           investigation={investigation}
+          hasRealityMode={commerce.realityMode}
+          onUpgrade={() => openUpgrade('realityMode')}
           onSway={(choice) => {
+            if (!canUseBetrayalsTableSway(choice, commerce.realityMode))
+              return openUpgrade('realityMode')
             utilities.playEffect('tv:ceremony_transition', 0.45)
             apply((active) => recordTableSway(active, token, choice))
           }}
@@ -1197,6 +1465,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           onComplete={finishCue}
         />
       )}
+      <BetrayalsAdBreak active={adBreak.active} />
     </>
   )
 }

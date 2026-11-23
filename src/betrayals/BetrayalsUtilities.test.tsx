@@ -9,6 +9,10 @@ import {
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
 import type { Phase } from './run'
 
+vi.mock('./commerce/useBetrayalsCommerce', () => ({
+  useBetrayalsCommerce: () => ({ realityMode: false }),
+}))
+
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
     init: vi.fn(),
@@ -110,5 +114,14 @@ describe('Betrayals game controls', () => {
     expect(
       screen.getByRole('button', { name: 'Default portrait', pressed: true })
     ).toBeInTheDocument()
+  })
+
+  it('keeps Reality presets locked until purchased and opens the store from the upgrade', () => {
+    render(<UtilitiesHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('combobox', { name: 'Reality Mode' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Reality Mode' })).toHaveValue('off')
+    fireEvent.click(screen.getByRole('button', { name: /Unlock Reality Mode/ }))
+    expect(screen.getByRole('dialog', { name: 'Store' })).toBeVisible()
   })
 })

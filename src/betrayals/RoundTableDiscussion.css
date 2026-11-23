@@ -256,6 +256,11 @@
   flex: 1;
 }
 
+.round-table-room__stances button[data-premium-locked] {
+  border-color: #d7b477;
+  color: #efca94;
+}
+
 .round-table-room .round-table-room__vote {
   margin-inline-start: auto;
   border-color: #f1c086;

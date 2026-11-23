@@ -3,6 +3,7 @@ import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { prepareShieldConversations } from './shieldSocial.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
+import { recordBetrayalsChallengeRewards } from './economy.ts'
 
 export type RankedScore = {
   contestantId: string
@@ -95,30 +96,42 @@ export function resolveChallenge(
     socialWallets: walletsAfterChallenge(run, standings),
   }
   if (run.phase === 'immunity') {
-    return { ...afterChallenge, phase: 'safety', immunityId: standings[0].contestantId }
+    return recordBetrayalsChallengeRewards(
+      run,
+      { ...afterChallenge, phase: 'safety', immunityId: standings[0].contestantId },
+      standings
+    )
   }
   if (run.phase === 'safety') {
     const nightShieldIds = standings.slice(0, 2).map(({ contestantId }) => contestantId)
-    return prepareShieldConversations({
-      ...afterChallenge,
-      phase: 'round-table',
-      private: {
-        ...run.private,
-        nightShieldIds,
-        nightShieldAwardIds: undefined,
-        safetyStandings: {
-          day: run.day,
-          publicResults,
-          rows: standings.map(({ contestantId, score, forfeited }) => ({
-            contestantId,
-            score,
-            forfeited,
-          })),
+    return recordBetrayalsChallengeRewards(
+      run,
+      prepareShieldConversations({
+        ...afterChallenge,
+        phase: 'round-table',
+        private: {
+          ...run.private,
+          nightShieldIds,
+          nightShieldAwardIds: undefined,
+          safetyStandings: {
+            day: run.day,
+            publicResults,
+            rows: standings.map(({ contestantId, score, forfeited }) => ({
+              contestantId,
+              score,
+              forfeited,
+            })),
+          },
         },
-      },
-    })
+      }),
+      standings
+    )
   }
-  return { ...afterChallenge, phase: 'final-banishment' }
+  return recordBetrayalsChallengeRewards(
+    run,
+    { ...afterChallenge, phase: 'final-banishment' },
+    standings
+  )
 }
 
 export function safetyResultsFor(run: Run, actorId: string | null) {

@@ -36,6 +36,15 @@ describe('durablePersistence', () => {
   it('migrates legacy saves, batches durable writes, and rolls back a failed flush', async () => {
     const legacyKey = 'bbmobilenew:savedRunSlot:profile-1:classic'
     localStorage.setItem(legacyKey, '{"version":1}')
+    const betrayalsFallbackRecords = {
+      'big-eye:betrayals:season:profile-1': '{"pendingNightShield":"purchase-1"}',
+      'big-eye:betrayals:commerce:v1': '{"receipts":{"purchase-1":{}}}',
+      'big-eye:betrayals:ad-breaks:v1:run-1': '["night:1"]',
+      'big-eye:betrayals:inbox:profile-1': '["message-1"]',
+    }
+    for (const [key, value] of Object.entries(betrayalsFallbackRecords)) {
+      localStorage.setItem(key, value)
+    }
     localStorage.setItem('bbmobilenew:settings', '{"audio":true}')
 
     const backend = new FakeBackend()
@@ -45,6 +54,11 @@ describe('durablePersistence', () => {
     expect(getDurableItem(legacyKey)).toBe('{"version":1}')
     expect(localStorage.getItem(legacyKey)).toBeNull()
     expect(localStorage.getItem('bbmobilenew:settings')).toBe('{"audio":true}')
+    for (const [key, value] of Object.entries(betrayalsFallbackRecords)) {
+      expect(backend.values.get(key)).toBe(value)
+      expect(getDurableItem(key)).toBe(value)
+      expect(localStorage.getItem(key)).toBeNull()
+    }
 
     const secondKey = 'bbmobilenew:savedRuns:profile-1'
     expect(setDurableItem(secondKey, '{"version":2}')).toBe(true)
@@ -75,7 +89,7 @@ describe('durablePersistence', () => {
 
     const diagnostics = getDurablePersistenceDiagnostics()
     expect(diagnostics.backend).toBe('indexeddb')
-    expect(diagnostics.migratedLegacyKeys).toBe(1)
+    expect(diagnostics.migratedLegacyKeys).toBe(5)
     expect(diagnostics.lastFailureReason).toBe('quota_exceeded')
   })
 })

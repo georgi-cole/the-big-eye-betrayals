@@ -41,6 +41,8 @@ describe('advertising privacy controls', () => {
     expect(screen.getByLabelText('Your age')).toHaveAttribute('type', 'number')
     expect(screen.getByRole('link', { name: 'Privacy policy' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to Betrayals' })).toBeInTheDocument()
+    expect(screen.getByText(/after each Final Five vote/)).toBeInTheDocument()
+    expect(screen.getByText(/short contextual ad breaks/)).toBeInTheDocument()
     unmount()
     renderPrivacy()
     expect(screen.getByRole('main')).not.toHaveClass('player-safety--betrayals')

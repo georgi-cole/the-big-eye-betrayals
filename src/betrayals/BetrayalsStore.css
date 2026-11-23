@@ -1,0 +1,340 @@
+.betrayals-market {
+  --market-gold: #dfbd79;
+  color: #f4eee7;
+  display: grid;
+  gap: 1.35rem;
+  min-width: 0;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.betrayals-market h3,
+.betrayals-market h4,
+.betrayals-market p {
+  margin: 0;
+}
+.betrayals-market button,
+.betrayals-market a {
+  -webkit-tap-highlight-color: transparent;
+}
+.betrayals-market button:focus-visible,
+.betrayals-market a:focus-visible {
+  outline: 2px solid #f6db9c;
+  outline-offset: 4px;
+}
+.betrayals-market .store-product-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  color: var(--market-gold);
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+.betrayals-market .store-product-icon__surface {
+  fill: #bf995f14;
+}
+.betrayals-market .store-product-icon__core {
+  fill: #d7ae6150;
+}
+.betrayals-market__wallet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #d4b37b38;
+  border-radius: 0.8rem;
+  background: #15101ba6;
+  font-size: 0.8rem;
+  color: #c5bccd;
+}
+.betrayals-market__wallet strong {
+  color: #f1d69b;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.betrayals-market__eyebrow {
+  color: #c8ad80;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.61rem;
+  font-weight: 650;
+}
+.betrayals-market__vip {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 1rem;
+  border: 1px solid #c9a36480;
+  padding: 1.5rem 1.1rem 1rem;
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(ellipse at 50% -5%, #8e614b47, transparent 68%),
+    linear-gradient(140deg, #201822, #130e19 70%);
+  box-shadow:
+    inset 0 1px #ffdfae18,
+    0 16px 36px #0003;
+}
+.betrayals-market__vip-top {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.betrayals-market__vip-top .store-product-icon {
+  width: 4.25rem;
+  height: 4.25rem;
+  filter: drop-shadow(0 0 16px #cda86647);
+}
+.betrayals-market__vip h3 {
+  font:
+    500 2rem/1.1 Georgia,
+    serif;
+  letter-spacing: -0.03em;
+}
+.betrayals-market__vip h3 em {
+  color: #f0cb83;
+  font-style: normal;
+}
+.betrayals-market__vip-top p {
+  color: #c9bbca;
+  font-size: 0.84rem;
+}
+.betrayals-market__vip ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.15rem 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.betrayals-market__vip li {
+  position: relative;
+  padding-left: 1.2rem;
+  font-size: 0.79rem;
+  line-height: 1.45;
+  color: #ded6de;
+}
+.betrayals-market__vip li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #d6b778;
+  content: '✓';
+}
+.betrayals-market__vip > small {
+  color: #a99ba9;
+  font-size: 0.67rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.betrayals-market__buy {
+  min-height: 2.7rem;
+  width: 100%;
+  border: 1px solid #dbbd7e7a;
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.55rem;
+  background: linear-gradient(180deg, #edcf92, #b88e4e);
+  color: #211709;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: normal;
+}
+.betrayals-market__buy:disabled {
+  cursor: default;
+  background: #cbb18112;
+  color: #b6a58b;
+  border-color: #c5a7712b;
+}
+.betrayals-market__buy.is-owned {
+  color: #a7d0b4;
+  border-color: #a3d0b53b;
+  background: #91bd9e0a;
+}
+.betrayals-market__section {
+  display: grid;
+  gap: 0.75rem;
+}
+.betrayals-market__heading {
+  display: grid;
+  gap: 0.4rem;
+}
+.betrayals-market__heading h3 {
+  font:
+    500 1.3rem/1.2 Georgia,
+    serif;
+}
+.betrayals-market__heading p {
+  color: #b4a8ba;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.betrayals-market__unlock,
+.betrayals-market__shield {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.65rem 0.8rem;
+  padding: 1rem;
+  border: 1px solid #c9a67925;
+  border-radius: 0.9rem;
+  background: #19121b7a;
+}
+.betrayals-market__unlock h4,
+.betrayals-market__shield h4 {
+  font-size: 0.94rem;
+  font-weight: 650;
+  margin-bottom: 0.35rem;
+}
+.betrayals-market__unlock p,
+.betrayals-market__shield p {
+  color: #c1b5c6;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.betrayals-market__unlock small,
+.betrayals-market__shield small {
+  display: block;
+  color: #ac997b;
+  font-size: 0.65rem;
+  line-height: 1.5;
+  margin-top: 0.4rem;
+}
+.betrayals-market__unlock > .betrayals-market__buy,
+.betrayals-market__shield > .betrayals-market__buy {
+  grid-column: 1 / -1;
+}
+.betrayals-market__packs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.betrayals-market__pack {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.25rem;
+  border: 1px solid #d0a46930;
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.35rem 0.4rem;
+  background: radial-gradient(ellipse at 50% 15%, #bf8b3420, transparent 80%), #120e19;
+}
+.betrayals-market__coin {
+  font-size: 1.8rem;
+  line-height: 1.2;
+  color: #dfb76b;
+}
+.betrayals-market__pack h4 {
+  font-size: 0.88rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.betrayals-market__pack > span:not(.betrayals-market__coin) {
+  font-size: 0.67rem;
+  color: #bca57e;
+}
+.betrayals-market__pack .betrayals-market__buy {
+  margin-top: 0.5rem;
+  font-size: 0.66rem;
+  padding: 0.6rem 0.25rem;
+  min-height: 3rem;
+}
+.betrayals-market__fineprint {
+  color: #9d91a2;
+  font-size: 0.66rem;
+  line-height: 1.55;
+}
+.betrayals-market__looks {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid #bb9b7133;
+  border-radius: 0.9rem;
+  color: #e7dac5;
+  background: linear-gradient(100deg, #3825328c, #1c1423);
+  text-align: left;
+  cursor: pointer;
+}
+.betrayals-market__looks strong {
+  font-size: 0.85rem;
+}
+.betrayals-market__looks small {
+  display: block;
+  margin-top: 0.3rem;
+  color: #bca9bb;
+  font-size: 0.71rem;
+  line-height: 1.4;
+}
+.betrayals-market__looks > span:last-child {
+  font-size: 1.65rem;
+}
+.betrayals-market__notice {
+  padding: 0.8rem;
+  border: 1px solid #d5b2784d;
+  border-radius: 0.7rem;
+  background: #b5894215;
+  color: #e4d3b3;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.betrayals-market__notice[role='alert'] {
+  border-color: #cb8c7b77;
+  color: #edc3b8;
+}
+.betrayals-market__footer {
+  display: grid;
+  justify-items: center;
+  gap: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #c7a97e22;
+  text-align: center;
+}
+.betrayals-market__footer button,
+.betrayals-market__footer a {
+  border: 0;
+  background: none;
+  color: #d2b984;
+  font: inherit;
+  font-size: 0.73rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.4rem;
+}
+.betrayals-market__footer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.betrayals-market__footer p {
+  color: #a698af;
+  font-size: 0.66rem;
+  line-height: 1.55;
+}
+.betrayals-market__legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+@media (max-width: 340px) {
+  .betrayals-market__packs {
+    grid-template-columns: 1fr;
+  }
+  .betrayals-market__pack {
+    grid-template-columns: 1.8rem 1fr auto;
+    align-items: center;
+    justify-items: start;
+    padding: 0.6rem;
+  }
+  .betrayals-market__pack > span:not(.betrayals-market__coin) {
+    display: none;
+  }
+  .betrayals-market__pack .betrayals-market__buy {
+    margin: 0;
+    width: auto;
+    max-width: 7rem;
+    min-height: 2.8rem;
+  }
+}

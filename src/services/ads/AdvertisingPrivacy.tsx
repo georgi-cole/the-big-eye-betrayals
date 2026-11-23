@@ -37,6 +37,12 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
           {betrayals ? 'THE BIG EYE: BETRAYALS' : 'THE BIG EYE'}
         </p>
         <h1 id="advertising-privacy-title">Advertising privacy</h1>
+        {betrayals && (
+          <p>
+            Standard play includes an automatic break after banishment and the night result, and
+            after each Final Five vote. No Ads and VIP remove these breaks.
+          </p>
+        )}
         {!record ? (
           <form onSubmit={submitAge}>
             <p>
@@ -116,11 +122,11 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
         ) : (
           <p>
             {betrayals
-              ? 'Rewarded ads are available to adults only.'
+              ? 'Rewarded ads and Eyeros pack purchases are available to adults only.'
               : 'Rewarded ads and Survival run purchases are available to adults only.'}
           </p>
         )}
-        {!betrayals && usesContextualAdTreatment() && (
+        {usesContextualAdTreatment() && (
           <p>
             Standard play may include short contextual ad breaks. These ads are selected without
             behavioral profiling. They apply to players under 18 and when no age is on file.

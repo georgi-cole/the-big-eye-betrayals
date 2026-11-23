@@ -159,7 +159,28 @@ These fire without any user action.
 | `final3_part3_break`        | After Final 3 Part 3, before the final decision/ceremony (`final3_decision`)                                          |
 | `survival_elimination_auto` | After each completed Survival elimination day (`week_end`), before the next day; only while the human is still active |
 
-Every automatic placement is preceded by the in-game **SHORT BREAK** announcement. The game records a stable season/day/phase break key when the break is queued, so a reload or re-render cannot stack the same automatic commercial twice.
+Every original-game automatic placement is preceded by the in-game **SHORT BREAK** announcement. The game records a stable season/day/phase break key when the break is queued, so a reload or re-render cannot stack the same automatic commercial twice.
+
+#### Betrayals automatic interstitials
+
+Betrayals uses its own event coordinator and permanent ownership. Its native
+placement strings share the configured interstitial unit; they are not separate
+AdMob unit IDs.
+
+| Placement                    | Trigger                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `betrayals_banishment_break` | After the ordinary banishment result and queued presentations close                                                         |
+| `betrayals_murder_break`     | After the completed night result and queued presentations close, including a prevented murder                               |
+| `betrayals_final_vote_break` | After each completed Final Five banishment, tied-vote count before a runoff, or End Season vote, including final settlement |
+
+There are two ordinary-day slots. A Final Five banishment uses only the final
+vote slot, never an additional ordinary banishment break. A pending event is
+saved with the run, then a durable receipt is claimed before native UI opens.
+The in-game break screen stays modal until dismissal/failure; a stuck request
+has a 45-second fallback. Run changes and unmounts invalidate late requests.
+Betrayals VIP and standalone No Ads suppress these placements. Missing native
+inventory or unavailable storage does not stop the season. See
+`docs/betrayals-monetization.md` for the full schedule and live setup requirements.
 
 Survival waits for the elimination and replacement presentations to finish before announcing its
 day-end break. The game controls stay blocked until the native interstitial closes or fails.

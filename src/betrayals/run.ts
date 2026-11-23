@@ -1,6 +1,7 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import type { SocialWallet } from './socialResources.ts'
+import { hasPaidNightShield } from './economy.ts'
 
 export const CAST_SIZE = 25
 export const MAX_TABLE_ROUNDS = 3
@@ -186,6 +187,8 @@ export type Run = {
   pot: number
   challengeHistory?: string[]
   seasonRewards?: import('./seasonRewards.ts').SeasonRewards
+  economy?: import('./economy.ts').BetrayalsEconomy
+  pendingAdBreak?: import('./adBreakPolicy.ts').BetrayalsAdBreakEvent
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
   investigation?: import('./investigationRecords.ts').Investigation
@@ -343,6 +346,7 @@ export function viewFor(run: Run, actorId: string | null) {
   const nightShieldCount = activeActor
     ? run.private.nightShieldIds.filter((id) => id === actor.id).length
     : 0
+  const purchasedNightShieldActive = Boolean(activeActor && hasPaidNightShield(run, actor.id))
   // Teammates see who won at Safety, but don't get updates about private handoffs.
   const shieldCycle =
     run.phase === 'round-table' ||
@@ -356,7 +360,8 @@ export function viewFor(run: Run, actorId: string | null) {
       if (teammateIds.includes(id)) knownNightShieldIds.add(id)
     }
   }
-  if (activeActor && nightShieldCount) knownNightShieldIds.add(actor.id)
+  if (activeActor && (nightShieldCount || purchasedNightShieldActive))
+    knownNightShieldIds.add(actor.id)
 
   return {
     phase: run.phase,
@@ -365,8 +370,9 @@ export function viewFor(run: Run, actorId: string | null) {
     teammateIds,
     knownNightShieldIds: [...knownNightShieldIds],
     publicNightShieldWinnerIds,
-    hasNightShield: nightShieldCount > 0,
+    hasNightShield: nightShieldCount > 0 || purchasedNightShieldActive,
     nightShieldCount,
+    purchasedNightShieldActive,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,

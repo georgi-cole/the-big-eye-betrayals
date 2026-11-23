@@ -2,6 +2,7 @@ const paidFeaturePaths = [
   /^src\/cinematic\/ceremonies\//,
   /^public\/assets\/ceremonies\//,
   /^src\/(vip|economy|modes|social|publicOpinion|appearance)\//,
+  /^src\/betrayals\/(commerce\/|economy\.|premiumAccess\.|BetrayalsStore\.|BetrayalsChallengeGame\.|BetrayalsChallengeStage\.|adBreakPolicy\.|useBetrayalsAdBreak\.|challengeExperience\.)/,
   /^src\/minigames\//,
   /^src\/components\/(MinigameHost|StoreProductModal|GlassBridgeComp|CrystalPathShatteredGame|RiskWheelComp|HouseOfCardsComp|HouseOfDarknessComp|ChainOfGreed|QuickTapRace|Vox[^/]*|Tribunal[^/]*)\//,
   /^src\/screens\/(Store|Settings|QuickTapSeasons|Surviv[^/]*|Rules\/VoxPopuliRules)\//,

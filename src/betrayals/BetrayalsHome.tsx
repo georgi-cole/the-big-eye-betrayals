@@ -28,6 +28,7 @@ function hasSeenOpening() {
 type HomeProps = {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
+  market?: import('./BetrayalsStore').BetrayalsStoreProps
   milestones?: BetrayalsMilestones
   name: string
   onNameChange: (name: string) => void
@@ -40,6 +41,7 @@ type HomeProps = {
 export function BetrayalsHome({
   utilities,
   profiles,
+  market,
   milestones,
   name,
   onNameChange,
@@ -211,7 +213,12 @@ export function BetrayalsHome({
             </a>
           </form>
         </div>
-        <BetrayalsUtilityPanel utilities={utilities} profiles={profiles} milestones={milestones} />
+        <BetrayalsUtilityPanel
+          utilities={utilities}
+          profiles={profiles}
+          milestones={milestones}
+          market={market}
+        />
       </main>
     </>
   )

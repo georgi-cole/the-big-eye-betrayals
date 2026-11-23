@@ -1,6 +1,8 @@
 import { Outlet, useNavigate } from 'react-router'
 import { useAppSelector } from '../store/hooks'
 import { selectCurrentProfile } from '../store/profilesSlice'
+import { store } from '../store/store'
+import { createBetrayalsWallet } from './profileWallet'
 import BetrayalsScreen from './BetrayalsScreen'
 import { getBetrayalsPortrait, isBetrayalsLook } from './betrayalsAppearance'
 import './betrayalsProfile.css'
@@ -27,6 +29,9 @@ export default function BetrayalsRoute() {
       key={profile?.id ?? 'no-profile'}
       profiles={{
         player: profile ? { id: profile.id, name: profile.name, portrait } : undefined,
+        wallet: profile
+          ? createBetrayalsWallet(store, profile.id, profile.eyeoleans ?? 0)
+          : undefined,
         openProfile: () =>
           navigate(profile ? '/profile' : '/profile-picker', { state: { from: '/' } }),
         openDressingRoom: (initialLookId) =>

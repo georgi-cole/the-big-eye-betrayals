@@ -6,11 +6,16 @@ import {
   isSeasonRealityMode,
 } from './betrayalsPreferences'
 import type { BetrayalsUtilities } from './betrayalsPreferences'
-import type { BetrayalsLookId } from './betrayalsAppearance'
+import { FREE_BETRAYALS_LOOK_IDS, type BetrayalsLookId } from './betrayalsAppearance'
+import BetrayalsStore, { type BetrayalsStoreProps } from './BetrayalsStore'
+import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
+import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
+import type { BetrayalsWallet } from './profileWallet'
 import './betrayalsUtilities.css'
 
 export type BetrayalsProfileControls = {
   player?: { id: string; name: string; portrait?: string }
+  wallet?: BetrayalsWallet
   openProfile: () => void
   openDressingRoom: (initialLookId?: BetrayalsLookId) => void
   openAccount: () => void
@@ -92,7 +97,7 @@ export function BetrayalsUtilityChips({
           <span className="betrayals-utility-chip__label">Settings</span>
         </button>
       )}
-      {showStore && !profiles && (
+      {showStore && (
         <button
           type="button"
           aria-haspopup="dialog"
@@ -169,6 +174,7 @@ function Settings({
   openAdvertisingPrivacy?: () => void
 }) {
   const { preferences, seasonOptions, toggleMusic, updatePreferences } = utilities
+  const commerce = useBetrayalsCommerce()
   return (
     <div className="betrayals-preferences">
       <div className="betrayals-preference-group">
@@ -212,9 +218,11 @@ function Settings({
         <label className="betrayals-preference-select">
           <span>Reality Mode</span>
           <select
-            value={seasonOptions.realityMode}
+            value={commerce.realityMode ? seasonOptions.realityMode : 'off'}
+            disabled={!commerce.realityMode}
             onChange={({ currentTarget: { value } }) => {
-              if (isSeasonRealityMode(value)) updatePreferences({ seasonRealityMode: value })
+              if (commerce.realityMode && isSeasonRealityMode(value))
+                updatePreferences({ seasonRealityMode: value })
             }}
           >
             <option value="off">Off</option>
@@ -227,6 +235,13 @@ function Settings({
             )}
           </select>
         </label>
+        {!commerce.realityMode && (
+          <BetrayalsPremiumButton
+            title="Unlock Reality Mode"
+            detail="Full profiles, advanced actions and more intense social seasons."
+            onClick={() => utilities.openPanel('store')}
+          />
+        )}
       </section>
       {openAdvertisingPrivacy && (
         <div className="betrayals-preference-group">
@@ -255,32 +270,34 @@ function Store({
     <div className="betrayals-store">
       <p>Choose a free portrait for your next season.</p>
       <div className="betrayals-store__portraits" role="group" aria-label="Season portraits">
-        {BETRAYALS_PORTRAITS.map(({ id, name }) => {
-          const portrait = getBetrayalsPortrait(id)
-          const equipped = profiles
-            ? profiles.player?.portrait === portrait
-            : preferences.lookId === id
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-label={name}
-              aria-pressed={equipped}
-              className="betrayals-store__portrait"
-              onClick={() => {
-                playEffect('ui:confirm', 0.45)
-                if (profiles) {
-                  utilities.closePanel()
-                  profiles.openDressingRoom(id)
-                } else updatePreferences({ lookId: id })
-              }}
-            >
-              <img src={portrait} alt="" width="256" height="256" />
-              <strong>{name}</strong>
-              <span>{equipped ? 'Equipped' : profiles ? 'Preview' : 'Equip'}</span>
-            </button>
-          )
-        })}
+        {BETRAYALS_PORTRAITS.filter(({ id }) => FREE_BETRAYALS_LOOK_IDS.includes(id)).map(
+          ({ id, name }) => {
+            const portrait = getBetrayalsPortrait(id)
+            const equipped = profiles
+              ? profiles.player?.portrait === portrait
+              : preferences.lookId === id
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-label={name}
+                aria-pressed={equipped}
+                className="betrayals-store__portrait"
+                onClick={() => {
+                  playEffect('ui:confirm', 0.45)
+                  if (profiles) {
+                    utilities.closePanel()
+                    profiles.openDressingRoom(id)
+                  } else updatePreferences({ lookId: id })
+                }}
+              >
+                <img src={portrait} alt="" width="256" height="256" />
+                <strong>{name}</strong>
+                <span>{equipped ? 'Equipped' : profiles ? 'Preview' : 'Equip'}</span>
+              </button>
+            )
+          }
+        )}
       </div>
       {!profiles && (
         <button
@@ -324,10 +341,12 @@ function UtilityDialog({
   utilities,
   profiles,
   milestones,
+  market,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
   milestones?: BetrayalsMilestones
+  market?: BetrayalsStoreProps
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const { panel, preferences, closePanel } = utilities
@@ -375,7 +394,11 @@ function UtilityDialog({
             openAdvertisingPrivacy={profiles?.openAdvertisingPrivacy}
           />
         ) : panel === 'store' ? (
-          <Store utilities={utilities} profiles={profiles} />
+          market ? (
+            <BetrayalsStore {...market} />
+          ) : (
+            <Store utilities={utilities} profiles={profiles} />
+          )
         ) : (
           <Achievements milestones={milestones} />
         )}
@@ -388,12 +411,19 @@ export function BetrayalsUtilityPanel({
   utilities,
   profiles,
   milestones,
+  market,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
   milestones?: BetrayalsMilestones
+  market?: BetrayalsStoreProps
 }) {
   return utilities.panel ? (
-    <UtilityDialog utilities={utilities} profiles={profiles} milestones={milestones} />
+    <UtilityDialog
+      utilities={utilities}
+      profiles={profiles}
+      milestones={milestones}
+      market={market}
+    />
   ) : null
 }

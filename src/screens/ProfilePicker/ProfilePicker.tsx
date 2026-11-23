@@ -49,6 +49,7 @@ import { warmSelectedAppearance } from '../../appearance/preloadAppearance'
 import { getAppearanceLook, SELECTABLE_LOOKS } from '../../appearance/catalog'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
 import { gameWithInitialProfileAppearance } from '../../appearance/initialSeasonAppearance'
 import { isPlayerSignInConfigured } from '../../services/backend/config'
 import {
@@ -93,7 +94,9 @@ export default function ProfilePicker() {
   const profiles = useAppSelector(selectAllProfiles)
   const activeProfileId = useAppSelector(selectActiveProfileId)
   const isGuest = useAppSelector(selectIsGuest)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const autoSelectingSingle =
     (location.state as { autoSelectSingle?: boolean } | null)?.autoSelectSingle === true &&
     profiles.length === 1

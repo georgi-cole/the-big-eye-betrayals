@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
@@ -10,6 +10,28 @@ import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
 import { applySocialMove } from './social'
 import { resolveTable } from './table'
+import { preparePaidNightShieldPurchase, recordBetrayalsEconomy } from './economy'
+
+const commerce = vi.hoisted(() => ({
+  ready: true,
+  vip: true,
+  myPulse: true,
+  realityMode: true,
+  noAds: true,
+  premiumGames: false,
+  paidLooks: true,
+  billingAvailable: false,
+  products: {},
+  loading: false,
+  purchasing: null,
+  error: null,
+  notice: null,
+  vipUpgradeAvailable: false,
+  purchase: vi.fn(),
+  restore: vi.fn(),
+  refresh: vi.fn(),
+}))
+vi.mock('./commerce/useBetrayalsCommerce', () => ({ useBetrayalsCommerce: () => commerce }))
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
@@ -113,6 +135,13 @@ async function finishCinematic() {
 describe('Betrayals season review', () => {
   beforeEach(() => {
     localStorage.clear()
+    Object.assign(commerce, {
+      vip: true,
+      myPulse: true,
+      realityMode: true,
+      noAds: true,
+      paidLooks: true,
+    })
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
       this: HTMLDialogElement
     ) {
@@ -153,8 +182,211 @@ describe('Betrayals season review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Store' }))
     const store = within(screen.getByRole('dialog', { name: 'Store' }))
-    fireEvent.click(store.getByRole('button', { name: 'The Heiress' }))
-    expect(openDressingRoom).toHaveBeenCalledWith('pc-015')
+    expect(store.getByText('Individual unlocks')).toBeVisible()
+    fireEvent.click(store.getByRole('button', { name: /The changing room/ }))
+    expect(openDressingRoom).toHaveBeenCalledWith()
+  })
+
+  it('routes locked Pulse and full profiles to their store unlocks while keeping basic conversation free', async () => {
+    Object.assign(commerce, {
+      vip: false,
+      myPulse: false,
+      realityMode: false,
+      noAds: false,
+      paidLooks: false,
+    })
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'free-access', roleSeed: 28, publicSeed: 823 }
+    )
+    saveRun(localStorage, 'edition-local', { ...run, phase: 'social' })
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open My Pulse' }))
+    expect(screen.queryByRole('dialog', { name: 'My Pulse' })).toBeNull()
+    const store = within(screen.getByRole('dialog', { name: 'Store' }))
+    expect(store.getByRole('heading', { name: 'My Pulse' })).toBeVisible()
+    fireEvent.click(store.getByRole('button', { name: 'Close store' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    const guest = run.seats[1]
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(guest.name),
+      })
+    )
+    expect(social.queryByRole('region', { name: `${guest.name} profile traits` })).toBeNull()
+    fireEvent.click(social.getByRole('button', { name: /Build trust/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status === 'ready' && saved.run.social?.at(-1)?.kind).toBe('rapport')
+    fireEvent.click(social.getByRole('button', { name: /View full profile/ }))
+    expect(screen.getByRole('dialog', { name: 'Store' })).toBeVisible()
+  })
+
+  it('recovers a pending shield by saving one wallet debit before granting protection', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'recover-shield', roleSeed: 28, publicSeed: 823 }
+    )
+    const night = {
+      ...original,
+      phase: 'night' as const,
+      private: {
+        ...original.private,
+        betrayers: original.seats.slice(1, 4).map(({ id }) => id),
+        nightShieldIds: [],
+      },
+    }
+    const pending = preparePaidNightShieldPurchase(night, commandToken(night), 4_000)
+    expect(pending.economy?.paidNightShields[0].status).toBe('pending')
+    saveRun(localStorage, 'profile-shield-profile', pending)
+    let finishDebit!: (result: 'paid') => void
+    const spend = vi.fn(
+      () =>
+        new Promise<'paid'>((resolve) => {
+          finishDebit = resolve
+        })
+    )
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'shield-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 4_000, claimRewards: vi.fn().mockResolvedValue(true), spend },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(spend).toHaveBeenCalledTimes(1))
+    const beforeDebit = restoreRun(localStorage, 'profile-shield-profile')
+    expect(
+      beforeDebit.status === 'ready' && beforeDebit.run.economy?.paidNightShields[0].status
+    ).toBe('pending')
+    await act(async () => {
+      finishDebit('paid')
+    })
+    await waitFor(() => {
+      const after = restoreRun(localStorage, 'profile-shield-profile')
+      expect(after.status === 'ready' && after.run.economy?.paidNightShields[0].status).toBe(
+        'active'
+      )
+    })
+    expect(spend).toHaveBeenCalledWith(
+      'betrayals:recover-shield:night-shield:1',
+      3_000,
+      'Night Shield'
+    )
+    expect(spend).toHaveBeenCalledTimes(1)
+    expect(screen.getByTitle('Purchased Night Shield')).toBeVisible()
+  })
+
+  it('does not let an old shield callback overwrite a profile after leaving the screen', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'leave-shield', roleSeed: 28, publicSeed: 823 }
+    )
+    const night = {
+      ...original,
+      phase: 'night' as const,
+      private: {
+        ...original.private,
+        betrayers: original.seats.slice(1, 4).map(({ id }) => id),
+        nightShieldIds: [],
+      },
+    }
+    const pending = preparePaidNightShieldPurchase(night, commandToken(night), 4_000)
+    saveRun(localStorage, 'profile-leaving-profile', pending)
+    let finishDebit!: (result: 'paid') => void
+    const spend = vi.fn(
+      () =>
+        new Promise<'paid'>((resolve) => {
+          finishDebit = resolve
+        })
+    )
+    const app = render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'leaving-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 4_000, claimRewards: vi.fn().mockResolvedValue(true), spend },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(spend).toHaveBeenCalledTimes(1))
+    app.unmount()
+    const newer = { ...pending, revision: pending.revision + 10, day: 2, phase: 'dawn' as const }
+    saveRun(localStorage, 'profile-leaving-profile', newer)
+    await act(async () => {
+      finishDebit('paid')
+    })
+    const saved = restoreRun(localStorage, 'profile-leaving-profile')
+    expect(saved.status === 'ready' && saved.run.revision).toBe(newer.revision)
+    expect(saved.status === 'ready' && saved.run.day).toBe(2)
+  })
+
+  it('drains new reward receipts that arrive while an earlier wallet save is pending', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'reward-queue', roleSeed: 28, publicSeed: 823 }
+    )
+    const socialRun = { ...original, phase: 'social' as const }
+    const first = recordBetrayalsEconomy(
+      socialRun,
+      applySocialMove(socialRun, commandToken(socialRun), {
+        actorId: socialRun.humanId,
+        recipientId: socialRun.seats[1].id,
+        kind: 'rapport',
+      })
+    )
+    saveRun(localStorage, 'profile-reward-profile', first)
+    let finishClaim!: (result: boolean) => void
+    const claimRewards = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            finishClaim = resolve
+          })
+      )
+      .mockResolvedValue(true)
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'reward-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 0, claimRewards, spend: vi.fn().mockResolvedValue('insufficient') },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(claimRewards).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(first.seats[2].name),
+      })
+    )
+    fireEvent.click(social.getByRole('button', { name: /Build trust/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    expect(claimRewards).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      finishClaim(true)
+    })
+    await waitFor(() => expect(claimRewards).toHaveBeenCalledTimes(2))
+    expect(claimRewards.mock.calls[1][0]).toHaveLength(2)
   })
 
   it('expands the profile, filters saved Intel with guest chips, and retains old notes after reload', async () => {

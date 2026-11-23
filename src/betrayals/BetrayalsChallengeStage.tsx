@@ -5,18 +5,29 @@ import { MinigameReadyCountdown } from '../components/MinigameHost/MinigameReady
 import MinigameRules from '../components/MinigameRules/MinigameRules'
 import MinigameUtilityDock from '../components/MinigameUtilityDock/MinigameUtilityDock'
 import type { GameRegistryEntry } from '../minigames/registryBase'
+import { BetrayalsChallengeAccessContext } from './challengeAccessContext'
+import { betrayalsChallengeRules } from './challengeExperience'
 import './challengeTheme.css'
 
 type Props = {
   title: string
   game: GameRegistryEntry
+  premiumGames?: boolean
   motion?: 'reduced'
   onForfeit: () => void
   children: ReactNode
 }
 
-export function BetrayalsChallengeStage({ title, game, motion, onForfeit, children }: Props) {
+export function BetrayalsChallengeStage({
+  title,
+  game,
+  premiumGames = false,
+  motion,
+  onForfeit,
+  children,
+}: Props) {
   const [phase, setPhase] = useState<'rules' | 'countdown' | 'playing'>('rules')
+  const [committedAccess, setCommittedAccess] = useState<boolean | null>(null)
   const [utilityView, setUtilityView] = useState<'menu' | 'rules' | 'forfeit' | null>(null)
   const [portalTarget] = useState(() => {
     const element = document.createElement('div')
@@ -31,6 +42,8 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
     [portalTarget]
   )
   const overlayOpen = utilityView === 'rules' || utilityView === 'forfeit'
+  const challengeAccess = committedAccess ?? premiumGames
+  const rulesGame = betrayalsChallengeRules(game, challengeAccess)
 
   useEffect(() => {
     if (!utilityView) return
@@ -51,7 +64,13 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
         <h1>{title}</h1>
       </header>
       {phase === 'rules' && !overlayOpen && (
-        <MinigameRules game={game} onConfirm={() => setPhase('countdown')} />
+        <MinigameRules
+          game={rulesGame}
+          onConfirm={() => {
+            setCommittedAccess(premiumGames)
+            setPhase('countdown')
+          }}
+        />
       )}
       {phase === 'countdown' && (
         <div className="betrayals-challenge-ready" inert={utilityView !== null}>
@@ -65,7 +84,9 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
       {phase === 'playing' && (
         <div inert={utilityView !== null} className="betrayals-challenge-game" ref={attachPortal}>
           <MinigamePortalContext.Provider value={portalTarget}>
-            {children}
+            <BetrayalsChallengeAccessContext.Provider value={challengeAccess}>
+              {children}
+            </BetrayalsChallengeAccessContext.Provider>
           </MinigamePortalContext.Provider>
         </div>
       )}
@@ -86,7 +107,7 @@ export function BetrayalsChallengeStage({ title, game, motion, onForfeit, childr
           <div className="betrayals-challenge-utility" data-minigame-theme="betrayals">
             {utilityView === 'rules' ? (
               <MinigameRules
-                game={game}
+                game={rulesGame}
                 mode="reference"
                 confirmLabel={phase === 'countdown' ? 'Return to countdown' : 'Return to game'}
                 onConfirm={() => setUtilityView(null)}

@@ -33,6 +33,7 @@ import { coerceAppearanceSelection, type AppearanceSelection } from '../../appea
 import { IS_BETRAYALS_EDITION, isBetrayalsLook } from '../../betrayals/betrayalsAppearance'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
 import { warmSelectedAppearance } from '../../appearance/preloadAppearance'
 import './EditProfile.css'
 
@@ -62,7 +63,9 @@ export default function EditProfile() {
   const routeLocation = useLocation()
   const dispatch = useAppDispatch()
   const profile = useAppSelector(selectCurrentProfile)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const profileCount = useAppSelector((state) => state.profiles.profiles.length)
   const currentRunPhotoId = useAppSelector(
     (state) =>
@@ -74,9 +77,8 @@ export default function EditProfile() {
   const creatingProfile =
     routeState?.createProfile === true &&
     creationSelection.kind === 'catalog' &&
-    (IS_BETRAYALS_EDITION
-      ? isBetrayalsLook(creationSelection.lookId)
-      : hasAppearanceLookAccess(creationSelection.lookId, null, isVip))
+    (!IS_BETRAYALS_EDITION || isBetrayalsLook(creationSelection.lookId)) &&
+    hasAppearanceLookAccess(creationSelection.lookId, null, isVip)
   const requestedReturnTo = routeState?.from
   const returnTo =
     requestedReturnTo === '/' ||

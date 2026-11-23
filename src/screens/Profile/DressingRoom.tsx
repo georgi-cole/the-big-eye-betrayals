@@ -21,6 +21,7 @@ import {
   IS_BETRAYALS_EDITION,
 } from '../../betrayals/betrayalsAppearance'
 import './DressingRoom.css'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
 
 const looks = IS_BETRAYALS_EDITION ? BETRAYALS_LOOKS : SELECTABLE_LOOKS
 const figureRole = IS_BETRAYALS_EDITION ? 'formal' : 'casual'
@@ -39,7 +40,9 @@ export default function DressingRoom() {
   const creatingProfile = routeState?.createProfile === true
   const dispatch = useAppDispatch()
   const profile = useAppSelector(selectCurrentProfile)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const atProfileLimit = useAppSelector((state) => state.profiles.profiles.length >= MAX_PROFILES)
   const canFillCurrentLook = useAppSelector(
     (state) =>
@@ -61,9 +64,7 @@ export default function DressingRoom() {
   const returnTo = IS_BETRAYALS_EDITION || routeState?.from === '/' ? '/' : '/game'
   const creationBack = routeState?.fromPlayerAccount ? '/profile/account' : '/'
   const currentLook = looks.find((look) => look.id === selectedId)
-  const isAvailable = IS_BETRAYALS_EDITION
-    ? Boolean(currentLook)
-    : hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
+  const isAvailable = hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
   const balance = creatingProfile ? 0 : (profile?.eyeoleans ?? 0)
 
   useEffect(() => {
@@ -224,17 +225,15 @@ export default function DressingRoom() {
           onConfirm={isAvailable ? confirmSelection : undefined}
           confirmLabel={creatingProfile ? 'Choose this look' : 'Use this look'}
           accessContent={
-            !IS_BETRAYALS_EDITION && (
-              <LookAccessBadges
-                isFree={isFreeAppearanceLook(selectedId)}
-                isVip={isVip}
-                isOwned={isAvailable}
-                onOpen={(option) => {
-                  if (option === 'vip') openVipStore()
-                  else setMarketOption('eyeros')
-                }}
-              />
-            )
+            <LookAccessBadges
+              isFree={isFreeAppearanceLook(selectedId)}
+              isVip={isVip}
+              isOwned={isAvailable}
+              onOpen={(option) => {
+                if (option === 'vip') openVipStore()
+                else setMarketOption('eyeros')
+              }}
+            />
           }
           figureRef={figureRef}
         />

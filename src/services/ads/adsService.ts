@@ -41,6 +41,15 @@ export type AdPlacement =
   | 'aftermath_unlock'
   | 'betrayals_rewind'
   | 'betrayals_reveal_roles'
+  | 'betrayals_banishment_break'
+  | 'betrayals_murder_break'
+  | 'betrayals_final_vote_break'
+
+export const BETRAYALS_INTERSTITIAL_PLACEMENTS = new Set<AdPlacement>([
+  'betrayals_banishment_break',
+  'betrayals_murder_break',
+  'betrayals_final_vote_break',
+])
 
 export const INTERSTITIAL_PLACEMENTS = new Set<AdPlacement>([
   'live_vote_auto',
@@ -49,6 +58,7 @@ export const INTERSTITIAL_PLACEMENTS = new Set<AdPlacement>([
   'final3_part2_break',
   'final3_part3_break',
   'survival_elimination_auto',
+  ...BETRAYALS_INTERSTITIAL_PLACEMENTS,
 ])
 
 export const DAILY_LIMITED_PLACEMENTS = new Set<AdPlacement>([
@@ -132,7 +142,13 @@ export function canShowAd(
   ) {
     return false
   }
-  if (automatic && (state.ads?.hasNoAdsPack || hasEffectiveStoreEntitlement(state.vip, 'noAds'))) {
+  // Betrayals has app-specific ownership, checked by its host and native bridge.
+  // Original-game purchases must not grant that separate edition an entitlement.
+  if (
+    automatic &&
+    !BETRAYALS_INTERSTITIAL_PLACEMENTS.has(placement) &&
+    (state.ads?.hasNoAdsPack || hasEffectiveStoreEntitlement(state.vip, 'noAds'))
+  ) {
     if (import.meta.env.DEV) {
       console.log(`[ads] ${placement} blocked: No Ads Pack owned`)
     }

@@ -38,6 +38,8 @@ function snapshot(run: Run): Checkpoint {
   const state = { ...run }
   delete state.seasonRewards
   delete state.presentation
+  delete state.economy
+  delete state.pendingAdBreak
   return state
 }
 
@@ -79,6 +81,7 @@ export function validSeasonCheckpoint(candidate: Checkpoint, current: Run, type:
 }
 
 export function rewindOffer(run: Run) {
+  if (run.seasonRewards?.finaleRevealed) return
   const loss = humanElimination(run)
   if (!loss) return
   const type = loss.cause === 'night' ? 'day' : 'table'
@@ -97,6 +100,8 @@ export function rewindSeason(run: Run): Run | undefined {
   return {
     ...checkpoint,
     revision: run.revision + 1,
+    economy: run.economy,
+    pendingAdBreak: undefined,
     seats: human
       ? checkpoint.seats.map((seat) =>
           seat.id === human.id ? { ...seat, name: human.name, portrait: human.portrait } : seat

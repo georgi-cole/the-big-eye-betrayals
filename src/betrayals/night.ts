@@ -7,6 +7,7 @@ import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { getSocialView, rapport } from './social.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
+import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
 
 type ConclaveProposal = {
   speakerId: string
@@ -110,6 +111,7 @@ export function resolveNight(
   nominations: readonly Ballot[] = choices
 ): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
+  if (pendingPaidNightShieldPurchase(run)) return run
   const tally = tallyNightBallots(run, choices)
   const nominated = choices === nominations ? tally : tallyNightBallots(run, nominations)
   if (!tally || !nominated || [...tally.keys()].some((id) => !nominated.has(id))) return run
@@ -127,7 +129,10 @@ export function resolveNight(
       ...run.private,
       pendingNight: {
         targetId,
-        blocked: Boolean(targetId && run.private.nightShieldIds.includes(targetId)),
+        blocked: Boolean(
+          targetId &&
+          (run.private.nightShieldIds.includes(targetId) || hasPaidNightShield(run, targetId))
+        ),
         byDraw,
       },
     },
@@ -364,6 +369,7 @@ export function describeConclaveVerdict(run: Run, actorId: string | null) {
 
 export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: string): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
+  if (pendingPaidNightShieldPurchase(run)) return run
   const humanIsBetrayer = isActiveBetrayer(run, run.humanId)
   const pending = run.private.conclaveVote
   const briefing = discussShields(run)
