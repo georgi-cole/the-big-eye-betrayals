@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { excludeMobileCinematicAssets } from './scripts/lib/mobile-cinematic-assets.mjs'
+import { excludeMobileBetrayalsSoundtrack } from './scripts/lib/mobile-betrayals-soundtrack.mjs'
 import { betrayalsMinigameCss } from './scripts/lib/betrayals-minigame-css'
 import cinematicPack from './src/cinematic/media/vipCinematicPackManifest.json'
 
@@ -61,8 +62,13 @@ export default defineConfig(({ mode }) => ({
           resolve(options.dir ?? 'dist'),
           cinematicPack
         )
+        const soundtrack = await excludeMobileBetrayalsSoundtrack(
+          process.cwd(),
+          resolve(options.dir ?? 'dist'),
+          cinematicPack.files.map((file) => file.path)
+        )
         console.log(
-          `Mobile media: excluded ${result.excludedFiles} cinematic images (${result.excludedBytes} bytes); verified ${result.retainedFiles} bundled public files.`
+          `Mobile media: excluded ${result.excludedFiles} cinematic images (${result.excludedBytes} bytes) and ${soundtrack.excludedFiles} full Betrayals tracks (${soundtrack.excludedBytes} bytes); verified ${soundtrack.retainedFiles} bundled public files.`
         )
       },
     },
