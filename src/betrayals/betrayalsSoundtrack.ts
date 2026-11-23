@@ -383,7 +383,7 @@ export class BetrayalsSoundtrackController {
   }
 }
 
-export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene): void {
+export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene | null): void {
   const controllerRef = useRef<BetrayalsSoundtrackController | null>(null)
 
   useEffect(() => {

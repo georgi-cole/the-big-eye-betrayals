@@ -7,13 +7,11 @@ import {
   useBetrayalsUtilities,
 } from './betrayalsPreferences'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
-import type { Phase } from './run'
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
     init: vi.fn(),
     unlockFromGesture: vi.fn(),
-    stopAllMusic: vi.fn(),
     setMusicVolume: vi.fn(),
     setMusicMuted: vi.fn(),
     setDesiredMusic: vi.fn(),
@@ -23,8 +21,8 @@ vi.mock('../services/sound/SoundManager', () => ({
   },
 }))
 
-function UtilitiesHarness({ phase, playing }: { phase?: Phase; playing?: boolean }) {
-  const utilities = useBetrayalsUtilities(phase, playing)
+function UtilitiesHarness() {
+  const utilities = useBetrayalsUtilities()
   return (
     <>
       <BetrayalsUtilityChips utilities={utilities} />
@@ -51,21 +49,17 @@ describe('Betrayals game controls', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('starts the phase soundtrack on demand and releases it during a challenge', () => {
-    const view = render(<UtilitiesHarness phase="dawn" />)
+  it('toggles and remembers the music preference without selecting any shared track', () => {
+    const view = render(<UtilitiesHarness />)
     const music = screen.getByRole('button', { name: 'Music', pressed: false })
     fireEvent.click(music)
     expect(music).toHaveAttribute('aria-pressed', 'true')
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('nominations', 'betrayals')
+    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(false)
     expect(SoundManager.unlockFromGesture).toHaveBeenCalled()
-
-    view.rerender(<UtilitiesHarness phase="immunity" playing />)
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('none', 'betrayals')
-    view.rerender(<UtilitiesHarness phase="night" />)
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('nominations_horror', 'betrayals')
+    expect(vi.mocked(SoundManager.setDesiredMusic).mock.calls).toEqual([['none', 'betrayals']])
 
     view.unmount()
-    render(<UtilitiesHarness phase="night" />)
+    render(<UtilitiesHarness />)
     expect(screen.getByRole('button', { name: 'Music', pressed: true })).toBeInTheDocument()
   })
 

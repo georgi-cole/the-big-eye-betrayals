@@ -14,10 +14,13 @@ vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
     init: vi.fn(),
     unlockFromGesture: vi.fn(),
-    stopAllMusic: vi.fn(),
     setMusicVolume: vi.fn(),
     setMusicMuted: vi.fn(),
     setDesiredMusic: vi.fn(),
+    claimExternalMusic: vi.fn(),
+    setExternalMusicVolume: vi.fn(),
+    releaseExternalMusic: vi.fn(),
+    syncMusic: vi.fn().mockResolvedValue(undefined),
     setCategoryEnabled: vi.fn(),
     setCategoryVolume: vi.fn(),
     play: vi.fn(),
@@ -108,6 +111,7 @@ async function finishCinematic() {
 describe('Betrayals season review', () => {
   beforeEach(() => {
     localStorage.clear()
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
       this: HTMLDialogElement
     ) {
