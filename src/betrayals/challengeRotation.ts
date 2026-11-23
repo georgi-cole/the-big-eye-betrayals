@@ -12,6 +12,7 @@ import {
 } from '../minigames/socialChallenges/abyss/abyssRules'
 import { mulberry32, seededPickN } from '../store/rng'
 import { challengeRelationships } from './challengeRelationships'
+import { betrayalsChallengePotTarget } from './challengeExperience'
 import { challengeContestantIds, type RankedScore } from './challenges'
 import { CAST_SIZE, type Run } from './run'
 
@@ -210,6 +211,7 @@ export function scoreField(
 ): RankedScore[] {
   const players = challengePlayers(run, game)
   const completion = human?.completion
+  const potTarget = betrayalsChallengePotTarget(game, completion)
   if (!human && (isSocialChallengeGameKey(game.key) || game.key === 'riskWheelAbyss')) {
     const ids = players.filter(({ isHuman }) => !isHuman).map(({ id }) => id)
     const social = { relationships: challengeRelationships(run, ids) }
@@ -250,14 +252,14 @@ export function scoreField(
         : ((game.potTarget === 'placement' ? placementPoints : undefined) ??
           (isHuman ? (human?.score ?? 0) : precomputedScore))
     const fraction =
-      game.potTarget === 'placement'
+      potTarget === 'placement'
         ? placementPoints === undefined
           ? score / 100
           : placementPoints / players.length
         : game.lowerScoreWins
-          ? 1 - score / game.potTarget
+          ? 1 - score / potTarget
           : (score + (completion ? (game.potOffset ?? 0) : 0)) /
-            (game.potOffset && !completion ? 100 : game.potTarget)
+            (game.potOffset && !completion ? 100 : potTarget)
     return {
       contestantId,
       score,

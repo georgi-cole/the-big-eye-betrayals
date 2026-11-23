@@ -224,6 +224,28 @@
   line-height: 1.3;
 }
 
+.kq-splash[data-splash-variant='lanterns'] :is(.kq-splash__title, .kq-splash__tagline) {
+  color: #e5bb87;
+  font-family: 'Palatino Linotype', Palatino, Georgia, serif;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+.kq-splash[data-splash-variant='lanterns'] .kq-splash__title {
+  font-size: clamp(0.65rem, 2.1vmin, 0.86rem);
+}
+
+.kq-splash[data-splash-variant='lanterns'] .kq-splash__preload-row {
+  color: #ead2b5;
+  font-family: Georgia, serif;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.kq-splash[data-splash-variant='lanterns'] .kq-splash__preload-row span:last-child {
+  color: #cfab85;
+}
+
 .kq-splash--artwork-ready .kq-splash__logo-wrap,
 .kq-splash--artwork-ready .kq-splash__dna-glow,
 .kq-splash--artwork-ready .kq-splash__title,

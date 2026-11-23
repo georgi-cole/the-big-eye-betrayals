@@ -1,16 +1,24 @@
 import { Player } from '@remotion/player';
 import { CinematicComposition } from '../../cinematic/components/CinematicComposition';
 import { CINEMATIC_CONFIG } from '../../cinematic/config/cinematicConfig';
+import { useNavigate } from 'react-router';
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton';
 import './CinematicPreview.css';
 
 const formatTime = (frames: number): string =>
   `${(frames / CINEMATIC_CONFIG.fps).toFixed(0)} seconds`;
 
 export default function CinematicPreview() {
+  const navigate = useNavigate();
   return (
     <div className="cinematic-preview">
       <header className="cinematic-preview__header">
-        <a href="#/" className="cinematic-preview__back">Back to game</a>
+        <GameBackButton
+          className="cinematic-preview__back"
+          label="Back to game"
+          showLabel
+          onClick={() => navigate('/')}
+        />
         <div>
           <span>BIG EYE / CITY FILM</span>
           <h1>Cinematic preview</h1>

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton';
 import type { GameHistoryEvent, Player } from '../../types';
 import SeasonRecapCinematic from '../../components/SeasonRecapCinematic/SeasonRecapCinematic';
 import { HOUSEMATES_BIO_CARDS } from '../../components/HousematesBioCinematic/housematesBioData';
@@ -61,6 +63,7 @@ function asset(path: string): string {
 
 /** A dev-only deep link for reviewing the interactive finale archive in isolation. */
 export default function SeasonRecapPreview() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(true);
   const audioRef = useRef<CinematicAudioController | null>(null);
 
@@ -101,7 +104,7 @@ export default function SeasonRecapPreview() {
       <p>Season recap preview</p>
       <h1>Archive closed.</h1>
       <button type="button" onClick={() => setOpen(true)}>Replay recap</button>
-      <a href="#/">Back to the app</a>
+      <GameBackButton label="Back to the app" showLabel onClick={() => navigate('/')} />
     </main>
   );
 }

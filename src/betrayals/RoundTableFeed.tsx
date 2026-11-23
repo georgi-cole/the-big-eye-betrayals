@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { Ballot, Run, Seat, TableCount } from './run'
 import { MAX_TABLE_ROUNDS } from './run'
@@ -186,13 +187,12 @@ function CountFeed({
                     ))}
                   </ol>
                 </div>
-                <button
-                  type="button"
+                <GameBackButton
                   className="round-table-feed__utility"
+                  label="Return to vote totals"
+                  showLabel
                   onClick={() => setReviewOpen(false)}
-                >
-                  Return to vote totals
-                </button>
+                />
               </div>
             ) : (
               <div className="round-table-ballot__frame">

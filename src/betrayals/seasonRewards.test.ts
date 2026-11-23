@@ -97,3 +97,22 @@ it('reveals the full finale roster only after the reward has been earned', () =>
       .sort()
   ).toEqual([...final.private.betrayers].sort())
 })
+
+it('cannot reveal the hidden roles and then return to a saved competition', () => {
+  const run = start()
+  const dawn = recordSeasonCheckpoints(run, acknowledgeRole(run, commandToken(run)))
+  const eliminated: Run = {
+    ...dawn,
+    seats: dawn.seats.map((seat) =>
+      seat.id === dawn.humanId ? { ...seat, exit: { cause: 'night', day: 1 } } : seat
+    ),
+  }
+  const settled = settleRun(eliminated, 'unanimous')
+  expect(rewindOffer(settled)).toBeDefined()
+  const revealed = reload({
+    ...settled,
+    seasonRewards: { ...settled.seasonRewards, finaleRevealed: true },
+  })
+  expect(rewindOffer(revealed)).toBeUndefined()
+  expect(rewindSeason(revealed)).toBeUndefined()
+})

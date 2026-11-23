@@ -13,6 +13,8 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { Provider } from 'react-redux'
 import { RouterProvider } from 'react-router/dom'
 import { store } from './store/store'
+import { creditBetrayalsPurchase } from './store/profilesSlice'
+import { configureBetrayalsCommerceWallet } from './betrayals/commerce/purchaseService'
 import { router } from './routes'
 import { setupRouteAnalytics } from './services/backend/routeAnalytics'
 import { SoundManager } from './services/sound/SoundManager'
@@ -43,6 +45,15 @@ import './styles/majorityRulesFinalDuel.css'
 
 const IS_PUBLIC_QA_BUILD = import.meta.env.VITE_VIP_DEV_ENTITLEMENT === 'true'
 const IS_BETRAYALS = import.meta.env.VITE_BETRAYALS_EDITION === 'true'
+
+if (IS_BETRAYALS) {
+  configureBetrayalsCommerceWallet({
+    getProfiles: () => store.getState().profiles,
+    grant: (credit) => {
+      store.dispatch(creditBetrayalsPurchase(credit))
+    },
+  })
+}
 
 if (import.meta.env.DEV) {
   console.log(

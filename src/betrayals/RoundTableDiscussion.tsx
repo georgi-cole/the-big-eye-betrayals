@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import { tableDiscussion, tableTargets } from './table'
@@ -10,6 +11,8 @@ import { WitnessLeadCard } from './WitnessLeadCard'
 import { caseReports } from './investigationEvidence'
 import { InvestigationAccountCard } from './InvestigationAccountCard'
 import { InvestigationButton, type InvestigationControls } from './BetrayalsGuestProfile'
+import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
+import { canUseBetrayalsTableSway } from './premiumAccess'
 import './betrayals-pulse.css'
 import './RoundTableDiscussion.css'
 
@@ -19,6 +22,8 @@ type Props = {
   art: string
   shieldName?: string
   reducedMotion?: boolean
+  hasRealityMode?: boolean
+  onUpgrade?: () => void
   onBack: () => void
   onAskWitness: () => void
   investigation?: Pick<InvestigationControls, 'act' | 'reason'>
@@ -41,6 +46,8 @@ export function RoundTableDiscussion({
   art,
   shieldName,
   reducedMotion,
+  hasRealityMode = false,
+  onUpgrade,
   onBack,
   onAskWitness,
   investigation,
@@ -52,12 +59,15 @@ export function RoundTableDiscussion({
   const followLatest = useRef(true)
   const speeches = useMemo(() => tableDiscussion(run), [run])
   const [caseOpen, setCaseOpen] = useState(false)
-  const lead = leadForPlayer(run)
+  const lead = hasRealityMode ? leadForPlayer(run) : undefined
   const [targetId, setTargetId] = useState(
     () =>
       lead?.suspectId ??
-      caseReports(run).find(({ report }) => tableTargets(run, run.humanId).includes(report.guestId))
-        ?.report.guestId ??
+      (hasRealityMode
+        ? caseReports(run).find(({ report }) =>
+            tableTargets(run, run.humanId).includes(report.guestId)
+          )?.report.guestId
+        : undefined) ??
       ''
   )
   const [behind, setBehind] = useState(false)
@@ -77,7 +87,7 @@ export function RoundTableDiscussion({
   const speakerId = !transcriptOpen && visible > 0 ? speeches[visible - 1]?.speakerId : undefined
   const candidates = tableTargets(run, run.humanId)
   const target = candidates.includes(targetId) ? seats.get(targetId) : undefined
-  const accounts = target ? caseReports(run, target.id) : []
+  const accounts = hasRealityMode && target ? caseReports(run, target.id) : []
   const name = (id: string) => seats.get(id)?.name ?? 'Guest'
 
   useEffect(() => {
@@ -109,6 +119,11 @@ export function RoundTableDiscussion({
     setBehind(false)
   }
 
+  function chooseSway(choice: TableSway | null) {
+    if (canUseBetrayalsTableSway(choice, hasRealityMode)) onSway(choice)
+    else onUpgrade?.()
+  }
+
   return (
     <dialog
       ref={dialogRef}
@@ -127,9 +142,11 @@ export function RoundTableDiscussion({
         <header className="round-table-room__head">
           <div className="round-table-room__topline">
             <span>Day {run.day}</span>
-            <button type="button" onClick={onBack}>
-              Back to castle
-            </button>
+            <GameBackButton
+              className="round-table-room__back"
+              label="Back to castle"
+              onClick={onBack}
+            />
           </div>
           <h2 id="round-table-room-title">Round Table</h2>
           {shieldName && <p>{shieldName} holds the Public Shield.</p>}
@@ -199,6 +216,13 @@ export function RoundTableDiscussion({
 
           {caseOpen && (
             <div className="round-table-room__case">
+              {!hasRealityMode && (
+                <BetrayalsPremiumButton
+                  title="Reality Mode at the Round Table"
+                  detail="Present accounts, call witnesses, defend a guest and press harder."
+                  onClick={onUpgrade}
+                />
+              )}
               {lead && candidates.includes(lead.suspectId) && (
                 <WitnessLeadCard lead={lead} onAsk={onAskWitness} />
               )}
@@ -220,7 +244,7 @@ export function RoundTableDiscussion({
                         <button
                           type="button"
                           onClick={() =>
-                            onSway({
+                            chooseSway({
                               targetId,
                               tone: 'careful',
                               investigation: { reportId: report.id },
@@ -234,7 +258,7 @@ export function RoundTableDiscussion({
                             <button
                               type="button"
                               onClick={() =>
-                                onSway({
+                                chooseSway({
                                   targetId,
                                   tone: 'careful',
                                   investigation: { reportId: report.id, witness: true },
@@ -275,7 +299,7 @@ export function RoundTableDiscussion({
                       <button
                         type="button"
                         onClick={() =>
-                          onSway({ targetId, tone: 'careful', evidence: 'call-witness' })
+                          chooseSway({ targetId, tone: 'careful', evidence: 'call-witness' })
                         }
                       >
                         Call {lead.witness}
@@ -283,7 +307,9 @@ export function RoundTableDiscussion({
                     )}
                     <button
                       type="button"
-                      onClick={() => onSway({ targetId, tone: 'careful', evidence: 'name-source' })}
+                      onClick={() =>
+                        chooseSway({ targetId, tone: 'careful', evidence: 'name-source' })
+                      }
                     >
                       Name {lead.source} as your source
                     </button>
@@ -291,21 +317,26 @@ export function RoundTableDiscussion({
                 )}
                 <button
                   type="button"
-                  onClick={() => onSway({ targetId, tone: 'careful', stance: 'question' })}
+                  onClick={() => chooseSway({ targetId, tone: 'careful', stance: 'question' })}
                 >
                   Ask for a reason
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSway({ targetId, tone: 'careful', stance: 'defend' })}
+                  data-premium-locked={!hasRealityMode || undefined}
+                  onClick={() => chooseSway({ targetId, tone: 'careful', stance: 'defend' })}
                 >
-                  Defend
+                  Defend{!hasRealityMode && <span> · VIP</span>}
                 </button>
-                <button type="button" onClick={() => onSway({ targetId, tone: 'careful' })}>
+                <button type="button" onClick={() => chooseSway({ targetId, tone: 'careful' })}>
                   Make a case
                 </button>
-                <button type="button" onClick={() => onSway({ targetId, tone: 'forceful' })}>
-                  Press hard
+                <button
+                  type="button"
+                  data-premium-locked={!hasRealityMode || undefined}
+                  onClick={() => chooseSway({ targetId, tone: 'forceful' })}
+                >
+                  Press hard{!hasRealityMode && <span> · VIP</span>}
                 </button>
               </div>
             </>
@@ -334,7 +365,11 @@ export function RoundTableDiscussion({
                 )}
               </>
             )}
-            <button className="round-table-room__vote" type="button" onClick={() => onSway(null)}>
+            <button
+              className="round-table-room__vote"
+              type="button"
+              onClick={() => chooseSway(null)}
+            >
               Go to vote
             </button>
           </div>

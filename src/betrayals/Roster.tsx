@@ -41,11 +41,13 @@ export function Roster({
         const nightShield =
           !seat.exit &&
           view.knownNightShieldIds.includes(seat.id) &&
-          (seat.id === humanId && view.nightShieldCount
-            ? view.nightShieldCount > 1
-              ? '2 Night Shields'
-              : 'Night Shield'
-            : 'Won a Night Shield')
+          (seat.id === humanId && view.purchasedNightShieldActive
+            ? 'Purchased Night Shield'
+            : seat.id === humanId && view.nightShieldCount
+              ? view.nightShieldCount > 1
+                ? '2 Night Shields'
+                : 'Night Shield'
+              : 'Won a Night Shield')
         const selectable = !selectableIds || selectableIds.includes(seat.id)
         const tied = runoffIds?.includes(seat.id)
         const confirmedRole = seat.exit?.revealedRole ?? seat.finaleRole

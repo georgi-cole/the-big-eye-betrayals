@@ -1,0 +1,65 @@
+.betrayals-ad-break {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  color: #f1e5c5;
+  background: radial-gradient(ellipse at 50% 42%, #2a2634 0, #100f18 65%);
+}
+
+.betrayals-ad-break::backdrop {
+  background: #100f18;
+}
+
+.betrayals-ad-break[open] {
+  display: grid;
+  place-items: center;
+}
+
+.betrayals-ad-break__card {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  width: min(100%, 360px);
+  text-align: center;
+}
+
+.betrayals-ad-break__eyebrow {
+  color: #c9b17f;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.betrayals-ad-break__seal {
+  width: 42px;
+  height: 42px;
+  margin: 8px 0;
+  border: 1px solid #c9b17f;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 7px #c9b17f12,
+    inset 0 0 0 9px #c9b17f1a;
+}
+
+.betrayals-ad-break__card h2 {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 400;
+}
+
+.betrayals-ad-break__card p {
+  margin: 0;
+  max-width: 28ch;
+  color: #c6bfce;
+  font-size: 14px;
+  line-height: 1.6;
+}

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
@@ -10,6 +10,28 @@ import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
 import { applySocialMove } from './social'
 import { resolveTable } from './table'
+import { preparePaidNightShieldPurchase, recordBetrayalsEconomy } from './economy'
+
+const commerce = vi.hoisted(() => ({
+  ready: true,
+  vip: true,
+  myPulse: true,
+  realityMode: true,
+  noAds: true,
+  premiumGames: false,
+  paidLooks: true,
+  billingAvailable: false,
+  products: {},
+  loading: false,
+  purchasing: null,
+  error: null,
+  notice: null,
+  vipUpgradeAvailable: false,
+  purchase: vi.fn(),
+  restore: vi.fn(),
+  refresh: vi.fn(),
+}))
+vi.mock('./commerce/useBetrayalsCommerce', () => ({ useBetrayalsCommerce: () => commerce }))
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
@@ -113,6 +135,13 @@ async function finishCinematic() {
 describe('Betrayals season review', () => {
   beforeEach(() => {
     localStorage.clear()
+    Object.assign(commerce, {
+      vip: true,
+      myPulse: true,
+      realityMode: true,
+      noAds: true,
+      paidLooks: true,
+    })
     vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
       this: HTMLDialogElement
     ) {
@@ -129,12 +158,13 @@ describe('Betrayals season review', () => {
 
   it('opens the paired Home Hub destinations from a profile', () => {
     const openDressingRoom = vi.fn()
+    const openProfile = vi.fn()
     sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
     render(
       <BetrayalsScreen
         profiles={{
           player: { id: 'intro-profile', name: 'Georgi', portrait: '/georgi.webp' },
-          openProfile: vi.fn(),
+          openProfile,
           openAccount: vi.fn(),
           openDressingRoom,
         }}
@@ -142,19 +172,370 @@ describe('Betrayals season review', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Start season' })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Help & Feedback' })).toHaveAttribute(
+    const profileCompass = screen.getByRole('button', { name: 'Profile' })
+    expect(profileCompass).toHaveClass('betrayals-home__compass')
+    fireEvent.click(profileCompass)
+    expect(openProfile).toHaveBeenCalledOnce()
+    const shortcuts = within(screen.getByRole('navigation', { name: 'Game controls' }))
+    expect(shortcuts.queryByRole('button', { name: 'Profile' })).toBeNull()
+    expect(shortcuts.getAllByRole('button')).toHaveLength(5)
+    expect(screen.getByRole('link', { name: 'Report a bug' })).toHaveAttribute(
       'href',
       expect.stringContaining('mailto:kolequant@gmail.com')
     )
+    expect(screen.getByRole('button', { name: 'Players' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Share The Big Eye' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Achievements' }))
     const achievements = within(screen.getByRole('dialog', { name: 'Achievements' }))
+    expect(achievements.getByRole('heading', { name: 'Hall of Fame' })).toBeVisible()
     expect(achievements.getByText('Enter the castle').parentElement).toHaveTextContent('Locked')
+    fireEvent.click(achievements.getByRole('button', { name: 'Eyeros rewards' }))
+    expect(achievements.getByText('Win the season').parentElement).toHaveTextContent(
+      '10,000 Eyeros'
+    )
     fireEvent.click(achievements.getByRole('button', { name: 'Close achievements' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rules' }))
+    const rules = within(screen.getByRole('dialog', { name: 'Rules' }))
+    expect(rules.getByRole('heading', { name: 'The Castle Handbook' })).toBeVisible()
+    const bookmarks = within(rules.getByRole('navigation', { name: 'Handbook chapters' }))
+    expect(bookmarks.getByRole('button', { name: 'Loyals', pressed: true })).toBeVisible()
+    expect(rules.getByRole('article', { name: 'The Loyal' })).toHaveTextContent(
+      'Survive until every Betrayer is out'
+    )
+    fireEvent.click(bookmarks.getByRole('button', { name: 'Betrayers' }))
+    const betrayer = rules.getByRole('article', { name: 'The Betrayer' })
+    expect(betrayer).toHaveTextContent('There are 3 or more Betrayers')
+    expect(betrayer).toHaveTextContent('meet in the secret Conclave')
+    expect(betrayer).not.toHaveTextContent(/\b4\b|\bfour\b/i)
+    fireEvent.click(bookmarks.getByRole('button', { name: 'The Season' }))
+    expect(rules.getByRole('article', { name: 'A Day in the Castle' })).toHaveTextContent(
+      'Safety Challenge'
+    )
+    fireEvent.click(bookmarks.getByRole('button', { name: 'Castle Notes' }))
+    expect(rules.getByRole('article', { name: 'Notes for Your Stay' })).toHaveTextContent(
+      'Public Shield'
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Close rules' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Store' }))
     const store = within(screen.getByRole('dialog', { name: 'Store' }))
-    fireEvent.click(store.getByRole('button', { name: 'The Heiress' }))
-    expect(openDressingRoom).toHaveBeenCalledWith('pc-015')
+    expect(store.getByRole('button', { name: 'View VIP benefits' })).toBeVisible()
+    expect(store.getByRole('button', { name: 'Feature unlocks' })).toBeVisible()
+    fireEvent.click(store.getByRole('button', { name: /The changing room/ }))
+    expect(openDressingRoom).toHaveBeenCalledWith()
+  })
+
+  it('opens the profile Wallet through the Store with real activity and a profile destination', () => {
+    const openProfile = vi.fn()
+    const openWalletProfile = vi.fn()
+    sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'wallet-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: {
+            balance: 4250,
+            transactions: [
+              {
+                id: 'social-reward',
+                amount: 50,
+                label: 'Social action',
+                source: 'season_reward',
+                createdAt: '2026-11-23T12:00:00Z',
+              },
+            ],
+            claimRewards: vi.fn().mockResolvedValue(true),
+            spend: vi.fn().mockResolvedValue('paid'),
+          },
+          openProfile,
+          openWalletProfile,
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: /Open wallet/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open wallet, 4,250 Eyeros' }))
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    expect(wallet.getByLabelText('4,250 Eyeros available')).toBeVisible()
+    expect(wallet.getByRole('heading', { name: 'Recent activity' })).toBeVisible()
+    expect(wallet.getByText('Social action')).toBeVisible()
+    expect(wallet.queryByRole('region', { name: 'Store overview' })).toBeNull()
+    fireEvent.click(wallet.getByRole('button', { name: 'Open profile: Georgi' }))
+    expect(openWalletProfile).toHaveBeenCalledOnce()
+    expect(openProfile).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open wallet, 4,250 Eyeros' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
+    const store = within(screen.getByRole('dialog', { name: 'Store' }))
+    expect(store.getByRole('button', { name: 'View VIP benefits' })).toBeVisible()
+  })
+
+  it('uses the Wallet return destination when no profile is selected', () => {
+    const openProfile = vi.fn()
+    const openWalletProfile = vi.fn()
+    sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
+    render(
+      <BetrayalsScreen
+        profiles={{
+          openProfile,
+          openWalletProfile,
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open wallet, 0 Eyeros' }))
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    fireEvent.click(wallet.getByRole('button', { name: 'Choose a profile' }))
+    expect(openWalletProfile).toHaveBeenCalledOnce()
+    expect(openProfile).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('routes locked Pulse and full profiles to their store unlocks while keeping basic conversation free', async () => {
+    Object.assign(commerce, {
+      vip: false,
+      myPulse: false,
+      realityMode: false,
+      noAds: false,
+      paidLooks: false,
+    })
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'free-access', roleSeed: 28, publicSeed: 823 }
+    )
+    saveRun(localStorage, 'edition-local', { ...run, phase: 'social' })
+    render(<BetrayalsScreen />)
+    expect(screen.queryByRole('button', { name: /Open Wallet,/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Open Store' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Open My Pulse' }))
+    expect(screen.queryByRole('dialog', { name: 'My Pulse' })).toBeNull()
+    const store = within(screen.getByRole('dialog', { name: 'Store' }))
+    expect(store.getByRole('heading', { name: 'My Pulse' })).toBeVisible()
+    fireEvent.click(store.getByRole('button', { name: 'Close store' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    const guest = run.seats[1]
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(guest.name),
+      })
+    )
+    const guestProfile = social.getByText('Profile traits', { exact: true }).closest('details')
+    expect(guestProfile).not.toHaveAttribute('open')
+    fireEvent.click(social.getByRole('button', { name: /Build trust/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status === 'ready' && saved.run.social?.at(-1)?.kind).toBe('rapport')
+    fireEvent.click(social.getByText('Profile traits', { exact: true }))
+    const profile = within(social.getByRole('region', { name: `${guest.name} profile traits` }))
+    expect(profile.queryByText('Openness')).toBeNull()
+    expect(profile.getAllByRole('img', { name: /locked for Reality Mode or VIP/ })).toHaveLength(5)
+    expect(profile.queryByRole('meter')).toBeNull()
+    expect(profile.getByRole('button', { name: 'Unlock with Reality Mode or VIP' })).toBeVisible()
+    expect(social.getByRole('region', { name: 'Social actions' })).toBeVisible()
+    expect(social.getByRole('button', { name: /Build trust/ })).toBeVisible()
+    fireEvent.click(profile.getByRole('button', { name: 'Unlock with Reality Mode or VIP' }))
+    expect(screen.getByRole('dialog', { name: 'Store' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Reality Mode' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close store' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Store' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Store' })).getByRole('button', {
+        name: /Open wallet, 0 Eyeros/i,
+      })
+    )
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    expect(wallet.getByRole('button', { name: 'Top up Eyeros' })).toBeVisible()
+    expect(wallet.queryByRole('heading', { name: 'Reality Mode' })).toBeNull()
+    fireEvent.click(wallet.getByRole('button', { name: 'Close wallet' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    expect(screen.getByRole('button', { name: 'Continue season' })).toBeVisible()
+    expect(screen.getByRole('main')).not.toHaveTextContent(/Day\s+1\s*·\s*Social/)
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'My Pulse' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Close store' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: /Unlock Reality Mode/ }))
+    expect(screen.getByRole('heading', { name: 'Reality Mode' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Explore VIP' })).toBeNull()
+  })
+
+  it('recovers a pending shield by saving one wallet debit before granting protection', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'recover-shield', roleSeed: 28, publicSeed: 823 }
+    )
+    const night = {
+      ...original,
+      phase: 'night' as const,
+      private: {
+        ...original.private,
+        betrayers: original.seats.slice(1, 4).map(({ id }) => id),
+        nightShieldIds: [],
+      },
+    }
+    const pending = preparePaidNightShieldPurchase(night, commandToken(night), 4_000)
+    expect(pending.economy?.paidNightShields[0].status).toBe('pending')
+    saveRun(localStorage, 'profile-shield-profile', pending)
+    let finishDebit!: (result: 'paid') => void
+    const spend = vi.fn(
+      () =>
+        new Promise<'paid'>((resolve) => {
+          finishDebit = resolve
+        })
+    )
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'shield-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 4_000, claimRewards: vi.fn().mockResolvedValue(true), spend },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(spend).toHaveBeenCalledTimes(1))
+    const beforeDebit = restoreRun(localStorage, 'profile-shield-profile')
+    expect(
+      beforeDebit.status === 'ready' && beforeDebit.run.economy?.paidNightShields[0].status
+    ).toBe('pending')
+    await act(async () => {
+      finishDebit('paid')
+    })
+    await waitFor(() => {
+      const after = restoreRun(localStorage, 'profile-shield-profile')
+      expect(after.status === 'ready' && after.run.economy?.paidNightShields[0].status).toBe(
+        'active'
+      )
+    })
+    expect(spend).toHaveBeenCalledWith(
+      'betrayals:recover-shield:night-shield:1',
+      3_000,
+      'Night Shield'
+    )
+    expect(spend).toHaveBeenCalledTimes(1)
+    expect(screen.getByTitle('Purchased Night Shield')).toBeVisible()
+  })
+
+  it('does not let an old shield callback overwrite a profile after leaving the screen', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'leave-shield', roleSeed: 28, publicSeed: 823 }
+    )
+    const night = {
+      ...original,
+      phase: 'night' as const,
+      private: {
+        ...original.private,
+        betrayers: original.seats.slice(1, 4).map(({ id }) => id),
+        nightShieldIds: [],
+      },
+    }
+    const pending = preparePaidNightShieldPurchase(night, commandToken(night), 4_000)
+    saveRun(localStorage, 'profile-leaving-profile', pending)
+    let finishDebit!: (result: 'paid') => void
+    const spend = vi.fn(
+      () =>
+        new Promise<'paid'>((resolve) => {
+          finishDebit = resolve
+        })
+    )
+    const app = render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'leaving-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 4_000, claimRewards: vi.fn().mockResolvedValue(true), spend },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(spend).toHaveBeenCalledTimes(1))
+    app.unmount()
+    const newer = { ...pending, revision: pending.revision + 10, day: 2, phase: 'dawn' as const }
+    saveRun(localStorage, 'profile-leaving-profile', newer)
+    await act(async () => {
+      finishDebit('paid')
+    })
+    const saved = restoreRun(localStorage, 'profile-leaving-profile')
+    expect(saved.status === 'ready' && saved.run.revision).toBe(newer.revision)
+    expect(saved.status === 'ready' && saved.run.day).toBe(2)
+  })
+
+  it('drains new reward receipts that arrive while an earlier wallet save is pending', async () => {
+    const original = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'reward-queue', roleSeed: 28, publicSeed: 823 }
+    )
+    const socialRun = { ...original, phase: 'social' as const }
+    const first = recordBetrayalsEconomy(
+      socialRun,
+      applySocialMove(socialRun, commandToken(socialRun), {
+        actorId: socialRun.humanId,
+        recipientId: socialRun.seats[1].id,
+        kind: 'rapport',
+      })
+    )
+    saveRun(localStorage, 'profile-reward-profile', first)
+    let finishClaim!: (result: boolean) => void
+    const claimRewards = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            finishClaim = resolve
+          })
+      )
+      .mockResolvedValue(true)
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'reward-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: { balance: 0, claimRewards, spend: vi.fn().mockResolvedValue('insufficient') },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    await waitFor(() => expect(claimRewards).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(first.seats[2].name),
+      })
+    )
+    fireEvent.click(social.getByRole('button', { name: /Build trust/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Execute' }))
+    expect(claimRewards).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      finishClaim(true)
+    })
+    await waitFor(() => expect(claimRewards).toHaveBeenCalledTimes(2))
+    expect(claimRewards.mock.calls[1][0]).toHaveLength(2)
   })
 
   it('expands the profile, filters saved Intel with guest chips, and retains old notes after reload', async () => {
@@ -183,9 +564,10 @@ describe('Betrayals season review', () => {
         name: new RegExp(guest.name),
       })
     )
-    fireEvent.click(social.getByText('View full profile', { exact: true }))
+    fireEvent.click(social.getByText('Profile traits', { exact: true }))
     const traits = within(social.getByRole('region', { name: `${guest.name} profile traits` }))
-    expect(traits.getAllByText('Too little to tell')).toHaveLength(6)
+    expect(traits.queryByText('Openness')).toBeNull()
+    expect(traits.getAllByText('Too little to tell')).toHaveLength(5)
     expect(social.queryByRole('combobox')).toBeNull()
     expect(social.queryByRole('textbox', { name: 'Private note' })).toBeNull()
     await clickAndSave(social.getByRole('button', { name: 'Observe · 1 Energy' }))
@@ -494,9 +876,7 @@ describe('Betrayals season review', () => {
     )
     render(<BetrayalsScreen />)
     expect(screen.getByText('The Loyals win.')).toBeVisible()
-    expect(
-      screen.getByText('The season ended automatically when two guests remained.')
-    ).toBeVisible()
+    expect(screen.getByText('The season ended automatically when 2 guests remained.')).toBeVisible()
     expect(screen.getByText('Only Loyals remained, so they split the pot.')).toBeVisible()
   })
 

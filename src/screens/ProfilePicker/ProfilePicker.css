@@ -434,6 +434,11 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.profile-picker__create-actions .profile-picker__create-back {
+  flex: 0 0 auto !important;
 }
 
 .profile-picker__btn--create {

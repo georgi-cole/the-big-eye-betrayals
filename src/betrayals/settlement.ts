@@ -4,6 +4,7 @@ import { hashId, isCurrentCommand } from './run.ts'
 import { getSocialView, relationship } from './perception.ts'
 import type { CommandToken, Role, Run } from './run.ts'
 import { resolutionPerspective, strongestCase } from './strategy.ts'
+import { FINAL_SURVIVOR_COUNT } from './seasonPhases.ts'
 
 type Reason = NonNullable<Run['result']>['reason']
 type EndVote = { voterId: string; choice: 'end' | 'banish' }
@@ -66,7 +67,7 @@ export function settleRun(run: Run, reason: Reason): Run {
 export function resolveEndVote(run: Run, token: CommandToken, votes: readonly EndVote[]): Run {
   if (run.phase !== 'end-vote' || !isCurrentCommand(run, token) || run.result) return run
   const voting = new Set(run.seats.filter(({ exit }) => !exit).map(({ id }) => id))
-  if (voting.size < 3 || votes.length !== voting.size) return run
+  if (voting.size <= FINAL_SURVIVOR_COUNT || votes.length !== voting.size) return run
   if (
     votes.some(
       ({ voterId, choice }) => !voting.delete(voterId) || (choice !== 'end' && choice !== 'banish')

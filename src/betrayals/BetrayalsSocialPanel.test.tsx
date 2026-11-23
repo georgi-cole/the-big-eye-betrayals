@@ -31,6 +31,8 @@ describe('Betrayals private conversations', () => {
     const onGeneralMove = vi.fn()
     render(
       <BetrayalsSocialPanel
+        hasRealityMode
+        hasMyPulse
         actorId="human"
         prospects={prospects}
         resources={resources}
@@ -75,6 +77,8 @@ describe('Betrayals private conversations', () => {
     const onMove = vi.fn()
     render(
       <BetrayalsSocialPanel
+        hasRealityMode
+        hasMyPulse
         actorId="human"
         prospects={prospects}
         resources={resources}
@@ -120,6 +124,8 @@ describe('Betrayals private conversations', () => {
     ]
     render(
       <BetrayalsSocialPanel
+        hasRealityMode
+        hasMyPulse
         actorId="human"
         prospects={prospects}
         cast={[...prospects, { id: 'ivy', name: 'Ivy' }]}
@@ -156,7 +162,7 @@ describe('Betrayals private conversations', () => {
     const history = screen.getByRole('region', { name: 'Private notes' })
     fireEvent.click(within(history).getByRole('button', { name: 'Dismiss current result' }))
     expect(within(history).queryByText('Ren wanted to compare notes about Ivy.')).toBeNull()
-    fireEvent.click(within(history).getByRole('button', { name: 'History' }))
+    fireEvent.click(within(history).getByRole('button', { name: /^History/ }))
     expect(within(history).getByText('Ren wanted to compare notes about Ivy.')).toBeInTheDocument()
     expect(within(history).queryByText('Opal wanted to compare notes about Georgi.')).toBeNull()
     expect(onMove).not.toHaveBeenCalled()
@@ -181,5 +187,45 @@ describe('Betrayals private conversations', () => {
     expect(onClose).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Close social panel' }))
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('offers locked advanced moves while a free player can still have a basic conversation', () => {
+    const onMove = vi.fn()
+    const onUpgrade = vi.fn()
+    const onGeneralMove = vi.fn()
+    render(
+      <BetrayalsSocialPanel
+        actorId="human"
+        prospects={prospects}
+        resources={resources}
+        onClose={vi.fn()}
+        onMove={onMove}
+        onGeneralMove={onGeneralMove}
+        onUpgrade={onUpgrade}
+      />
+    )
+    const general = within(screen.getByRole('region', { name: 'General actions' }))
+    fireEvent.click(general.getByRole('button', { name: /Group Chat/ }))
+    expect(onUpgrade).toHaveBeenLastCalledWith('realityMode')
+    expect(onGeneralMove).not.toHaveBeenCalled()
+    expect(general.queryByRole('group', { name: 'Group Chat guests' })).not.toBeInTheDocument()
+    fireEvent.click(general.getByRole('button', { name: /Lay Low/ }))
+    fireEvent.click(general.getByRole('button', { name: 'Execute general action' }))
+    expect(onGeneralMove).toHaveBeenCalledWith('lay-low', [])
+
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: /Ren/,
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Build trust/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Execute' }))
+    expect(onMove).toHaveBeenCalledWith('rapport', undefined, 'ren')
+    onMove.mockClear()
+    fireEvent.click(screen.getByRole('tab', { name: 'Strategic' }))
+    fireEvent.click(screen.getByRole('button', { name: /Plan a vote/ }))
+    expect(onUpgrade).toHaveBeenLastCalledWith('realityMode')
+    expect(screen.getByRole('button', { name: 'Execute' })).toBeDisabled()
+    expect(onMove).not.toHaveBeenCalled()
   })
 })

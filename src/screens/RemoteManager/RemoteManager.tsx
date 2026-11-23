@@ -28,6 +28,7 @@ import {
   type GitHubPublishTarget,
 } from '../../remoteConfig/githubConfigPublisher'
 import { isDebugAccessGranted } from '../../utils/debugMode'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import './RemoteManager.css'
 
 type Section = 'broadcast' | 'music' | 'game' | 'social' | 'tutorial' | 'json' | 'publish'
@@ -284,9 +285,7 @@ export default function RemoteManager() {
           <h1>Remote Manager</h1>
           <p>Edit broadcasts, music, games, and social tuning without changing source code.</p>
         </div>
-        <button type="button" onClick={() => navigate('/game?debug=1')}>
-          Back to game
-        </button>
+        <GameBackButton label="Back to game" showLabel onClick={() => navigate('/game?debug=1')} />
       </header>
 
       <aside className="remote-manager__notice" aria-live="polite">

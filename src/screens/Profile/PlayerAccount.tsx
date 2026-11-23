@@ -351,17 +351,16 @@ export default function PlayerAccount() {
             <button type="submit" className="game-button player-account__gold" disabled={busy}>
               {sentTo ? 'Verify and sign in' : 'Send sign-in code'}
             </button>
-            <button
-              type="button"
-              className="game-button game-button--secondary"
+            <GameBackButton
+              className="player-account__email-back"
+              label="Back to sign-in options"
+              showLabel
               disabled={busy}
               onClick={() => {
                 closeEmailForm()
                 clearError()
               }}
-            >
-              Back to sign-in options
-            </button>
+            />
           </form>
         ) : (
           <>

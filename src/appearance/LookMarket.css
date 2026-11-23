@@ -293,6 +293,10 @@
   padding: 5px 0 0;
 }
 
+.look-market__return {
+  margin-top: 4px;
+}
+
 .look-market__success-icon {
   display: grid;
   place-items: center;

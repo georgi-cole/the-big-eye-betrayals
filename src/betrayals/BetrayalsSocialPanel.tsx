@@ -16,6 +16,7 @@ import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
 import { BetrayalsGuestProfile, type InvestigationControls } from './BetrayalsGuestProfile'
+import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
 import {
@@ -231,6 +232,9 @@ type Props = {
   recent?: SocialEntry
   intel?: React.ReactNode
   investigation?: InvestigationControls
+  hasRealityMode?: boolean
+  hasMyPulse?: boolean
+  onUpgrade?: (product: 'realityMode' | 'myPulse') => void
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
   onGeneralMove?: (
@@ -439,13 +443,20 @@ function CastleWire({
             <button
               type="button"
               className="ra-history-btn"
+              aria-label={showHistory ? 'Show latest activity' : `History · ${notes.length}`}
               aria-expanded={showHistory}
               onClick={() => setShowHistory(!showHistory)}
             >
-              {showHistory ? 'Close history' : 'History'}
-              <span className="ra-history-btn__count" aria-hidden="true">
-                {notes.length}
-              </span>
+              {showHistory ? (
+                'Latest'
+              ) : (
+                <>
+                  <span>History</span>
+                  <span className="ra-history-btn__count" aria-hidden="true">
+                    {notes.length}
+                  </span>
+                </>
+              )}
             </button>
           )}
         </span>
@@ -529,6 +540,9 @@ export function BetrayalsSocialPanel({
   recent,
   intel,
   investigation,
+  hasRealityMode = false,
+  hasMyPulse = false,
+  onUpgrade,
   onClose,
   onMove,
   onGeneralMove,
@@ -647,6 +661,7 @@ export function BetrayalsSocialPanel({
     Boolean(
       peer &&
       selectedAction &&
+      canUseBetrayalsAction(selectedAction, hasRealityMode) &&
       moveKinds.includes(selectedAction) &&
       !unavailable(selectedAction) &&
       (!targetKind || availableTargets.some(({ id }) => id === target))
@@ -754,7 +769,7 @@ export function BetrayalsSocialPanel({
                   group={group}
                   actorId={actorId}
                   contacts={contacts}
-                  onChange={planningOpen ? onAllianceChange : undefined}
+                  onChange={planningOpen && hasRealityMode ? onAllianceChange : undefined}
                 />
               ))}
               {allies.length > 0 && (
@@ -778,6 +793,7 @@ export function BetrayalsSocialPanel({
                   className="sp2-focus__clear"
                   type="button"
                   aria-label={`Deselect ${peer.name} and show roster`}
+                  title="Close guest profile"
                   onClick={() => chooseContact(undefined)}
                 >
                   ×
@@ -854,6 +870,8 @@ export function BetrayalsSocialPanel({
                     investigation={investigation}
                     contacts={contacts}
                     name={label}
+                    locked={!hasRealityMode}
+                    onUnlock={!hasRealityMode ? () => onUpgrade?.('realityMode') : undefined}
                   />
                 )}
               </>
@@ -881,11 +899,24 @@ export function BetrayalsSocialPanel({
 
           {!peer && investigation && (
             <button
-              className="sp2-action-button"
+              className="house-pulse__summary betrayals-social-pulse"
               type="button"
+              aria-label={hasMyPulse ? 'Open My Pulse' : 'Open My Pulse, VIP feature'}
+              aria-haspopup="dialog"
               onClick={() => investigation.openPulse()}
             >
-              My Pulse
+              <span className="house-pulse__mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M2.5 12s3.7-6 9.5-6 9.5 6 9.5 6-3.7 6-9.5 6-9.5-6-9.5-6Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+              <span>
+                <strong>My Pulse</strong>
+                <small>Day {day ?? '—'} · Your investigation log</small>
+              </span>
+              <em>Track your story, gathered intel and commitments.</em>
+              <b>{hasMyPulse ? 'Open My Pulse' : 'VIP · Unlock'}</b>
             </button>
           )}
           {!peer && intel}
@@ -898,6 +929,8 @@ export function BetrayalsSocialPanel({
               actorId={actorId}
               notes={notes}
               planningOpen={planningOpen}
+              hasRealityMode={hasRealityMode}
+              onUpgrade={() => onUpgrade?.('realityMode')}
               onMove={onGeneralMove}
             />
           )}
@@ -982,6 +1015,8 @@ export function BetrayalsSocialPanel({
                         action={{ ...action, baseCost: cost.energy }}
                         costs={cost}
                         selected={action.id === selectedAction}
+                        premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
+                        onPremiumLockedClick={() => onUpgrade?.('realityMode')}
                         disabled={Boolean(reason)}
                         disabledMessage={reason}
                         onClick={() => {

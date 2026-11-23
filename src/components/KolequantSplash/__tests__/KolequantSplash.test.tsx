@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { createRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import KolequantSplash from '../KolequantSplash'
 
@@ -62,6 +63,19 @@ describe('KolequantSplash', () => {
 
     expect(screen.getByText('Loading the house exterior.')).toBeInTheDocument()
     expect(screen.queryByText('Starting the Kolequant engine.')).toBeNull()
+  })
+
+  it('uses Betrayals title and tagline for the lantern opening', () => {
+    render(
+      <KolequantSplash
+        status="Lighting the castle lanterns…"
+        lanternTargets={[createRef<HTMLSpanElement>(), createRef<HTMLSpanElement>()]}
+      />
+    )
+
+    expect(screen.getByText('The Big Eye: Betrayals')).toBeInTheDocument()
+    expect(screen.getByText('Lighting the castle lanterns…')).toBeInTheDocument()
+    expect(screen.getByText('The castle keeps its secrets.')).toBeInTheDocument()
   })
 
   it('keeps the latest finish callback without cancelling an active exit', async () => {

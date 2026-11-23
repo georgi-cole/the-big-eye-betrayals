@@ -20,8 +20,14 @@ import { SocialEngine } from './social/SocialEngine'
 import { syncRuntimeAudioSettings } from './services/sound/audioSettingsSync'
 import { installAudioVisualSync } from './services/sound/audioVisualSync'
 import { SoundManager } from './services/sound/SoundManager'
-import { canShowAd, clearPendingAdRewards, initAdBridge } from './services/ads/adsService'
+import {
+  BETRAYALS_INTERSTITIAL_PLACEMENTS,
+  canShowAd,
+  clearPendingAdRewards,
+  initAdBridge,
+} from './services/ads/adsService'
 import { installAdMobBridge, invalidateAdMobRequests } from './services/ads/admobBridge'
+import { getBetrayalsCommerceSnapshot } from './betrayals/commerce/purchaseService'
 import { installE2EStateProbe } from './testSupport/e2eStateProbe'
 import { isPlayerSignInConfigured, PLAYER_ACCOUNT_PATH } from './services/backend/config'
 import { router } from './routes'
@@ -95,7 +101,12 @@ SocialEngine.init(store)
 // Register the window.onAdRewardGranted callback so native Android/iOS wrappers
 // can complete rewarded ad flows.
 initAdBridge()
-installAdMobBridge((placement) => canShowAd(placement, store.getState()))
+installAdMobBridge(
+  (placement) =>
+    (!BETRAYALS_INTERSTITIAL_PLACEMENTS.has(placement) ||
+      (getBetrayalsCommerceSnapshot().ready && !getBetrayalsCommerceSnapshot().noAds)) &&
+    canShowAd(placement, store.getState())
+)
 let adRunId = store.getState().game.gameId
 store.subscribe(() => {
   const nextRunId = store.getState().game.gameId

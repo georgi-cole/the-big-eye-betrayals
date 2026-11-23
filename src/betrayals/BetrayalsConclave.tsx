@@ -1,8 +1,13 @@
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
+import CinematicSkipButton from '../components/CinematicSkipButton/CinematicSkipButton'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
+import { BetrayalsPlayButton } from './BetrayalsDock'
 import type { CinematicCastMember } from './CinematicScene'
 import { ConclaveFilm } from './ConclaveFilm'
 import { conclaveOpeningBeats } from './conclaveDirection'
 import type { ConclaveLine, ConclaveView } from './night'
+import { Roster } from './Roster'
+import type { viewFor } from './run'
 import './BetrayalsConclave.css'
 
 export function BetrayalsConclave({
@@ -55,7 +60,8 @@ export function BetrayalsConclave({
 
 export function ConclaveDiscussion({
   cast,
-  candidates,
+  view,
+  humanId,
   vote,
   line,
   step,
@@ -71,7 +77,8 @@ export function ConclaveDiscussion({
   onFinishFilm,
 }: {
   cast: readonly CinematicCastMember[]
-  candidates: readonly CinematicCastMember[]
+  view: ReturnType<typeof viewFor>
+  humanId: string
   vote?: ConclaveView
   line?: ConclaveLine
   step: number
@@ -93,12 +100,14 @@ export function ConclaveDiscussion({
   useEffect(() => {
     const element = dialog.current
     if (!element) return
-    if (typeof element.showModal === 'function') {
-      element.showModal()
-      return () => element.close()
+    element.showModal?.()
+    if (!element.open) element.setAttribute('open', '')
+    return () => {
+      element.close?.()
+      element.removeAttribute('open')
     }
-    element.setAttribute('open', '')
   }, [])
+  const candidates = view.seats.filter(({ id }) => vote?.targetIds.includes(id))
   const selected = candidates.find(({ id }) => id === selectedId)
   const actors = cast.filter(({ concealed }) => !concealed)
   const cameraBeat = opening
@@ -119,6 +128,16 @@ export function ConclaveDiscussion({
   )
   const filmStage = opening ? 'opening' : verdict ? 'verdict' : line ? 'discussion' : 'ballot'
   const skip = () => (opening ? onFinishFilm('skipped') : line && onSkip())
+  const advanceLabel =
+    opening || verdict
+      ? 'Continue'
+      : line
+        ? step + 1 < total
+          ? 'Next speaker'
+          : 'Open ballot'
+        : vote?.runoff
+          ? 'Lock runoff vote'
+          : 'Lock Night choice'
 
   return (
     <dialog
@@ -150,9 +169,12 @@ export function ConclaveDiscussion({
       <header>
         <h1 id={titleId}>The Conclave</h1>
         {(opening || (line && !verdict)) && (
-          <button type="button" className="betrayals-secondary" onClick={skip}>
-            {opening ? 'Skip cinematic' : 'Skip to ballot'}
-          </button>
+          <CinematicSkipButton
+            ariaLabel={opening ? 'Skip cinematic' : 'Skip to ballot'}
+            label={opening ? 'Skip' : 'Skip to ballot'}
+            indicator={opening ? 'close' : 'forward'}
+            onClick={skip}
+          />
         )}
       </header>
       {opening || verdict ? (
@@ -182,17 +204,12 @@ export function ConclaveDiscussion({
             <h2>{vote.runoff ? 'Runoff ballot' : 'Who do you nominate?'}</h2>
             {vote.runoff && <p>First ballot · {vote.runoff}. Highest count decides the runoff.</p>}
             <div className="betrayals-conclave-dialog__candidates">
-              {candidates.map(({ id, name, portrait }) => (
-                <button
-                  type="button"
-                  key={id}
-                  aria-pressed={selected?.id === id}
-                  onClick={() => onSelect(id)}
-                >
-                  {portrait && <img src={portrait} alt="" loading="lazy" />}
-                  <span>{name}</span>
-                </button>
-              ))}
+              <Roster
+                view={{ ...view, seats: candidates }}
+                humanId={humanId}
+                selectedId={selected?.id}
+                onSelect={onSelect}
+              />
             </div>
             {selected && vote.ownArgument && <p aria-live="polite">{vote.ownArgument}</p>}
           </section>
@@ -200,35 +217,16 @@ export function ConclaveDiscussion({
       )}
       <footer>
         {!opening && !verdict && step > 0 && !vote?.runoff && (
-          <button type="button" className="betrayals-secondary" onClick={onBack}>
-            Back
-          </button>
+          <GameBackButton label="Back" onClick={onBack} />
         )}
-        {opening || verdict ? (
-          <button
-            type="button"
-            className="betrayals-primary"
-            disabled={Boolean(hold)}
-            onClick={() => onFinishFilm('played')}
-          >
-            Continue
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="betrayals-primary"
-            disabled={!line && candidates.length > 0 && !selected}
-            onClick={onAdvance}
-          >
-            {line
-              ? step + 1 < total
-                ? 'Next speaker'
-                : 'Open ballot'
-              : vote?.runoff
-                ? 'Lock runoff vote'
-                : 'Lock Night choice'}
-          </button>
-        )}
+        <BetrayalsPlayButton
+          label={advanceLabel}
+          faceLabel={advanceLabel}
+          disabled={
+            opening || verdict ? Boolean(hold) : !line && candidates.length > 0 && !selected
+          }
+          onClick={opening || verdict ? () => onFinishFilm('played') : onAdvance}
+        />
       </footer>
     </dialog>
   )

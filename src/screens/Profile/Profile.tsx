@@ -13,6 +13,7 @@ import { selectCurrentProfile, selectIsGuest } from '../../store/profilesSlice'
 import { imageIdToDataUrl } from '../../utils/imageDb'
 import { isPlayerSignInConfigured } from '../../services/backend/config'
 import { betrayalsProfileArt, IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 import './Profile.css'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 
@@ -41,7 +42,11 @@ export default function Profile() {
   const gameInProgress =
     !IS_BETRAYALS_EDITION &&
     (isGameActive || week > 1 || (phase !== 'season_start' && phase !== 'week_start'))
-  const returnTo = IS_BETRAYALS_EDITION || routeState?.from === '/' ? '/' : '/game'
+  const returnTo = IS_BETRAYALS_EDITION
+    ? betrayalsProfileReturnPath(routeState?.from)
+    : routeState?.from === '/'
+      ? '/'
+      : '/game'
   const goBack = () => navigate(returnTo, { replace: true })
   const showAccount = IS_BETRAYALS_EDITION || isPlayerSignInConfigured()
   const openAccount = () => navigate('/profile/account', { state: { profileFrom: returnTo } })

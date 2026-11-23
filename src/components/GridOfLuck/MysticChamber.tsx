@@ -11,6 +11,7 @@ import { cryptoSeed } from '../../features/riskWheel/cryptoSpin'
 import { mulberry32 } from '../../store/rng'
 import { store } from '../../store/store'
 import { updateRelationship } from '../../social/socialSlice'
+import GameBackButton from '../ui/GameBackButton/GameBackButton'
 import {
   CHAMBER_ROUNDS,
   CHAMBER_FORBIDDEN_OPENINGS,
@@ -749,17 +750,15 @@ export default function MysticChamber(props: GenericMinigameProps) {
               </div>
             )}
             <div className="mystic-chamber__actions">
-              <button
-                type="button"
-                className="is-secondary"
+              <GameBackButton
+                label="Back to powers"
+                showLabel
                 onClick={() => {
                   setSelectedAction(null)
                   setSelectedTargetId(null)
                   setView('choice')
                 }}
-              >
-                Back to powers
-              </button>
+              />
               <button
                 type="button"
                 disabled={!selectedTarget}

@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { ageBandForAge, declarePlayerAge } from '../../safety/playerSafety'
 import { usePlayerSafety } from '../../safety/usePlayerSafety'
 import { usesContextualAdTreatment } from './adAudience'
@@ -37,6 +38,12 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
           {betrayals ? 'THE BIG EYE: BETRAYALS' : 'THE BIG EYE'}
         </p>
         <h1 id="advertising-privacy-title">Advertising privacy</h1>
+        {betrayals && (
+          <p>
+            Standard play includes an automatic break after banishment and the night result, and
+            after each Final Five vote. No Ads and VIP remove these breaks.
+          </p>
+        )}
         {!record ? (
           <form onSubmit={submitAge}>
             <p>
@@ -116,11 +123,11 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
         ) : (
           <p>
             {betrayals
-              ? 'Rewarded ads are available to adults only.'
+              ? 'Rewarded ads and Eyeros pack purchases are available to adults only.'
               : 'Rewarded ads and Survival run purchases are available to adults only.'}
           </p>
         )}
-        {!betrayals && usesContextualAdTreatment() && (
+        {usesContextualAdTreatment() && (
           <p>
             Standard play may include short contextual ad breaks. These ads are selected without
             behavioral profiling. They apply to players under 18 and when no age is on file.
@@ -141,21 +148,21 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
           <a href="mailto:kolequant@gmail.com?subject=The%20Big%20Eye%20ad%20report">
             Report an ad
           </a>
-          <button
-            type="button"
-            className="player-safety__secondary"
+          <GameBackButton
+            label={
+              returnToCompetition
+                ? 'Back to competition'
+                : betrayals
+                  ? 'Back to Betrayals'
+                  : 'Back to settings'
+            }
+            showLabel
             onClick={() => {
               if (returnToCompetition) navigate('/game', { replace: true })
               else if (openedFromSettings) navigate(-1)
               else navigate(betrayals ? '/' : '/settings', { replace: true })
             }}
-          >
-            {returnToCompetition
-              ? 'Back to competition'
-              : betrayals
-                ? 'Back to Betrayals'
-                : 'Back to settings'}
-          </button>
+          />
         </div>
       </section>
     </main>

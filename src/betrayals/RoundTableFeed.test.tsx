@@ -34,6 +34,7 @@ describe('Round Table broadcast', () => {
     render(
       <RoundTableDiscussion
         run={run}
+        hasRealityMode
         open
         art="/council.jpg"
         onBack={vi.fn()}

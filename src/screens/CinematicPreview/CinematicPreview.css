@@ -41,7 +41,6 @@
   justify-self: start;
   color: #b7ced8;
   font-size: 13px;
-  text-decoration: none;
 }
 .cinematic-preview__back:hover { color: #fff; }
 .cinematic-preview__status {

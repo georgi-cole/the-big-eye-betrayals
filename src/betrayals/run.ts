@@ -1,6 +1,8 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import type { SocialWallet } from './socialResources.ts'
+import { hasPaidNightShield } from './economy.ts'
+import { MAX_BETRAYERS, MIN_BETRAYERS, NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 
 export const CAST_SIZE = 25
 export const MAX_TABLE_ROUNDS = 3
@@ -186,6 +188,8 @@ export type Run = {
   pot: number
   challengeHistory?: string[]
   seasonRewards?: import('./seasonRewards.ts').SeasonRewards
+  economy?: import('./economy.ts').BetrayalsEconomy
+  pendingAdBreak?: import('./adBreakPolicy.ts').BetrayalsAdBreakEvent
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
   investigation?: import('./investigationRecords.ts').Investigation
@@ -259,13 +263,13 @@ export function startRun(
     }
   }
   if (eligible.size < CAST_SIZE - 1) {
-    throw new Error('Betrayals requires 24 distinct AI contestants.')
+    throw new Error(`Betrayals requires ${CAST_SIZE - 1} distinct AI contestants.`)
   }
 
   const castRandom = mulberry32(entropy.publicSeed)
   const roster = seededPickN(castRandom, [...eligible.values()], CAST_SIZE - 1)
   const privateRandom = mulberry32(entropy.roleSeed)
-  const betrayerCount = privateRandom() < 0.5 ? 3 : 4
+  const betrayerCount = privateRandom() < 0.5 ? MIN_BETRAYERS : MAX_BETRAYERS
   const seats = [human, ...roster].map(({ id, name, portrait }) => ({ id, name, portrait }))
 
   return {
@@ -322,7 +326,7 @@ export function knownTeammateIds(run: Run, actorId: string | null): string[] {
 export function nightShieldWinners(run: Run): readonly string[] {
   const standings = run.private.safetyStandings
   return standings?.day === run.day
-    ? standings.rows.slice(0, 2).map(({ contestantId }) => contestantId)
+    ? standings.rows.slice(0, NIGHT_SHIELD_COUNT).map(({ contestantId }) => contestantId)
     : (run.private.nightShieldAwardIds ?? run.private.nightShieldIds)
 }
 
@@ -343,6 +347,7 @@ export function viewFor(run: Run, actorId: string | null) {
   const nightShieldCount = activeActor
     ? run.private.nightShieldIds.filter((id) => id === actor.id).length
     : 0
+  const purchasedNightShieldActive = Boolean(activeActor && hasPaidNightShield(run, actor.id))
   // Teammates see who won at Safety, but don't get updates about private handoffs.
   const shieldCycle =
     run.phase === 'round-table' ||
@@ -356,7 +361,8 @@ export function viewFor(run: Run, actorId: string | null) {
       if (teammateIds.includes(id)) knownNightShieldIds.add(id)
     }
   }
-  if (activeActor && nightShieldCount) knownNightShieldIds.add(actor.id)
+  if (activeActor && (nightShieldCount || purchasedNightShieldActive))
+    knownNightShieldIds.add(actor.id)
 
   return {
     phase: run.phase,
@@ -365,8 +371,9 @@ export function viewFor(run: Run, actorId: string | null) {
     teammateIds,
     knownNightShieldIds: [...knownNightShieldIds],
     publicNightShieldWinnerIds,
-    hasNightShield: nightShieldCount > 0,
+    hasNightShield: nightShieldCount > 0 || purchasedNightShieldActive,
     nightShieldCount,
+    purchasedNightShieldActive,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,

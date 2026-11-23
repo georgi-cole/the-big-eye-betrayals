@@ -12,6 +12,7 @@ const LEGACY_DURABLE_PREFIXES = [
   'bbmobilenew:savedRunSlot:',
   'bbmobilenew:seasonArchives',
   'bbmobilenew:allianceRecovery:',
+  'big-eye:betrayals:',
 ] as const
 
 export type DurablePersistenceBackendKind =

@@ -1395,7 +1395,7 @@ body.no-animations .majority-rules-avatar-chip--pulse .majority-rules-portrait {
   font-size: clamp(1.05rem, 3.8vw, 1.45rem);
 }
 
-.majority-rules-intel-close {
+.majority-rules-intel-back {
   justify-self: end;
   border: 0;
   padding: 0.25rem 0;
@@ -1768,7 +1768,7 @@ body.no-animations .majority-rules-avatar-chip--pulse .majority-rules-portrait {
   animation: majority-rules-live-dot 0.9s ease-in-out infinite alternate;
 }
 
-.majority-rules-intel-close {
+.majority-rules-intel-back {
   position: absolute;
   top: clamp(0.2rem, 1.4vh, 0.8rem);
   right: clamp(0.1rem, 1vw, 0.8rem);

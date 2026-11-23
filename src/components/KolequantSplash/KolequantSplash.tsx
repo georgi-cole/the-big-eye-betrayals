@@ -223,7 +223,9 @@ export default function KolequantSplash({
                 onError={() => markArtworkSettled(2)}
               />
             </div>
-            <p className="kq-splash__title">The Big Eye</p>
+            <p className="kq-splash__title">
+              {lanternTargets ? 'The Big Eye: Betrayals' : 'The Big Eye'}
+            </p>
           </div>
           <div className="kq-splash__preload" aria-hidden="true">
             <div className="kq-splash__preload-row">
@@ -235,7 +237,9 @@ export default function KolequantSplash({
             </div>
           </div>
           <div className="kq-splash__footer">
-            <p className="kq-splash__tagline">Life doesn't have to be short</p>
+            <p className="kq-splash__tagline">
+              {lanternTargets ? 'The castle keeps its secrets.' : "Life doesn't have to be short"}
+            </p>
           </div>
         </div>
       </div>

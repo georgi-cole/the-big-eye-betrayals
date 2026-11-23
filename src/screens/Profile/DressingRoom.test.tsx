@@ -9,11 +9,22 @@ import profilesReducer, {
 import DressingRoom from './DressingRoom'
 
 const mockNavigate = vi.fn()
+const mockEdition = vi.hoisted(() => ({ betrayals: false }))
 const mockDispatch = vi.fn()
 let mockReducedMotion = false
 let mockVipActive = false
 let mockProfiles: ProfilesState
 let mockLocationState: Record<string, unknown> = { from: '/' }
+
+vi.mock('../../betrayals/betrayalsAppearance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../betrayals/betrayalsAppearance')>()),
+  get IS_BETRAYALS_EDITION() {
+    return mockEdition.betrayals
+  },
+}))
+vi.mock('../../betrayals/commerce/useBetrayalsCommerce', () => ({
+  useBetrayalsCommerce: () => ({ paidLooks: mockVipActive }),
+}))
 
 vi.mock('react-router', () => ({
   useNavigate: () => mockNavigate,
@@ -110,6 +121,7 @@ describe('Changing room look lock-in and market', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockNavigate.mockReset()
+    mockEdition.betrayals = false
     mockDispatch.mockReset()
     mockReducedMotion = false
     mockVipActive = false
@@ -161,6 +173,45 @@ describe('Changing room look lock-in and market', () => {
       state: { from: '/profile/account', manageOnly: true },
     })
     expect(screen.queryByRole('button', { name: 'Choose this look' })).toBeNull()
+  })
+
+  it.each([
+    ['/store/items', 'Back to store'],
+    ['/wallet', 'Back to wallet'],
+  ])('returns from changing-room browsing to the Betrayals %s entry', (from, label) => {
+    mockEdition.betrayals = true
+    mockLocationState = { from }
+    render(<DressingRoom />)
+    fireEvent.click(screen.getByRole('button', { name: label }))
+    expect(mockNavigate).toHaveBeenCalledWith(from, { state: { from } })
+    expect(mockDispatch).not.toHaveBeenCalled()
+  })
+
+  it('opens Betrayals VIP directly and carries the selected look for the return journey', () => {
+    mockEdition.betrayals = true
+    mockLocationState = { from: '/store/items' }
+    render(<DressingRoom />)
+    fireEvent.click(screen.getByRole('button', { name: 'Preview look 6' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open VIP market for all looks' }))
+    expect(mockNavigate).toHaveBeenLastCalledWith('/store/vip', {
+      state: {
+        returnTo: '/profile/dressing-room',
+        returnState: { from: '/store/items', initialLookId: 'pc-006' },
+      },
+    })
+  })
+
+  it('carries a Wallet entry through the Betrayals creation look reveal', () => {
+    mockEdition.betrayals = true
+    mockLocationState = { from: '/wallet', createProfile: true }
+    render(<DressingRoom />)
+    fireEvent.click(screen.getByRole('button', { name: 'Choose this look' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Skip reveal' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/profile-edit', {
+      replace: true,
+      state: expect.objectContaining({ from: '/wallet', createProfile: true }),
+    })
   })
 
   it('allows the reveal to be skipped while its portrait is still loading', () => {

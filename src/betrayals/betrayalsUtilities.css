@@ -1,38 +1,37 @@
 .betrayals-utility-chips {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
+  justify-content: space-evenly;
   align-items: center;
 }
 
 .betrayals-utility-chip,
-.betrayals-utility-dialog button {
+:where(.betrayals-utility-dialog) button {
   font: inherit;
   cursor: pointer;
 }
 
 .betrayals-utility-chips .betrayals-utility-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.75rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid rgba(197, 163, 110, 0.35);
-  border-radius: 0.35rem;
-  color: #eee0c9;
-  background: linear-gradient(160deg, #1f2429, #101418 78%);
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.025em;
-  transition:
-    background-color 140ms ease,
-    color 140ms ease,
-    border-color 140ms ease;
+  position: relative;
+  display: grid;
+  flex: 0 1 auto;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0.48rem;
+  color: #e8c593;
+  background: transparent;
+  transition: color 140ms ease;
+}
+
+.betrayals-utility-chips a.betrayals-utility-chip {
+  text-decoration: none;
 }
 
 .betrayals-utility-chips .betrayals-utility-chip:is(:hover, :focus-visible) {
-  border-color: #c7a66c;
+  background: radial-gradient(ellipse, #99623691, #75481b45 48%, transparent 72%);
   color: #fff5e2;
 }
 
@@ -40,7 +39,7 @@
   flex: none;
   width: 1rem;
   height: 1rem;
-  color: #d5ad70;
+  color: inherit;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.2;
@@ -48,19 +47,12 @@
   stroke-linejoin: round;
 }
 
-.betrayals-utility-chip--profile img {
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 1px solid #b08960a6;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 .betrayals-utility-chip__lamp {
-  flex: none;
-  width: 0.37rem;
-  height: 0.37rem;
-  border: 1px solid #a29379;
+  position: absolute;
+  inset: 0.52rem 0.44rem auto auto;
+  width: 0.25rem;
+  height: 0.25rem;
+  border: 1px solid #a29379ad;
   border-radius: 50%;
 }
 
@@ -84,6 +76,31 @@
   box-shadow:
     0 1.75rem 5rem #000b,
     inset 0 0 0 3px #111419;
+}
+
+.betrayals-utility-dialog[data-betrayals-panel='store'] {
+  border-color: #a95c54;
+  background:
+    radial-gradient(ellipse at 50% -8%, #71304480, transparent 62%),
+    linear-gradient(175deg, #20101a, #100a12 72%);
+  box-shadow:
+    0 1.75rem 5rem #000b,
+    inset 0 0 0 3px #160b13,
+    inset 0 0 2rem #6f26301f;
+}
+
+.betrayals-utility-dialog[data-betrayals-panel='store'] .betrayals-utility-dialog__header {
+  border-bottom-color: #bd6d5b55;
+}
+
+.betrayals-utility-dialog[data-betrayals-panel='store'] .betrayals-utility-dialog__header h2 {
+  color: #ffe0a1;
+}
+
+.betrayals-utility-dialog[data-betrayals-panel='store'] button.betrayals-utility-dialog__close {
+  border-color: #b65d595e;
+  color: #ffe0a1;
+  background: linear-gradient(145deg, #31121e, #180b13);
 }
 
 .betrayals-utility-dialog[open] {
@@ -266,43 +283,6 @@
 .betrayals-preference-volume span:last-child {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-.betrayals-achievements p {
-  margin: 0 0 0.8rem;
-  color: #cfbca9;
-  font-size: 0.86rem;
-}
-
-.betrayals-achievements ul {
-  display: grid;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.betrayals-achievements li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.7rem;
-  border: 1px solid #a6865d38;
-  border-radius: 0.42rem;
-}
-
-.betrayals-achievements li small {
-  color: #b9a897;
-}
-
-.betrayals-achievements li[data-achieved='true'] {
-  border-color: #cda16269;
-  background: #c0914d14;
-}
-
-.betrayals-achievements li[data-achieved='true'] small {
-  color: #efc385;
 }
 
 .betrayals-utility-dialog .betrayals-store > p {

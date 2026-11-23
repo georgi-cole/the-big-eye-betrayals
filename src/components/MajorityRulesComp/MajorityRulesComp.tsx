@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import type { RootState } from '../../store/store'
 import type { AiGameIdentity } from '../../ai/aiGameIdentity'
 import type { PlayerStatus } from '../../types'
+import GameBackButton from '../ui/GameBackButton/GameBackButton'
 import { isEmoji, resolveAvatarCandidates } from '../../utils/avatar'
 import { resolvePresentationAvatarCandidates } from '../../utils/presentationAvatar'
 import { preloadImages } from '../../utils/preloadImages'
@@ -906,13 +907,11 @@ export default function MajorityRulesComp({
             <div className="majority-rules-intel-on-air" aria-hidden="true">
               <span /> LIVE INTEL
             </div>
-            <button
-              type="button"
-              className="majority-rules-intel-close"
+            <GameBackButton
+              className="majority-rules-intel-back"
+              label="Back to answer"
               onClick={() => setDismissedHintKey(activeHintKey)}
-            >
-              Back to answer
-            </button>
+            />
             {game.roundHintPollEstimate && (
               <>
                 <div className="majority-rules-intel-heading">

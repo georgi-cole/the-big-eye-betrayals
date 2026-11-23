@@ -56,6 +56,7 @@ const BetrayalsReview =
     ? lazy(() => import('./betrayals/BetrayalsScreen'))
     : null
 const Betrayals = isBetrayalsEdition ? lazy(() => import('./betrayals/BetrayalsRoute')) : null
+const BetrayalsShop = lazy(() => import('./betrayals/BetrayalsShopRoute'))
 const BetrayalsProfileShell = isBetrayalsEdition
   ? lazy<object>(() =>
       import('./betrayals/BetrayalsRoute').then(({ BetrayalsProfileShell }) => ({
@@ -166,6 +167,9 @@ export const router = createHashRouter(
           element: load(<BetrayalsProfileShell />),
           errorElement: <RouteErrorBoundary />,
           children: [
+            { path: '/store', element: load(<BetrayalsShop />) },
+            { path: '/store/:section', element: load(<BetrayalsShop />) },
+            { path: '/wallet', element: load(<BetrayalsShop />) },
             { path: '/profile', element: load(<Profile />) },
             { path: '/profile/account', element: load(<PlayerAccount />) },
             { path: '/profile/dressing-room', element: load(<DressingRoom />) },

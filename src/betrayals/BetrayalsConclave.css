@@ -89,24 +89,17 @@
   font-size: clamp(1.35rem, 5vw, 2.2rem);
 }
 
-.betrayals-conclave-dialog .betrayals-primary {
+.betrayals-conclave-dialog footer .betrayals-dock__play {
+  min-width: 5.8rem;
   margin-inline-start: auto;
-}
-.betrayals-conclave-dialog button {
-  min-height: 2.65rem;
+  padding-inline: 0.65rem;
 }
 
-.betrayals-conclave-dialog button:disabled {
-  opacity: 0.46;
-}
-
-.betrayals-conclave-dialog .betrayals-secondary {
-  border: 1px solid #b38a5c7a;
-  border-radius: 0.45rem;
-  padding: 0.42rem 0.8rem;
-  color: #f5dec0;
-  background: #161319e8;
-  font-weight: 650;
+.betrayals-conclave-dialog header .cinematic-skip-button {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex-shrink: 0;
 }
 
 .betrayals-conclave-dialog__caption,
@@ -162,40 +155,21 @@
 
 .betrayals-conclave-dialog__candidates {
   grid-row: 3;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(4.25rem, 100%), 1fr));
-  gap: 0.5rem;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 0 0.2rem 0.25rem;
+  padding: 0.2rem;
 }
 
-.betrayals-conclave-dialog__candidates button {
-  display: grid;
-  place-items: center;
-  align-content: end;
-  gap: 0.16rem;
-  border: 1px solid #a083654d;
-  border-radius: 0.45rem;
-  padding: 0.22rem;
-  background: #1d1817;
-  color: #f6e5cd;
-  overflow: hidden;
+.betrayals-conclave-dialog__candidates .betrayals-roster {
+  grid-template-rows: none;
 }
 
-.betrayals-conclave-dialog__candidates button[aria-pressed='true'] {
-  border-color: #e2ae73;
-  box-shadow: inset 0 0 0 1px #e2ae73;
-  background: #3b281d;
+.betrayals-conclave-dialog__candidates .betrayals-roster > li {
+  aspect-ratio: 0.88;
 }
 
-.betrayals-conclave-dialog__candidates img {
-  width: 100%;
-  max-height: 5.5rem;
-  aspect-ratio: 0.91;
-  object-fit: cover;
-}
-.betrayals-conclave-dialog__candidates span {
-  font-size: 0.78rem;
+.betrayals-conclave-dialog__candidates .betrayals-roster__seat:focus-visible {
+  outline: 2px solid #f3c897;
+  outline-offset: 1px;
 }

@@ -122,6 +122,13 @@
   min-height: 44px;
 }
 
+.player-account form .game-back-button.player-account__email-back {
+  margin-top: 8px;
+  border-color: #9b7540 !important;
+  background: linear-gradient(145deg, #594120, #2b1b10) !important;
+  color: #f8dc96 !important;
+}
+
 .player-account .player-account__gold {
   --game-button-bg: linear-gradient(180deg, #f8dc96, #d6a750);
   --game-button-border: #eec980;

@@ -220,7 +220,7 @@ export function BetrayalsPulse({
           <h2 id="betrayals-pulse-title">My Pulse</h2>
           <p>Your latest developments, learned intel and commitments.</p>
         </div>
-        <GameBackButton className="house-pulse__back" label="Close My Pulse" onClick={onClose} />
+        <GameBackButton className="house-pulse__back" label="Back to Social" onClick={onClose} />
       </header>
       <nav className="house-pulse__tabs" aria-label="My Pulse sections">
         {tabs.map((item) => (

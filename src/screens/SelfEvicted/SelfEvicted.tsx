@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { resetGame } from '../../store/gameSlice'
 import { selectActiveProfileId, selectIsGuest } from '../../store/profilesSlice'
@@ -79,9 +80,7 @@ export default function SelfEvicted() {
           <button className="self-evicted-btn self-evicted-btn--primary" onClick={startNewSeason}>
             Start New Season
           </button>
-          <button className="self-evicted-btn self-evicted-btn--ghost" onClick={exitToHome}>
-            Return to Home
-          </button>
+          <GameBackButton label="Return to Home" showLabel onClick={exitToHome} />
         </div>
       </div>
     </div>

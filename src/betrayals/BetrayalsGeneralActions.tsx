@@ -9,6 +9,7 @@ import { castleAlliances } from './allianceRecords'
 import { generalActionCards } from './generalSocialCards'
 import type { RealityPreset, SocialEntry } from './run'
 import { socialMoveCost } from './socialResources'
+import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 
 export function BetrayalsGeneralActions({
   contacts,
@@ -18,6 +19,8 @@ export function BetrayalsGeneralActions({
   actorId,
   notes,
   planningOpen,
+  hasRealityMode = false,
+  onUpgrade,
   onMove,
 }: {
   contacts: readonly Player[]
@@ -27,6 +30,8 @@ export function BetrayalsGeneralActions({
   actorId: string
   notes: readonly SocialEntry[]
   planningOpen: boolean
+  hasRealityMode?: boolean
+  onUpgrade?: () => void
   onMove: (
     kind: GeneralSocialMove,
     guestIds: readonly string[],
@@ -63,6 +68,7 @@ export function BetrayalsGeneralActions({
   }
   const ready =
     selected &&
+    canUseBetrayalsAction(selected, hasRealityMode) &&
     (selected === 'lay-low' || planningOpen) &&
     !unavailable(selected) &&
     (!multiselect || guests.length >= MIN_CHAT_GUESTS) &&
@@ -127,6 +133,8 @@ export function BetrayalsGeneralActions({
                 action={{ ...action, baseCost: cost.energy }}
                 costs={cost}
                 selected={selected === action.id}
+                premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
+                onPremiumLockedClick={onUpgrade}
                 disabled={Boolean(reason)}
                 disabledMessage={reason}
                 onClick={() => {

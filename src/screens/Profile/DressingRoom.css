@@ -64,6 +64,113 @@
   letter-spacing: 0.01em;
 }
 
+.dressing-room--betrayals {
+  --wardrobe-gold: #f0c574;
+  --wardrobe-ruby: #9b3349;
+  background:
+    radial-gradient(ellipse at 7% 8%, rgba(147, 39, 59, 0.24), transparent 29%),
+    radial-gradient(ellipse at 92% 52%, rgba(109, 36, 50, 0.16), transparent 34%),
+    linear-gradient(165deg, #24101a 0%, #171019 48%, #0b0b11 100%);
+}
+
+.dressing-room--betrayals .dressing-room__topbar {
+  color: #f0c574;
+}
+
+.dressing-room--betrayals .dressing-room__topbar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dressing-room--betrayals .dressing-room__topbar svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.dressing-room--betrayals .game-back-button.dressing-room__back {
+  border-color: rgba(237, 190, 103, 0.78) !important;
+  background: linear-gradient(145deg, #7c2a42, #2b101d) !important;
+  color: #ffe2a4 !important;
+  box-shadow:
+    inset 0 1px rgba(255, 246, 220, 0.19),
+    inset 0 -7px 18px rgba(8, 5, 14, 0.28),
+    0 7px 20px rgba(7, 3, 10, 0.36) !important;
+}
+
+.dressing-room--betrayals .game-back-button.dressing-room__back:hover:not(:disabled) {
+  border-color: #ffe2a4 !important;
+  background: linear-gradient(145deg, #a23d54, #371421) !important;
+  box-shadow:
+    inset 0 1px rgba(255, 246, 220, 0.25),
+    0 0 18px rgba(176, 51, 68, 0.28),
+    0 9px 22px rgba(7, 3, 10, 0.38) !important;
+}
+
+.dressing-room--betrayals h1 {
+  color: #fff0d4;
+  text-shadow:
+    0 2px 18px rgba(227, 171, 98, 0.16),
+    0 0 30px rgba(128, 35, 52, 0.2);
+}
+
+.dressing-room--betrayals .dressing-room__subtitle,
+.dressing-room--betrayals .dressing-room__season-note {
+  color: #d5bdc0;
+}
+
+.dressing-room--betrayals .appearance-carousel__stage {
+  border: 1px solid rgba(226, 174, 94, 0.68);
+  border-radius: 1.05rem;
+  box-shadow:
+    inset 0 0 0 2px rgba(98, 24, 43, 0.4),
+    0 16px 34px rgba(0, 0, 0, 0.38),
+    0 0 22px rgba(131, 38, 50, 0.14);
+}
+
+.dressing-room--betrayals .appearance-carousel__arrow {
+  border-color: rgba(236, 187, 104, 0.76);
+  background: linear-gradient(145deg, rgba(111, 37, 57, 0.94), rgba(27, 11, 19, 0.96));
+  color: #ffe3a6;
+  box-shadow:
+    inset 0 1px rgba(255, 239, 205, 0.18),
+    inset 0 0 0 3px rgba(154, 52, 67, 0.16),
+    0 6px 16px rgba(0, 0, 0, 0.36);
+}
+
+.dressing-room--betrayals .appearance-carousel__arrow:hover {
+  border-color: #ffe1a1;
+  box-shadow:
+    0 0 0 4px rgba(184, 58, 72, 0.17),
+    0 8px 20px rgba(0, 0, 0, 0.38);
+}
+
+.dressing-room--betrayals .appearance-carousel__confirm {
+  border-color: #e6ba70;
+  background:
+    linear-gradient(105deg, transparent 0 35%, rgba(255, 255, 255, 0.16) 49%, transparent 63%),
+    linear-gradient(145deg, #8d3148, #632037 58%, #351421);
+  color: #fff0d1;
+  box-shadow:
+    inset 0 1px rgba(255, 242, 211, 0.34),
+    inset 0 -2px rgba(20, 7, 13, 0.32),
+    0 8px 20px rgba(0, 0, 0, 0.36),
+    0 0 18px rgba(145, 41, 57, 0.18);
+}
+
+.dressing-room--betrayals .appearance-carousel__confirm:hover {
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 1px rgba(255, 242, 211, 0.4),
+    0 10px 23px rgba(0, 0, 0, 0.4),
+    0 0 22px rgba(174, 49, 66, 0.25);
+}
+
 @media (max-width: 360px) {
   .dressing-room {
     padding-right: 12px;
