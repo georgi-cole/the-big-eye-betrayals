@@ -268,6 +268,43 @@
   font-variant-numeric: tabular-nums;
 }
 
+.betrayals-achievements p {
+  margin: 0 0 0.8rem;
+  color: #cfbca9;
+  font-size: 0.86rem;
+}
+
+.betrayals-achievements ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.betrayals-achievements li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid #a6865d38;
+  border-radius: 0.42rem;
+}
+
+.betrayals-achievements li small {
+  color: #b9a897;
+}
+
+.betrayals-achievements li[data-achieved='true'] {
+  border-color: #cda16269;
+  background: #c0914d14;
+}
+
+.betrayals-achievements li[data-achieved='true'] small {
+  color: #efc385;
+}
+
 .betrayals-utility-dialog .betrayals-store > p {
   margin: 0 0 1rem;
   color: #d9c9b0;

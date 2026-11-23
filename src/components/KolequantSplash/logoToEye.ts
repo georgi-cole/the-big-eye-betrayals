@@ -1,4 +1,5 @@
 export const LOGO_TO_EYE_MS = 1470
+export const LOGO_TO_LANTERNS_MS = 1900
 
 const CODONS = ['ATG', 'CGT', 'GCA', 'TTC', 'AAC', 'GGT', 'TCA', 'CTG', 'AGC', 'TGA']
 const TURN = 2 * Math.PI
@@ -10,6 +11,7 @@ type Fragment = Box & { tint: string; codon?: string }
 type Eye = Point & { halfWidth: number; halfHeight: number; iris: number }
 type EyeArtwork = Omit<Eye, keyof Point> & { centerY: number; glow: string }
 type Layout = { viewport: Box; logo: Box; eye: Eye }
+type Flight = (index: number, from: Point) => { target: Point; lift: Point; approach: Point }
 
 // The shipped portrait backgrounds share two compositions. These coordinates
 // are fractions of the original artwork, before HomeHub's cover crop.
@@ -144,12 +146,13 @@ function ribbonPoint(from: Point, lift: Point, approach: Point, to: Point, t: nu
 function drawFragments(
   context: CanvasRenderingContext2D,
   logo: HTMLImageElement,
-  layout: Layout,
+  box: Box,
   fragments: Fragment[],
-  time: number
+  time: number,
+  flight: Flight,
+  amber = false
 ) {
   if (time >= IRIS_LOCK) return
-  const { logo: box, eye } = layout
   const sweep = phase(time, 0.027, 0.3)
   if (sweep < 1) {
     const left = sweep * box.width
@@ -171,7 +174,10 @@ function drawFragments(
     context.restore()
   }
 
-  context.font = `500 ${Math.min(10, Math.max(8, box.width / 26))}px ui-monospace, monospace`
+  const labelSize = amber
+    ? Math.min(12, Math.max(9, box.width / 20))
+    : Math.min(10, Math.max(8, box.width / 26))
+  context.font = `500 ${labelSize}px ui-monospace, monospace`
   context.textAlign = 'center'
   context.textBaseline = 'middle'
   const dissolve = 1 - smooth(phase(time, 0.51, IRIS_LOCK))
@@ -182,29 +188,13 @@ function drawFragments(
     const arrival = 0.53 + (index % 7) * 0.009
     if (time <= release) continue
 
-    const lane = index % 3
-    const fraction = (Math.floor(index / 3) + 0.5) / Math.ceil((fragments.length - lane) / 3)
-    const target =
-      lane === 2
-        ? {
-            x: eye.x + eye.iris * Math.cos(fraction * TURN),
-            y: eye.y + eye.iris * Math.sin(fraction * TURN),
-          }
-        : lidPoint(eye, fraction, lane === 0 ? -1 : 1)
     const life = phase(time, release, arrival)
     const from = {
       x: box.x + fromX * box.width,
       y: box.y + (cell.y + cell.height / 2) * box.height,
     }
-    const side = lane === 0 ? -1 : 1
-    const lift = {
-      x: from.x + side * eye.halfWidth * 0.66,
-      y: from.y - eye.halfHeight * 0.48,
-    }
-    const approach = {
-      x: target.x + side * eye.halfWidth * (lane === 2 ? 0.65 : 0.91),
-      y: target.y + (from.y - target.y) * 0.22,
-    }
+    const { target, lift, approach } = flight(index, from)
+    const tint = amber && life > 0.48 ? '#ffc482' : cell.tint
     const { x, y } = ribbonPoint(from, lift, approach, target, smooth(life))
 
     if (life < 0.24) {
@@ -241,8 +231,8 @@ function drawFragments(
       )
       const filament = context.createLinearGradient(tail.x, tail.y, x, y)
       filament.addColorStop(0, 'transparent')
-      filament.addColorStop(0.65, cell.tint)
-      filament.addColorStop(1, '#e9f8ff')
+      filament.addColorStop(0.65, tint)
+      filament.addColorStop(1, amber ? '#fff0d1' : '#e9f8ff')
       context.strokeStyle = filament
       context.lineWidth = 3.4
       context.globalAlpha = light * 0.11
@@ -252,14 +242,14 @@ function drawFragments(
       context.stroke()
     } else {
       context.lineTo(x, y)
-      context.strokeStyle = cell.tint
+      context.strokeStyle = tint
       context.lineWidth = 0.55
       context.globalAlpha = light * 0.25
       context.stroke()
     }
 
     const label = cell.codon ? light * (1 - smooth(phase(life, 0.7, 0.88))) : 0
-    context.fillStyle = cell.tint
+    context.fillStyle = tint
     context.globalAlpha = light * 0.78 - label * 0.65
     context.fillRect(x - 0.65, y - 0.65, 1.3, 1.3)
     if (cell.codon && label > 0) {
@@ -317,6 +307,32 @@ function drawEye(context: CanvasRenderingContext2D, eye: Eye, glow: string, time
   }
   context.stroke()
   context.restore()
+}
+
+function eyeFlight(eye: Eye, count: number): Flight {
+  return (index, from) => {
+    const lane = index % 3
+    const fraction = (Math.floor(index / 3) + 0.5) / Math.ceil((count - lane) / 3)
+    const target =
+      lane === 2
+        ? {
+            x: eye.x + eye.iris * Math.cos(fraction * TURN),
+            y: eye.y + eye.iris * Math.sin(fraction * TURN),
+          }
+        : lidPoint(eye, fraction, lane === 0 ? -1 : 1)
+    const side = lane === 0 ? -1 : 1
+    return {
+      target,
+      lift: {
+        x: from.x + side * eye.halfWidth * 0.66,
+        y: from.y - eye.halfHeight * 0.48,
+      },
+      approach: {
+        x: target.x + side * eye.halfWidth * (lane === 2 ? 0.65 : 0.91),
+        y: target.y + (from.y - target.y) * 0.22,
+      },
+    }
+  }
 }
 
 function drawIrisIgnition(context: CanvasRenderingContext2D, eye: Eye, glow: string, time: number) {
@@ -468,7 +484,7 @@ export function playLogoToEye({
     const time = phase(now - start, 0, LOGO_TO_EYE_MS)
     const { viewport, eye } = layout
     context.clearRect(0, 0, viewport.width, viewport.height)
-    drawFragments(context, logo, layout, fragments, time)
+    drawFragments(context, logo, layout.logo, fragments, time, eyeFlight(eye, fragments.length))
     drawEye(context, eye, artwork.glow, time)
     drawIrisIgnition(context, eye, artwork.glow, time)
     if (time > IRIS_LOCK) revealHub(scene, layout, time, aperture)
@@ -488,6 +504,131 @@ export function playLogoToEye({
     scene.style.removeProperty('mask-size')
     scene.style.removeProperty('mask-position')
     scene.style.removeProperty('--kq-splash-sweep')
+    scene.style.removeProperty('opacity')
+  }
+}
+
+function lanternFlight(lanterns: Box[], count: number, distance: number): Flight {
+  return (index, from) => {
+    const lane = index % lanterns.length
+    const lantern = lanterns[lane]
+    const fraction =
+      (Math.floor(index / lanterns.length) + 0.5) / Math.ceil(count / lanterns.length)
+    const curve = fraction * TURN
+    const target = {
+      x: lantern.x + lantern.width / 2 + lantern.width * 0.42 * Math.sin(curve),
+      y: lantern.y + lantern.height * (0.47 - 0.45 * Math.cos(curve)),
+    }
+    const direction = lane === 0 ? -1 : 1
+    return {
+      target,
+      lift: { x: from.x + direction * distance * 0.22, y: from.y - distance * 0.14 },
+      approach: { x: target.x - direction * distance * 0.12, y: target.y + distance * 0.12 },
+    }
+  }
+}
+
+function lightLantern(
+  context: CanvasRenderingContext2D,
+  { x, y, width, height }: Box,
+  time: number
+) {
+  const warmUp = smooth(phase(time, 0.46, 0.64))
+  const fade = 1 - smooth(phase(time, 0.75, 1))
+  if (!warmUp || !fade) return
+  const intensity = warmUp * fade
+  const spread = height * (1 + warmUp * 1.8)
+  context.save()
+  context.translate(x + width / 2, y + height * 0.55)
+  const glow = context.createRadialGradient(0, 0, 0, 0, 0, spread)
+  glow.addColorStop(0, '#fff4bd')
+  glow.addColorStop(0.2, '#ffba65b0')
+  glow.addColorStop(0.56, '#de7b2b35')
+  glow.addColorStop(1, '#de7b2b00')
+  context.globalAlpha = intensity * 0.76
+  context.fillStyle = glow
+  context.fillRect(-spread, -spread, spread * 2, spread * 2)
+  context.scale(width, height)
+  context.globalAlpha = intensity
+  context.beginPath()
+  context.moveTo(0, -0.53)
+  context.bezierCurveTo(0.04, -0.16, 0.46, -0.14, 0.41, 0.19)
+  context.bezierCurveTo(0.33, 0.56, -0.37, 0.51, -0.42, 0.18)
+  context.bezierCurveTo(-0.46, -0.08, -0.13, -0.32, 0, -0.53)
+  context.fillStyle = '#ffe1a1'
+  context.fill()
+  context.restore()
+}
+
+export function playLogoToLanterns({
+  canvas,
+  scene,
+  logo,
+  lanterns,
+  onFinish,
+}: Omit<Playback, 'hubFrame' | 'artwork'> & {
+  lanterns: readonly [HTMLElement, HTMLElement]
+}): (() => void) | null {
+  if (!logo.naturalWidth || !logo.naturalHeight) return null
+  const context = canvas.getContext('2d')
+  if (!context) return null
+
+  let fragments: Fragment[]
+  try {
+    fragments = sampleLogo(logo)
+  } catch {
+    return null
+  }
+  if (!fragments.length) return null
+
+  let viewport: DOMRect
+  let box: Box
+  let destinations: Box[]
+  let flight: Flight
+  const resize = () => {
+    viewport = canvas.getBoundingClientRect()
+    const position = (element: HTMLElement): Box => {
+      const bounds = element.getBoundingClientRect()
+      return {
+        x: bounds.left - viewport.left,
+        y: bounds.top - viewport.top,
+        width: bounds.width,
+        height: bounds.height,
+      }
+    }
+    box = position(logo)
+    destinations = lanterns.map(position)
+    flight = lanternFlight(
+      destinations,
+      fragments.length,
+      Math.min(viewport.width, viewport.height)
+    )
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5)
+    canvas.width = Math.round(viewport.width * ratio)
+    canvas.height = Math.round(viewport.height * ratio)
+    context.setTransform(ratio, 0, 0, ratio, 0, 0)
+  }
+  resize()
+  window.addEventListener('resize', resize)
+
+  let frameId = 0
+  const start = performance.now()
+  const paint = (now: number) => {
+    const time = phase(now - start, 0, LOGO_TO_LANTERNS_MS)
+    context.clearRect(0, 0, viewport.width, viewport.height)
+    drawFragments(context, logo, box, fragments, time, flight, true)
+    scene.style.opacity = String(1 - smooth(phase(time, 0.46, 0.94)))
+    for (const lantern of destinations) lightLantern(context, lantern, time)
+    if (time < 1) frameId = window.requestAnimationFrame(paint)
+    else onFinish()
+  }
+  paint(start)
+  scene.classList.add('kq-splash__scene--morphing')
+
+  return () => {
+    window.cancelAnimationFrame(frameId)
+    window.removeEventListener('resize', resize)
+    scene.classList.remove('kq-splash__scene--morphing')
     scene.style.removeProperty('opacity')
   }
 }

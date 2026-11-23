@@ -87,9 +87,11 @@ function makeRain() {
 export function WeatherAtmosphere({
   weather,
   reducedMotion = false,
+  strength = 1,
 }: {
-  weather: CastleWeather
+  weather: CastleWeather | 'clouds'
   reducedMotion?: boolean
+  strength?: number
 }) {
   const surface = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
@@ -99,8 +101,11 @@ export function WeatherAtmosphere({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const random = mulberry32(0x6bc33)
+    const sizeBoost = 1 + (strength - 1) * 0.38
+    const densityBoost = 1 + (strength - 1) * 0.28
     const rain = weather === 'rain' ? makeRain() : undefined
-    const fog = weather === 'mist' ? makeMist(random) : undefined
+    const clouds = weather === 'clouds'
+    const fog = clouds || weather === 'mist' ? makeMist(random) : undefined
     const flake = weather === 'snow' ? makeSnow() : undefined
     const particles = fog
       ? []
@@ -148,8 +153,10 @@ export function WeatherAtmosphere({
             t * (index % 2 ? -11 : 8 + index * 4) + span * (0.47 + index * 0.18),
             span
           )
-          const top = horizon - bandHeight * 0.66 + index * height * 0.091
-          ctx.globalAlpha = opacity
+          const top = clouds
+            ? height * (-0.08 + index * 0.179)
+            : horizon - bandHeight * 0.66 + index * height * 0.091
+          ctx.globalAlpha = Math.min(1, opacity * strength * (clouds ? 0.93 : 1))
           ctx.drawImage(fog, left, top, span, bandHeight)
           ctx.drawImage(fog, left + span, top, span, bandHeight)
         }
@@ -159,7 +166,7 @@ export function WeatherAtmosphere({
 
       const count = Math.min(
         particles.length,
-        Math.round(Math.sqrt(width * height) * (rain ? 0.47 : 0.3))
+        Math.round(Math.sqrt(width * height) * (rain ? 0.47 : 0.3) * densityBoost)
       )
       for (let i = 0; i < count; i += 1) {
         const { x, y, depth, pace, angle, light } = particles[i]
@@ -170,18 +177,18 @@ export function WeatherAtmosphere({
         const px = wrap(x * (width + pad * 2) + wind * size * t + turbulence, width + 2 * pad) - pad
         const py = wrap(y * (height + pad * 2) + speed * size * pace * t, height + 2 * pad) - pad
         if (rain) {
-          const length = (5 + depth * 24) * pace * size
+          const length = (5 + depth * 24) * pace * size * sizeBoost
           const direction = Math.atan2(-wind, speed * pace)
           const cos = Math.cos(direction) * ratio
           const sin = Math.sin(direction) * ratio
-          const w = (0.9 + depth * 1.65) * size
+          const w = (0.9 + depth * 1.65) * size * sizeBoost
           ctx.setTransform(cos, sin, -sin, cos, px * ratio, py * ratio)
-          ctx.globalAlpha = (0.18 + depth * 0.33) * light
+          ctx.globalAlpha = Math.min(1, (0.18 + depth * 0.33) * light * strength)
           ctx.drawImage(rain, -w / 2, -length, w, length)
         } else if (flake) {
-          const radius = (0.52 + depth * depth * 3.1) * size
+          const radius = (0.52 + depth * depth * 3.1) * size * sizeBoost
           const glint = 0.82 + Math.sin(t * 1.4 + angle) * 0.18
-          ctx.globalAlpha = (0.18 + depth * 0.48) * light * glint
+          ctx.globalAlpha = Math.min(1, (0.18 + depth * 0.48) * light * glint * strength)
           ctx.drawImage(flake, px - radius, py - radius, radius * 2, radius * 2)
         }
       }
@@ -193,7 +200,7 @@ export function WeatherAtmosphere({
       window.cancelAnimationFrame(frame)
       observer.disconnect()
     }
-  }, [weather, reducedMotion])
+  }, [weather, reducedMotion, strength])
 
   if (weather === 'clear' || reducedMotion) return null
   return (

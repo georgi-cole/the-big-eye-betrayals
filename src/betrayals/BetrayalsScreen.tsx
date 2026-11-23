@@ -316,12 +316,18 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             )
         : undefined
 
+    const exitDay = run?.seats.find(({ id }) => id === run.humanId)?.exit?.day
+
     return (
       <BetrayalsHome
         utilities={utilities}
         profiles={profiles}
         name={name}
         onNameChange={setName}
+        milestones={{
+          dayReached: exitDay ?? run?.day ?? 0,
+          won: Boolean(run?.result && Object.hasOwn(run.result.payouts, run.humanId)),
+        }}
         season={
           run
             ? { day: run.day, phase: phaseLabel[run.phase], settled: run.phase === 'settled' }
