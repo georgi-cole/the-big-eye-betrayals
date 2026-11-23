@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/betrayals-pages.yml'
+      - 'scripts/lib/betrayals-pages-incident.mjs'
+      - 'tests/betrayals-pages-incident.test.mjs'
       - 'src/betrayals/**'
       - 'public/assets/betrayals/**'
 
@@ -23,12 +25,12 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PAGES_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.retry.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,6 +47,8 @@ jobs:
           VITE_BASE_PATH: /the-big-eye-betrayals/
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --config playwright.betrayals.config.ts
+      - name: Mark the build for public verification
+        run: printf '%s\n' "$GITHUB_SHA" > dist/deployed-commit.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           name: ${{ env.PAGES_ARTIFACT_NAME }}
@@ -64,6 +68,57 @@ jobs:
           exit 1
       - name: Deploy preview
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
         with:
           artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
+      - name: Pause before retrying Pages
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 15
+      - name: Retry Pages deployment
+        id: retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
+      - name: Verify the new build is live
+        env:
+          PAGE_URL: ${{ steps.retry.outputs.page_url || steps.deployment.outputs.page_url }}
+        run: |
+          test -n "$PAGE_URL"
+          for attempt in {1..12}; do
+            if served=$(curl --fail --silent --show-error --max-time 10 \
+                "${PAGE_URL%/}/deployed-commit.txt?run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}") \
+              && [[ "$served" == "$GITHUB_SHA" ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Pages did not serve the commit from this deployment.' >&2
+          exit 1
+
+  report:
+    needs: deploy
+    if: ${{ !cancelled() && (needs.deploy.result == 'failure' || needs.deploy.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reconcile the Pages deployment issue
+        uses: actions/github-script@v8
+        env:
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { resolve } = require('node:path');
+            const { reportPagesIncident } = await import(pathToFileURL(
+              resolve('scripts/lib/betrayals-pages-incident.mjs')
+            ).href);
+            await reportPagesIncident({ github, context, result: process.env.DEPLOY_RESULT, core });
