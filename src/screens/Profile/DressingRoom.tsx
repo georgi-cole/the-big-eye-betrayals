@@ -22,6 +22,7 @@ import {
 } from '../../betrayals/betrayalsAppearance'
 import './DressingRoom.css'
 import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 
 const looks = IS_BETRAYALS_EDITION ? BETRAYALS_LOOKS : SELECTABLE_LOOKS
 const figureRole = IS_BETRAYALS_EDITION ? 'formal' : 'casual'
@@ -61,8 +62,28 @@ export default function DressingRoom() {
       ? routeState!.initialLookId!
       : (looks.find(({ id }) => id === savedLookId)?.id ?? looks[0]?.id ?? '')
   )
-  const returnTo = IS_BETRAYALS_EDITION || routeState?.from === '/' ? '/' : '/game'
-  const creationBack = routeState?.fromPlayerAccount ? '/profile/account' : '/'
+  const returnTo = IS_BETRAYALS_EDITION
+    ? betrayalsProfileReturnPath(routeState?.from)
+    : routeState?.from === '/'
+      ? '/'
+      : '/game'
+  const returningToShop = IS_BETRAYALS_EDITION && returnTo !== '/'
+  const creationBack = routeState?.fromPlayerAccount
+    ? '/profile/account'
+    : returningToShop
+      ? returnTo
+      : '/'
+  const backPath = creatingProfile ? creationBack : returningToShop ? returnTo : '/profile'
+  const backLabel =
+    creatingProfile && routeState?.fromPlayerAccount
+      ? 'Back to account'
+      : returningToShop
+        ? returnTo === '/wallet'
+          ? 'Back to wallet'
+          : 'Back to store'
+        : creatingProfile
+          ? 'Back to home'
+          : 'Back to profile'
   const currentLook = looks.find((look) => look.id === selectedId)
   const isAvailable = hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
   const balance = creatingProfile ? 0 : (profile?.eyeoleans ?? 0)
@@ -159,7 +180,14 @@ export default function DressingRoom() {
       replace: true,
       state: { ...routeState, initialLookId: selectedId },
     })
-    navigate('/store', { state: { shelf: 'all-access' } })
+    if (IS_BETRAYALS_EDITION) {
+      navigate('/store/vip', {
+        state: {
+          returnTo: '/profile/dressing-room',
+          returnState: { ...routeState, initialLookId: selectedId },
+        },
+      })
+    } else navigate('/store', { state: { shelf: 'all-access' } })
   }
 
   function finishLockIn() {
@@ -167,7 +195,7 @@ export default function DressingRoom() {
       navigate('/profile-edit', {
         replace: true,
         state: {
-          from: '/',
+          from: IS_BETRAYALS_EDITION ? returnTo : '/',
           createProfile: true,
           appearanceSelection: { kind: 'catalog', lookId: selectedId, revision: 1 },
           adoptGuestRun: routeState?.adoptGuestRun === true,
@@ -193,17 +221,11 @@ export default function DressingRoom() {
         <div className="dressing-room__topbar">
           <GameBackButton
             onClick={() =>
-              navigate(creatingProfile ? creationBack : '/profile', {
+              navigate(backPath, {
                 state: creatingProfile ? undefined : { from: returnTo },
               })
             }
-            label={
-              creatingProfile
-                ? routeState?.fromPlayerAccount
-                  ? 'Back to account'
-                  : 'Back to home'
-                : 'Back to profile'
-            }
+            label={backLabel}
           />
           <span>Changing room</span>
         </div>

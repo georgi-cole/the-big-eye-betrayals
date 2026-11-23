@@ -61,6 +61,40 @@ Product-ID overrides are supported by `VITE_BETRAYALS_VIP_PRODUCT_ID`,
 `VITE_BETRAYALS_EYEROS100000_PRODUCT_ID`, and
 `VITE_BETRAYALS_VIP_UPGRADE_<CENTS>_PRODUCT_ID` for each listed upgrade tier.
 
+## Store sections and wallet
+
+The Store opens on a compact overview with a wallet balance and links to distinct
+destinations. Product details and currency packs appear after choosing a
+destination, keeping the overview short enough to scan on a phone.
+
+| Destination     | Contents                                                                    | Purchase behavior                                                      |
+| --------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| VIP             | Permanent bundle benefits, current ownership and any eligible upgrade price | Uses the existing native VIP offer                                     |
+| Feature unlocks | My Pulse, Reality Mode and No Ads                                           | Each card keeps its localized native price and ownership state         |
+| Season items    | Night Shield availability and a changing-room link                          | Uses the current season's shield eligibility and existing Eyeros debit |
+| Wallet          | Selected profile, Eyeros balance, recent activity and a top-up entry        | Viewing activity does not start a purchase                             |
+| Top up Eyeros   | The three currency packs and their delivery/storage explanation             | Uses the selected profile and existing native consumable checkout      |
+
+The changing room remains directly accessible from the Store overview. Detail
+views return to the overview, and the top-up view returns to the wallet before
+leaving it. A locked feature opens its corresponding section directly: VIP opens
+the bundle, My Pulse/Reality Mode/No Ads open feature unlocks, and a currency-pack
+entry opens wallet top-up. Returning from a focused product does not reopen that
+product automatically.
+
+The wallet shows existing profile transactions as recent activity, with an
+option to expand the list. It is a view of the same profile balance used for
+season earnings, Night Shields and looks; it does not create another wallet.
+Without a selected profile, the wallet offers profile selection and prevents a
+currency-pack checkout. Purchases, restore, native prices, earned amounts and
+Night Shield eligibility retain their existing contracts.
+
+Standalone review links are `#/store`, `#/store/vip`, `#/store/features`,
+`#/store/items` and `#/wallet`. Home and the in-season balance open Wallet in
+the utility dialog; season items keep the active run's eligibility there.
+Choosing or creating a profile from Wallet preserves its return destination.
+Restore, advertising privacy and legal links remain under **Purchases & support**.
+
 ## Gameplay access
 
 A standard player can complete a season, participate in its challenges, cast

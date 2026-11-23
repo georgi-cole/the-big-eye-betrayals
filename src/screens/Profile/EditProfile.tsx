@@ -31,6 +31,7 @@ import { normalizeProfileBio } from '../../components/ProfileOptionalDetails/pro
 import ProfilePhotoPreview from '../../components/ProfilePhotoPreview/ProfilePhotoPreview'
 import { coerceAppearanceSelection, type AppearanceSelection } from '../../appearance/catalog'
 import { IS_BETRAYALS_EDITION, isBetrayalsLook } from '../../betrayals/betrayalsAppearance'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
 import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
@@ -86,7 +87,7 @@ export default function EditProfile() {
     requestedReturnTo === '/profile-picker'
       ? requestedReturnTo
       : IS_BETRAYALS_EDITION
-        ? '/'
+        ? betrayalsProfileReturnPath(requestedReturnTo)
         : '/game'
   const editReturnPath = returnTo === '/profile-picker' ? '/profile-picker' : '/profile'
   const editReturnFrom = returnTo === '/profile-picker' ? '/profile' : returnTo
@@ -261,7 +262,7 @@ export default function EditProfile() {
         else
           navigate('/profile', {
             replace: true,
-            state: { from: '/', fromLookReveal: true },
+            state: { from: IS_BETRAYALS_EDITION ? returnTo : '/', fromLookReveal: true },
           })
       } finally {
         if (mounted.current) setSaving(false)

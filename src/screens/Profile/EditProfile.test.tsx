@@ -16,12 +16,22 @@ import profilesReducer, {
 import EditProfile from './EditProfile'
 
 const mockNavigate = vi.fn()
+const mockEdition = vi.hoisted(() => ({ betrayals: false }))
 const mockDispatch = vi.fn()
 const mockPhoto = vi.fn<() => Promise<string | null>>()
 const CONTACT_REVISION = '732ce7bc-24b4-4057-b99e-ff0a5787590b'
 let mockLivePhotoId: string | undefined
 let mockProfiles: ProfilesState
 let mockLocationState: Record<string, unknown> = { from: '/profile-picker' }
+vi.mock('../../betrayals/betrayalsAppearance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../betrayals/betrayalsAppearance')>()),
+  get IS_BETRAYALS_EDITION() {
+    return mockEdition.betrayals
+  },
+}))
+vi.mock('../../betrayals/commerce/useBetrayalsCommerce', () => ({
+  useBetrayalsCommerce: () => ({ paidLooks: false }),
+}))
 const bio: ProfileBio = {
   age: '25',
   sex: 'Female',
@@ -101,6 +111,7 @@ function mockSavedContact(updatesOptIn = true) {
 
 describe('EditProfile details', () => {
   beforeEach(() => {
+    mockEdition.betrayals = false
     mockLivePhotoId = undefined
     vi.mocked(pruneProfilePhotos).mockClear()
     mockNavigate.mockReset()
@@ -291,6 +302,30 @@ describe('EditProfile details', () => {
       replace: true,
       state: { from: '/', fromLookReveal: true },
     })
+  })
+
+  it('keeps Wallet as the return destination after creating a Betrayals profile', async () => {
+    mockEdition.betrayals = true
+    mockProfiles = profilesReducer(undefined, { type: 'test/reset' })
+    mockLocationState = {
+      from: '/wallet',
+      createProfile: true,
+      appearanceSelection: { kind: 'catalog', lookId: 'pc-005', revision: 1 },
+    }
+    render(<EditProfile />)
+    fireEvent.change(screen.getByLabelText(/Display Name/), { target: { value: 'Mara' } })
+    fireEvent.change(screen.getByLabelText(/Age/), { target: { value: '24' } })
+    fireEvent.change(screen.getByLabelText(/Location/), { target: { value: 'Sofia' } })
+    fireEvent.change(screen.getByLabelText(/Sex \(Reality storylines\)/), {
+      target: { value: 'Female' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Profile' }))
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/profile', {
+        replace: true,
+        state: { from: '/wallet', fromLookReveal: true },
+      })
+    )
   })
 
   it('starts with optional email and consent empty and creates locally without a contact request', async () => {

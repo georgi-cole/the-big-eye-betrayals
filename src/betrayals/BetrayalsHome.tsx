@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { formatEyeoleans } from '../economy/eyeoleans'
 import KolequantSplash from '../components/KolequantSplash/KolequantSplash'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { BetrayalsUtilities } from './betrayalsPreferences'
@@ -11,6 +12,7 @@ import {
 } from './BetrayalsUtilities'
 import { ObservatoryWindow } from './ObservatoryWindow'
 import { useObservatorySky } from './observatoryWeather'
+import type { BetrayalsProductKey } from './commerce/catalog'
 import './betrayalsHome.css'
 
 const observatory = import.meta.env.BASE_URL + 'assets/betrayals/observatory.jpg'
@@ -29,6 +31,9 @@ type HomeProps = {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
   market?: import('./BetrayalsStore').BetrayalsStoreProps
+  onOpenStore?: () => void
+  onOpenWallet?: () => void
+  onUpgrade?: (product: BetrayalsProductKey) => void
   milestones?: BetrayalsMilestones
   name: string
   onNameChange: (name: string) => void
@@ -42,6 +47,9 @@ export function BetrayalsHome({
   utilities,
   profiles,
   market,
+  onOpenStore,
+  onOpenWallet,
+  onUpgrade,
   milestones,
   name,
   onNameChange,
@@ -179,7 +187,8 @@ export function BetrayalsHome({
                   aria-haspopup="dialog"
                   onClick={() => {
                     utilities.playEffect('ui:navigate', 0.45)
-                    utilities.openPanel(panel)
+                    if (panel === 'store' && onOpenStore) onOpenStore()
+                    else utilities.openPanel(panel)
                   }}
                 >
                   <UtilityIcon kind={panel} />
@@ -187,6 +196,20 @@ export function BetrayalsHome({
                 </button>
               ))}
             </div>
+            {onOpenWallet && (
+              <button
+                type="button"
+                className="betrayals-wallet-chip"
+                aria-haspopup="dialog"
+                aria-label={`Open Wallet, ${formatEyeoleans(market?.balance ?? 0)} Eyeros`}
+                onClick={() => {
+                  utilities.playEffect('ui:navigate', 0.45)
+                  onOpenWallet()
+                }}
+              >
+                Wallet <span aria-hidden="true">◈</span> {formatEyeoleans(market?.balance ?? 0)}
+              </button>
+            )}
             {setup ? (
               <button type="button" className="betrayals-home__link" onClick={setup.openAccount}>
                 Account sign-in
@@ -218,6 +241,7 @@ export function BetrayalsHome({
           profiles={profiles}
           milestones={milestones}
           market={market}
+          onUpgrade={onUpgrade}
         />
       </main>
     </>

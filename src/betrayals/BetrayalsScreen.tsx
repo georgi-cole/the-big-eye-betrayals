@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { formatEyeoleans } from '../economy/eyeoleans'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
 import type { BetrayalsProductKey } from './commerce/catalog'
-import type { BetrayalsStoreProps } from './BetrayalsStore'
+import type { BetrayalsStoreProps, BetrayalsStoreSection } from './BetrayalsStore'
+import { betrayalsStoreSectionForProduct } from './betrayalsNavigation'
 import {
   canUseBetrayalsAction,
   canUseBetrayalsTableSway,
@@ -199,6 +200,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const [conclaveProgress, setConclaveProgress] = useState<{ key: string; step: number }>()
   const [saveIssue, setSaveIssue] = useState(false)
   const [storeFocus, setStoreFocus] = useState<BetrayalsProductKey>()
+  const [storeSection, setStoreSection] = useState<BetrayalsStoreSection>('home')
   const [shieldIssue, setShieldIssue] = useState<string>()
   const financialBusy = useRef(false)
   const mounted = useRef(true)
@@ -248,13 +250,18 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     setIncomingOpen(true)
   }
 
-  function openUpgrade(product: BetrayalsProductKey) {
+  function openStore(section: BetrayalsStoreSection = 'home', product?: BetrayalsProductKey) {
     setStoreFocus(product)
+    setStoreSection(section)
     setSocialOpen(false)
     setIncomingOpen(false)
     setPulse(undefined)
     if (run) setClosedDiscussion(run.id + ':' + run.day)
     utilities.openPanel('store')
+  }
+
+  function openUpgrade(product: BetrayalsProductKey) {
+    openStore(betrayalsStoreSectionForProduct(product), product)
   }
 
   async function commit(
@@ -436,7 +443,16 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const shieldOffer = paidNightShieldOffer(run, profiles?.wallet?.balance ?? 0)
   const market: BetrayalsStoreProps = {
     profileId: player?.id,
+    profileName: player?.name,
     balance: profiles?.wallet?.balance ?? 0,
+    transactions: profiles?.wallet?.transactions,
+    onOpenProfile: profiles
+      ? () => {
+          utilities.closePanel()
+          if (profiles.openWalletProfile) profiles.openWalletProfile()
+          else profiles.openProfile()
+        }
+      : undefined,
     onOpenLooks: profiles
       ? () => {
           utilities.closePanel()
@@ -449,6 +465,11 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       : { ...shieldOffer, available: false, reason: 'Select a profile to use Eyeros.' },
     onBuyShield: buyShield,
     focusProduct: storeFocus,
+    section: storeSection,
+    onSectionChange: (section) => {
+      setStoreFocus(undefined)
+      setStoreSection(section)
+    },
   }
 
   async function claimSeasonReward(reward: SeasonReward) {
@@ -537,6 +558,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         utilities={utilities}
         profiles={profiles}
         market={market}
+        onOpenStore={() => openStore()}
+        onOpenWallet={() => openStore('wallet')}
+        onUpgrade={openUpgrade}
         name={name}
         onNameChange={setName}
         milestones={{
@@ -1109,10 +1133,11 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             <button
               className="betrayals-wallet-chip"
               type="button"
-              onClick={() => openUpgrade('vip')}
-              aria-label={`Open store, ${formatEyeoleans(profiles?.wallet?.balance ?? 0)} Eyeros`}
+              onClick={() => openStore('wallet')}
+              aria-label={`Open Wallet, ${formatEyeoleans(profiles?.wallet?.balance ?? 0)} Eyeros`}
+              aria-haspopup="dialog"
             >
-              Store <span aria-hidden="true">◈</span>{' '}
+              Wallet <span aria-hidden="true">◈</span>{' '}
               {formatEyeoleans(profiles?.wallet?.balance ?? 0)}
             </button>
           </div>
@@ -1395,7 +1420,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             }
           />
         )}
-        <BetrayalsUtilityPanel utilities={utilities} profiles={profiles} market={market} />
+        <BetrayalsUtilityPanel
+          utilities={utilities}
+          profiles={profiles}
+          market={market}
+          onUpgrade={openUpgrade}
+        />
       </main>
       {filmDiscussion && (
         <ConclaveDiscussion

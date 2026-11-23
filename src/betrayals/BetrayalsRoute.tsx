@@ -34,6 +34,8 @@ export default function BetrayalsRoute() {
           : undefined,
         openProfile: () =>
           navigate(profile ? '/profile' : '/profile-picker', { state: { from: '/' } }),
+        openWalletProfile: () =>
+          navigate(profile ? '/profile' : '/profile-picker', { state: { from: '/wallet' } }),
         openDressingRoom: (initialLookId) =>
           navigate('/profile/dressing-room', {
             state: { from: '/', createProfile: !profile, initialLookId },

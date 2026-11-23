@@ -36,6 +36,7 @@ import { savedProfilePhotoIds } from '../../appearance/profilePhotos'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileSeasonStatus from '../../components/ProfileSeasonStatus/ProfileSeasonStatus'
 import { IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 import ProfileOptionalDetails from '../../components/ProfileOptionalDetails/ProfileOptionalDetails'
 import ProfileEmailFields from '../../components/ProfileEmailFields/ProfileEmailFields'
 import {
@@ -88,7 +89,7 @@ export default function ProfilePicker() {
     : requestedReturnTo === '/' || requestedReturnTo === '/profile'
       ? requestedReturnTo
       : IS_BETRAYALS_EDITION
-        ? '/'
+        ? betrayalsProfileReturnPath(requestedReturnTo)
         : '/game'
 
   const profiles = useAppSelector(selectAllProfiles)
@@ -212,7 +213,7 @@ export default function ProfilePicker() {
     navigate('/profile/dressing-room', {
       replace: true,
       state: {
-        from: '/',
+        from: IS_BETRAYALS_EDITION ? returnTo : '/',
         createProfile: true,
         adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
         ...(playerAccount && { playerAccountId: playerAccount.id }),
@@ -228,6 +229,7 @@ export default function ProfilePicker() {
     manageOnly,
     navigate,
     playerAccount,
+    returnTo,
     waitingForAccountSync,
   ])
 
@@ -582,7 +584,11 @@ export default function ProfilePicker() {
                   ? 'Back to profile'
                   : returnTo === '/game'
                     ? 'Back to game'
-                    : 'Back to home'
+                    : returnTo === '/wallet'
+                      ? 'Back to wallet'
+                      : returnTo.startsWith('/store')
+                        ? 'Back to store'
+                        : 'Back to home'
             }
           />
         </div>
@@ -708,7 +714,7 @@ export default function ProfilePicker() {
                     if (!IS_BETRAYALS_EDITION) setShowCreateForm(true)
                     navigate('/profile/dressing-room', {
                       state: {
-                        from: '/',
+                        from: IS_BETRAYALS_EDITION ? returnTo : '/',
                         createProfile: true,
                         adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
                         ...(playerAccount && { playerAccountId: playerAccount.id }),

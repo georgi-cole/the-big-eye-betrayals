@@ -1,0 +1,439 @@
+.betrayals-wallet {
+  --wallet-gold: #dfbd79;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.2rem;
+  min-width: 0;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  color: #f4eee7;
+  overflow-wrap: anywhere;
+}
+
+.betrayals-wallet :is(h3, h4, p) {
+  margin: 0;
+}
+.betrayals-wallet :where(button) {
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.betrayals-wallet button:focus-visible {
+  outline: 2px solid #f6db9c;
+  outline-offset: 4px;
+}
+.betrayals-wallet button:disabled {
+  cursor: default;
+}
+.betrayals-wallet__header {
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  scroll-margin-top: 0.6rem;
+}
+.betrayals-wallet__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  margin: -0.5rem 0 0.25rem;
+  padding: 0.2rem 0.15rem;
+  border: 0;
+  background: transparent;
+  color: #cdbfae;
+  font-size: 0.76rem;
+}
+.betrayals-wallet__back > span {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+.betrayals-wallet__eyebrow {
+  color: #c8ad80;
+  font-size: 0.61rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.betrayals-wallet__header h3 {
+  color: #f3e4cf;
+  font:
+    500 2rem/1.1 'Cormorant Garamond',
+    Georgia,
+    serif;
+}
+.betrayals-wallet__header p {
+  color: #bdafc4;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.betrayals-wallet__balance-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #c7a77773;
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(ellipse at 50% 20%, #8b64522b, transparent 70%),
+    linear-gradient(145deg, #2c2034, #18121f 80%);
+  box-shadow:
+    inset 0 1px #ffdfae12,
+    0 12px 30px #0002;
+}
+.betrayals-wallet__balance-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  width: 100%;
+  color: #c9bbcb;
+  font-size: 0.7rem;
+}
+.betrayals-wallet__balance-heading > :last-child {
+  min-width: 0;
+  max-width: 60%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.betrayals-wallet__balance-heading button {
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e1c394;
+  font-size: inherit;
+}
+.betrayals-wallet__balance-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  max-width: 100%;
+  margin-top: 1rem;
+  color: #f6d997;
+}
+.betrayals-wallet__balance-amount strong {
+  max-width: 100%;
+  font-size: clamp(2rem, 9vw, 3.15rem);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.06em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.betrayals-wallet__coin {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.7rem;
+  height: 2.7rem;
+  place-items: center;
+  border: 1px solid #c3a16c9c;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 22%, #bb8e5552, #c69d5b0a 78%);
+  color: #ebc987;
+  font-size: 1.75rem;
+  line-height: 1;
+  box-shadow: inset 0 0 0 3px #d7b47513;
+}
+.betrayals-wallet__currency {
+  color: #d4ba8b;
+  font-size: 0.73rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.betrayals-wallet__balance-card > p {
+  max-width: 27ch;
+  margin: 0.4rem 0 0.6rem;
+  color: #bdafc4;
+  font-size: 0.77rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.betrayals-wallet__top-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid #f4d39b;
+  border-radius: 0.65rem;
+  background: linear-gradient(145deg, #f1d199, #d1aa69);
+  color: #2b1a13;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+.betrayals-wallet__top-up > span {
+  font-size: 1.2rem;
+  font-weight: 400;
+}
+.betrayals-wallet__profile-needed {
+  padding: 1rem;
+  border: 1px solid #9c84ae44;
+  border-radius: 0.8rem;
+  background: #38274630;
+}
+.betrayals-wallet__profile-needed strong {
+  color: #eadceb;
+  font-size: 0.85rem;
+}
+.betrayals-wallet__profile-needed p {
+  margin-top: 0.4rem;
+  color: #bdafc4;
+  font-size: 0.77rem;
+  line-height: 1.5;
+}
+.betrayals-wallet__text-button {
+  min-height: 2.75rem;
+  padding: 0.3rem 0;
+  border: 0;
+  background: transparent;
+  color: #dec393;
+  font-size: 0.74rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.betrayals-wallet__text-button:disabled {
+  color: #a399ae;
+  opacity: 0.65;
+}
+.betrayals-wallet__balance-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #c7a77738;
+  border-radius: 0.75rem;
+  background: #251b2d75;
+}
+.betrayals-wallet__balance-line > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.betrayals-wallet__balance-line > div > span {
+  color: #cab9cd;
+  font-size: 0.72rem;
+}
+.betrayals-wallet__balance-line small {
+  color: #a899b2;
+  font-size: 0.65rem;
+  overflow-wrap: anywhere;
+}
+.betrayals-wallet__balance-line strong {
+  color: #ead099;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.betrayals-wallet__balance-line strong > span {
+  color: #c29b60;
+}
+.betrayals-wallet__packs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.betrayals-wallet__pack {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(5.5rem, 0.9fr);
+  align-items: center;
+  min-width: 0;
+  gap: 0.8rem;
+  padding: 1rem 0.85rem;
+  border: 1px solid #b99b6a4a;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #2d2235b3, #17121e);
+}
+.betrayals-wallet__pack-value h4 {
+  color: #f0d6a0;
+  font-size: clamp(1.15rem, 4.8vw, 1.5rem);
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.betrayals-wallet__pack-value > span {
+  color: #b7a6c1;
+  font-size: 0.7rem;
+}
+.betrayals-wallet__pack-buy {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.45rem;
+  border: 1px solid #bd9c67;
+  border-radius: 0.5rem;
+  background: #ddbe8321;
+  color: #f1d59e;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.betrayals-wallet__pack-buy:disabled {
+  border-color: #9c88a63b;
+  background: #342b3d3b;
+  color: #a89bb2;
+  font-weight: 450;
+}
+.betrayals-wallet__delivery {
+  color: #c6b5cb;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+.betrayals-wallet__footer {
+  padding-top: 0.85rem;
+  border-top: 1px solid #b99b6a25;
+}
+.betrayals-wallet__footer p {
+  color: #ad9db8;
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+.betrayals-wallet__footer > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-top: 0.35rem;
+}
+.betrayals-wallet__activity {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.betrayals-wallet__activity-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.betrayals-wallet__activity-heading h4 {
+  color: #eadde8;
+  font-size: 0.94rem;
+  font-weight: 550;
+}
+.betrayals-wallet__activity-heading > span {
+  color: #a997b5;
+  font-size: 0.65rem;
+}
+.betrayals-wallet__transactions {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.betrayals-wallet__transactions > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #b99b6a21;
+}
+.betrayals-wallet__transactions > li:first-child {
+  padding-top: 0.2rem;
+}
+.betrayals-wallet__activity-mark {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border: 1px solid #b5996545;
+  border-radius: 50%;
+  color: #dfc28c;
+  background: #a5854017;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.betrayals-wallet__activity-mark.is-spend {
+  border-color: #a58bb43b;
+  color: #bdaac8;
+  background: #956cad12;
+}
+.betrayals-wallet__transaction-detail {
+  min-width: 0;
+}
+.betrayals-wallet__transaction-detail > strong {
+  display: block;
+  color: #e6dce9;
+  font-size: 0.77rem;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.betrayals-wallet__transaction-detail > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.55rem;
+  margin-top: 0.25rem;
+  color: #a797b1;
+  font-size: 0.62rem;
+  line-height: 1.3;
+}
+.betrayals-wallet__transaction-amount {
+  color: #e3c68e;
+  font-size: 0.79rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.betrayals-wallet__transaction-amount.is-spend {
+  color: #c4afd0;
+}
+.betrayals-wallet__more {
+  min-height: 2.75rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid #ad8eb53d;
+  border-radius: 0.5rem;
+  background: #70577b0f;
+  color: #cbb3d1;
+  font-size: 0.75rem;
+}
+.betrayals-wallet__empty {
+  padding: 1.25rem 1rem;
+  border: 1px dashed #a58bb43b;
+  border-radius: 0.7rem;
+  color: #b8a6c1;
+  font-size: 0.77rem;
+  line-height: 1.6;
+  text-align: center;
+}
+.betrayals-wallet__notice {
+  padding: 0.85rem;
+  border: 1px solid #d5b2784d;
+  border-radius: 0.7rem;
+  background: #b5894215;
+  color: #e4d3b3;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.betrayals-wallet__notice[role='alert'] {
+  border-color: #cb8c7b77;
+  color: #edc3b8;
+}
+.betrayals-wallet__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 350px) {
+  .betrayals-wallet__pack {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.7rem;
+  }
+  .betrayals-wallet__pack-buy {
+    grid-column: 1 / -1;
+  }
+  .betrayals-wallet__transaction-amount {
+    font-size: 0.7rem;
+  }
+}

@@ -10,6 +10,7 @@ import { FREE_BETRAYALS_LOOK_IDS, type BetrayalsLookId } from './betrayalsAppear
 import BetrayalsStore, { type BetrayalsStoreProps } from './BetrayalsStore'
 import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
+import type { BetrayalsProductKey } from './commerce/catalog'
 import type { BetrayalsWallet } from './profileWallet'
 import './betrayalsUtilities.css'
 
@@ -17,6 +18,7 @@ export type BetrayalsProfileControls = {
   player?: { id: string; name: string; portrait?: string }
   wallet?: BetrayalsWallet
   openProfile: () => void
+  openWalletProfile?: () => void
   openDressingRoom: (initialLookId?: BetrayalsLookId) => void
   openAccount: () => void
   openAdvertisingPrivacy?: () => void
@@ -169,9 +171,11 @@ function VolumeControl({
 function Settings({
   utilities,
   openAdvertisingPrivacy,
+  onUpgrade,
 }: {
   utilities: BetrayalsUtilities
   openAdvertisingPrivacy?: () => void
+  onUpgrade?: (product: BetrayalsProductKey) => void
 }) {
   const { preferences, seasonOptions, toggleMusic, updatePreferences } = utilities
   const commerce = useBetrayalsCommerce()
@@ -239,7 +243,7 @@ function Settings({
           <BetrayalsPremiumButton
             title="Unlock Reality Mode"
             detail="Full profiles, advanced actions and more intense social seasons."
-            onClick={() => utilities.openPanel('store')}
+            onClick={() => (onUpgrade ? onUpgrade('realityMode') : utilities.openPanel('store'))}
           />
         )}
       </section>
@@ -342,15 +346,18 @@ function UtilityDialog({
   profiles,
   milestones,
   market,
+  onUpgrade,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
   milestones?: BetrayalsMilestones
   market?: BetrayalsStoreProps
+  onUpgrade?: (product: BetrayalsProductKey) => void
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const { panel, preferences, closePanel } = utilities
-  const title = panelTitles[panel ?? 'settings']
+  const title =
+    panel === 'store' && market?.section === 'wallet' ? 'Wallet' : panelTitles[panel ?? 'settings']
 
   useEffect(() => {
     const node = dialogRef.current
@@ -392,6 +399,7 @@ function UtilityDialog({
           <Settings
             utilities={utilities}
             openAdvertisingPrivacy={profiles?.openAdvertisingPrivacy}
+            onUpgrade={onUpgrade}
           />
         ) : panel === 'store' ? (
           market ? (
@@ -412,11 +420,13 @@ export function BetrayalsUtilityPanel({
   profiles,
   milestones,
   market,
+  onUpgrade,
 }: {
   utilities: BetrayalsUtilities
   profiles?: BetrayalsProfileControls
   milestones?: BetrayalsMilestones
   market?: BetrayalsStoreProps
+  onUpgrade?: (product: BetrayalsProductKey) => void
 }) {
   return utilities.panel ? (
     <UtilityDialog
@@ -424,6 +434,7 @@ export function BetrayalsUtilityPanel({
       profiles={profiles}
       milestones={milestones}
       market={market}
+      onUpgrade={onUpgrade}
     />
   ) : null
 }

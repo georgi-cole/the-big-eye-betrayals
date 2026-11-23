@@ -36,7 +36,7 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  min-height: 34px;
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid rgb(210 177 112 / 42%);
   border-radius: 999px;
@@ -68,9 +68,36 @@
 .betrayals-shop-page > header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 14px;
   max-width: 680px;
   margin: 0 auto 20px;
+}
+
+.betrayals-shop-page > header h1 {
+  margin: 0;
+  color: #e6d4bd;
+  font:
+    500 1.25rem/1.2 Georgia,
+    serif;
+}
+
+.betrayals-shop-page > header button {
+  min-height: 44px;
+  padding: 0.35rem 0;
+  border: 0;
+  background: transparent;
+  color: #bcaebf;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.betrayals-shop-page > header button:focus-visible,
+.betrayals-wallet-chip:focus-visible {
+  outline: 2px solid #f6db9c;
+  outline-offset: 4px;
 }
 
 .betrayals-shop-page > .betrayals-market {

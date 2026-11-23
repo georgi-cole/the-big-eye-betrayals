@@ -168,6 +168,8 @@ export const router = createHashRouter(
           errorElement: <RouteErrorBoundary />,
           children: [
             { path: '/store', element: load(<BetrayalsShop />) },
+            { path: '/store/:section', element: load(<BetrayalsShop />) },
+            { path: '/wallet', element: load(<BetrayalsShop />) },
             { path: '/profile', element: load(<Profile />) },
             { path: '/profile/account', element: load(<PlayerAccount />) },
             { path: '/profile/dressing-room', element: load(<DressingRoom />) },

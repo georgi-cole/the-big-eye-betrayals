@@ -50,6 +50,16 @@ store listings or change configured prices.
 
 ## Review log
 
+- 2026-11-23: Reviewed the Betrayals Store navigation and dedicated Wallet.
+  The compact Store overview leads to separate VIP, Feature unlocks, Season
+  items and Wallet views, with a direct Changing room shortcut. The Wallet
+  shows the selected profile's existing Eyeros balance and recent activity;
+  packs are offered in its separate Top up Eyeros view. Locked features enter
+  the matching Store section, and back controls return through the appropriate
+  overview. Native localized checkout, ownership, restore, product identifiers,
+  prices, wallet delivery and Night Shield eligibility retain their current
+  behavior. This reorganization adds no product, reward or entitlement.
+
 - 2026-11-23: Reviewed the new Betrayals store: permanent VIP, My Pulse, Reality
   Mode and No Ads; native Eyeros consumables; catalog-based standalone upgrade
   credit; owned changing-room looks; earned Eyeros; and the restricted one-night

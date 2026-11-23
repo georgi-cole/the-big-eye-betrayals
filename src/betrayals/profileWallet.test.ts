@@ -39,6 +39,7 @@ function setup(balance = 10_000) {
     },
   }
   return {
+    source,
     wallet: createBetrayalsWallet(source, 'buyer', balance),
     state: () => state,
     replace: (next: ProfilesState) => {
@@ -52,6 +53,34 @@ describe('Betrayals wallet persistence boundary', () => {
     vi.clearAllMocks()
     persistence.save.mockReturnValue(true)
     persistence.flush.mockResolvedValue(true)
+  })
+
+  it('exposes the bound profile’s existing transaction ledger without mixing another profile’s activity', () => {
+    const { source, state, replace } = setup()
+    const transactions = [
+      {
+        id: reward.id,
+        amount: reward.amount,
+        source: 'season_reward' as const,
+        label: 'Castle conversation',
+        createdAt: '2026-11-23T12:00:00Z',
+      },
+    ]
+    replace({
+      ...state(),
+      profiles: state().profiles.map((profile) => ({
+        ...profile,
+        eyeoleanTransactions:
+          profile.id === 'buyer'
+            ? transactions
+            : [{ ...transactions[0], id: 'other-profile-reward', label: 'Other profile reward' }],
+      })),
+    })
+    const wallet = createBetrayalsWallet(source, 'buyer', 10_000)
+    expect(wallet.transactions).toBe(transactions)
+    expect(wallet.transactions).toHaveLength(1)
+    expect(wallet.transactions?.[0].label).toBe('Castle conversation')
+    expect(createBetrayalsWallet(source, 'missing', 0).transactions).toEqual([])
   })
 
   it('credits the bound profile after selection changes and deduplicates replayed season events', async () => {

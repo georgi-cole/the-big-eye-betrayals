@@ -182,9 +182,79 @@ describe('Betrayals season review', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Store' }))
     const store = within(screen.getByRole('dialog', { name: 'Store' }))
-    expect(store.getByText('Individual unlocks')).toBeVisible()
+    expect(store.getByRole('button', { name: 'View VIP benefits' })).toBeVisible()
+    expect(store.getByRole('button', { name: 'Feature unlocks' })).toBeVisible()
     fireEvent.click(store.getByRole('button', { name: /The changing room/ }))
     expect(openDressingRoom).toHaveBeenCalledWith()
+  })
+
+  it('opens the profile Wallet directly from Home with real activity and a profile destination', () => {
+    const openProfile = vi.fn()
+    const openWalletProfile = vi.fn()
+    sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'wallet-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          wallet: {
+            balance: 4250,
+            transactions: [
+              {
+                id: 'social-reward',
+                amount: 50,
+                label: 'Social action',
+                source: 'season_reward',
+                createdAt: '2026-11-23T12:00:00Z',
+              },
+            ],
+            claimRewards: vi.fn().mockResolvedValue(true),
+            spend: vi.fn().mockResolvedValue('paid'),
+          },
+          openProfile,
+          openWalletProfile,
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Wallet, 4,250 Eyeros' }))
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    expect(wallet.getByLabelText('4,250 Eyeros available')).toBeVisible()
+    expect(wallet.getByRole('heading', { name: 'Recent activity' })).toBeVisible()
+    expect(wallet.getByText('Social action')).toBeVisible()
+    expect(wallet.queryByRole('region', { name: 'Store overview' })).toBeNull()
+    fireEvent.click(wallet.getByRole('button', { name: 'Open profile: Georgi' }))
+    expect(openWalletProfile).toHaveBeenCalledOnce()
+    expect(openProfile).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Wallet, 4,250 Eyeros' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
+    const store = within(screen.getByRole('dialog', { name: 'Store' }))
+    expect(store.getByRole('button', { name: 'View VIP benefits' })).toBeVisible()
+  })
+
+  it('uses the Wallet return destination when no profile is selected', () => {
+    const openProfile = vi.fn()
+    const openWalletProfile = vi.fn()
+    sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
+    render(
+      <BetrayalsScreen
+        profiles={{
+          openProfile,
+          openWalletProfile,
+          openAccount: vi.fn(),
+          openDressingRoom: vi.fn(),
+        }}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Open Wallet, 0 Eyeros' }))
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    fireEvent.click(wallet.getByRole('button', { name: 'Choose a profile' }))
+    expect(openWalletProfile).toHaveBeenCalledOnce()
+    expect(openProfile).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('routes locked Pulse and full profiles to their store unlocks while keeping basic conversation free', async () => {
@@ -223,6 +293,25 @@ describe('Betrayals season review', () => {
     expect(saved.status === 'ready' && saved.run.social?.at(-1)?.kind).toBe('rapport')
     fireEvent.click(social.getByRole('button', { name: /View full profile/ }))
     expect(screen.getByRole('dialog', { name: 'Store' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Reality Mode' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close store' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Wallet, 0 Eyeros' }))
+    const wallet = within(screen.getByRole('dialog', { name: 'Wallet' }))
+    expect(wallet.getByRole('button', { name: 'Top up Eyeros' })).toBeVisible()
+    expect(wallet.queryByRole('heading', { name: 'Reality Mode' })).toBeNull()
+    fireEvent.click(wallet.getByRole('button', { name: 'Close wallet' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: 'My Pulse' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Close store' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: /Unlock Reality Mode/ }))
+    expect(screen.getByRole('heading', { name: 'Reality Mode' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Explore VIP' })).toBeNull()
   })
 
   it('recovers a pending shield by saving one wallet debit before granting protection', async () => {

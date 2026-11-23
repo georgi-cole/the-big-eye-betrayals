@@ -6,7 +6,7 @@
 }
 
 .betrayals-utility-chip,
-.betrayals-utility-dialog button {
+:where(.betrayals-utility-dialog) button {
   font: inherit;
   cursor: pointer;
 }
