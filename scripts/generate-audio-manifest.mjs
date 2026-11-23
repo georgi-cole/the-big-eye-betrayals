@@ -63,6 +63,7 @@ async function readConfig() {
     }
     return {
       bindings: Array.isArray(parsed.bindings) ? parsed.bindings : [],
+      unbundledMusic: Array.isArray(parsed.unbundledMusic) ? parsed.unbundledMusic : [],
       keyAliases:
         parsed.keyAliases && typeof parsed.keyAliases === 'object' ? parsed.keyAliases : {},
       filenameAliases:
@@ -73,7 +74,13 @@ async function readConfig() {
     }
   } catch (error) {
     if (error?.code === 'ENOENT') {
-      return { bindings: [], keyAliases: {}, filenameAliases: {}, featureAliases: [] }
+      return {
+        bindings: [],
+        unbundledMusic: [],
+        keyAliases: {},
+        filenameAliases: {},
+        featureAliases: [],
+      }
     }
     throw error
   }
@@ -188,6 +195,20 @@ async function main() {
   ])
   const allFiles = [...musicFiles, ...soundFiles]
   const relativePaths = allFiles.map((file) => normalizeSlashes(path.relative(PUBLIC_ASSETS, file)))
+  // Keep the shared game's track IDs available without including its audio.
+  for (const catalogPath of config.unbundledMusic) {
+    if (
+      typeof catalogPath !== 'string' ||
+      (!/^music\/[^/\\]+\.mp3$/i.test(catalogPath) &&
+        catalogPath !== 'sounds/cinematic/Intro_hub_loop.mp3')
+    ) {
+      throw new Error(`Unexpected unbundled music path: ${catalogPath}`)
+    }
+    if (relativePaths.includes(catalogPath)) {
+      throw new Error(`Unbundled music path still contains audio: ${catalogPath}`)
+    }
+    relativePaths.push(catalogPath)
+  }
   const knownPaths = new Set(relativePaths)
   const explicitByPath = new Map()
   const bindings = []

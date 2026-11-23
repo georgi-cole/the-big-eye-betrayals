@@ -22,12 +22,14 @@ export interface SoundEntry {
 }
 
 const _viteBase: string = import.meta.env.BASE_URL ?? '/'
+const isBetrayalsEdition = import.meta.env.VITE_BETRAYALS_EDITION === 'true'
 export const ASSETS_BASE = `${_viteBase}assets/`
 export const MUSIC_BASE = `${ASSETS_BASE}music/`
 export const SOUNDS_BASE = `${ASSETS_BASE}sounds/`
 
 const registry: Record<string, SoundEntry> = {}
 for (const asset of GENERATED_AUDIO_ASSETS) {
+  if (isBetrayalsEdition && asset.category === 'music') continue
   registry[asset.key] = {
     key: asset.key,
     category: asset.category as SoundCategory,
