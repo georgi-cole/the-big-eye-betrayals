@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { formatEyeoleans } from '../economy/eyeoleans'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
 import type { BetrayalsProductKey } from './commerce/catalog'
 import type { BetrayalsStoreProps, BetrayalsStoreSection } from './BetrayalsStore'
@@ -49,7 +48,7 @@ import {
 } from './generalSocial'
 import { BetrayalsUtilityPanel, type BetrayalsProfileControls } from './BetrayalsUtilities'
 import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferences'
-import type { Run, Phase, RealityPreset } from './run'
+import type { Run, RealityPreset } from './run'
 import { acknowledgeRole, commandToken, eligibleBanishmentTargets, startRun, viewFor } from './run'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
@@ -64,7 +63,7 @@ import {
   resolveConclave,
   revealDawn,
 } from './night'
-import { castleWeather, cinematicFor, presentationAfter } from './presentation'
+import { castleWeather, cinematicFor, dawnBroadcast, presentationAfter } from './presentation'
 import { DawnWeather } from './DawnWeather'
 import { chooseTarget, resolutionPerspective } from './strategy'
 import { advanceDayBeat } from './daySocial'
@@ -97,6 +96,12 @@ import { applySocialMove, getSocialView, socialMoveKinds } from './social'
 import { socialWalletFor } from './socialResources'
 import { restoreRun, saveRun } from './persistence'
 import { Roster } from './Roster'
+import {
+  FINAL_SURVIVOR_COUNT,
+  NIGHT_SHIELD_COUNT,
+  phaseGroupLabel,
+  phaseLabel,
+} from './seasonPhases'
 import './season.css'
 
 const ChallengeGame = lazy(() => import('./BetrayalsChallengeGame'))
@@ -107,7 +112,7 @@ const castleExterior = artBase + 'castle-exterior.jpg'
 const finaleEnding = {
   'last-betrayer': 'The last Betrayer was banished at the Round Table.',
   unanimous: 'Every remaining guest voted to end the season.',
-  'final-two': 'The season ended automatically when two guests remained.',
+  'final-two': `The season ended automatically when ${FINAL_SURVIVOR_COUNT} guests remained.`,
 } as const
 const saveStorage = {
   getItem: getDurableItem,
@@ -115,37 +120,6 @@ const saveStorage = {
     if (!setDurableItem(key, value)) throw new Error('Betrayals save was unavailable.')
   },
 }
-const phaseLabel: Record<Phase, string> = {
-  'role-reveal': 'Your role',
-  dawn: 'Dawn',
-  social: 'Social',
-  immunity: 'Immunity Challenge',
-  safety: 'Safety Challenge',
-  'final-challenge': 'Final challenge',
-  'round-table': 'Round Table',
-  'final-banishment': 'Final banishment',
-  'table-reveal': 'Vote result',
-  night: 'Night',
-  'night-resolved': 'Daybreak',
-  'end-vote': 'End Season',
-  settled: 'Season result',
-}
-const phaseGroupLabel: Record<Phase, string> = {
-  'role-reveal': 'Opening',
-  dawn: 'Day',
-  social: 'Day',
-  immunity: 'Day',
-  safety: 'Day',
-  'final-challenge': 'Finale',
-  'round-table': 'Council',
-  'table-reveal': 'Council',
-  night: 'Night',
-  'night-resolved': 'Night',
-  'final-banishment': 'Finale',
-  'end-vote': 'Finale',
-  settled: 'Finale',
-}
-
 function begin(
   name: string,
   publicMode: boolean,
@@ -559,19 +533,20 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         profiles={profiles}
         market={market}
         onOpenStore={() => openStore()}
-        onOpenWallet={() => openStore('wallet')}
         onUpgrade={openUpgrade}
         name={name}
         onNameChange={setName}
-        milestones={{
-          dayReached: exitDay ?? run?.day ?? 0,
-          won: Boolean(run?.result && Object.hasOwn(run.result.payouts, run.humanId)),
-        }}
-        season={
+        milestones={
           run
-            ? { day: run.day, phase: phaseLabel[run.phase], settled: run.phase === 'settled' }
+            ? {
+                runId: run.id,
+                dayReached: exitDay ?? run.day,
+                won: !!run.result && Object.hasOwn(run.result.payouts, run.humanId),
+                rewards: betrayalsRewardEvents(run),
+              }
             : undefined
         }
+        seasonState={run ? (run.phase === 'settled' ? 'settled' : 'active') : undefined}
         onPlaySeason={() => {
           if (
             current.current &&
@@ -821,11 +796,6 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         : '')
     : undefined
   const enteredFinaleByBanishment = stage === 'final-challenge' && tableExit?.day === run.day
-  const dawn = run.lastDawn
-    ? run.lastDawn.eliminatedId
-      ? label(run.lastDawn.eliminatedId) + ' did not return.'
-      : 'Everyone returned.'
-    : 'The observatory opens.'
   const publicShieldId = run.publicShield?.day === run.day ? run.publicShield.id : undefined
   const visibleShieldResults = view.publicNightShieldWinnerIds.length > 0
   const tableFeed =
@@ -847,7 +817,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       }
       break
     case 'dawn': {
-      message = dawn
+      message = dawnBroadcast(run)
       const reviewedCase = run.caseReviews?.find(
         ({ day, speakerId, result }) =>
           day === run.day - 1 && speakerId === run.humanId && result === 'missed'
@@ -873,9 +843,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       message = enteredFinaleByBanishment ? banishment : challengeName
       detail =
         stage === 'safety'
-          ? run.immunityId
-            ? label(run.immunityId) + ' is immune. Two shields protect at Night.'
-            : 'Two shields protect at Night.'
+          ? `${run.immunityId ? label(run.immunityId) + ' is immune. ' : ''}The top ${NIGHT_SHIELD_COUNT} earn Night Shields.`
           : stage === 'final-challenge'
             ? (enteredFinaleByBanishment ? challengeName : 'This challenge') +
               ' adds to the pot. In the finale, banished roles stay sealed until the season ends.'
@@ -997,9 +965,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       detail = (
         <div className="betrayals-finale-detail">
           <p>
-            Ending takes a unanimous vote. One Banish Again vote starts another ballot. At two
-            guests, the season ends automatically. Any surviving Betrayer wins the pot for their
-            side.
+            Ending takes a unanimous vote. One Banish Again vote starts another ballot. At{' '}
+            {FINAL_SURVIVOR_COUNT} guests, the season ends automatically. Any surviving Betrayer
+            wins the pot for their side.
           </p>
         </div>
       )
@@ -1128,38 +1096,48 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           <div className="betrayals-brand-row">
             <div className="betrayals-wordmark">
               <span className="betrayals-eye" aria-hidden="true" />
-              Betrayals
+              <span className="betrayals-wordmark__signature">Betrayals</span>
             </div>
-            <button
-              className="betrayals-wallet-chip"
-              type="button"
-              onClick={() => openStore('wallet')}
-              aria-label={`Open Wallet, ${formatEyeoleans(profiles?.wallet?.balance ?? 0)} Eyeros`}
-              aria-haspopup="dialog"
-            >
-              Wallet <span aria-hidden="true">◈</span>{' '}
-              {formatEyeoleans(profiles?.wallet?.balance ?? 0)}
-            </button>
           </div>
           <div className="betrayals-phase-strip">
             <div className="betrayals-phase-strip__copy" aria-live="polite">
               <span className="betrayals-phase-strip__group">{phaseGroupLabel[stage]}</span>
               <span className="betrayals-phase-strip__subphase">{phaseLabel[stage]}</span>
             </div>
-            <button
-              className="betrayals-phase-strip__log"
-              type="button"
-              aria-label="Open My Pulse"
-              aria-haspopup="dialog"
-              aria-expanded={Boolean(pulse)}
-              title="My Pulse"
-              onClick={() => investigation.openPulse()}
+            <div
+              className="betrayals-phase-strip__tools"
+              role="group"
+              aria-label="Season shortcuts"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
-                <path d="M12 3v3l1.5-1 1.5 1V3" />
-              </svg>
-            </button>
+              <button
+                className="betrayals-phase-strip__log"
+                type="button"
+                aria-label="Open My Pulse"
+                aria-haspopup="dialog"
+                aria-expanded={Boolean(pulse)}
+                title="My Pulse"
+                onClick={() => investigation.openPulse()}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
+                  <path d="M12 3v3l1.5-1 1.5 1V3" />
+                </svg>
+              </button>
+              <button
+                className="betrayals-phase-strip__store"
+                type="button"
+                aria-label="Open Store"
+                aria-haspopup="dialog"
+                title="Store"
+                onClick={() => openStore('home')}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 8h14l-1 13H6L5 8Z" />
+                  <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+                  <path d="M9 12v1m6-1v1" />
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -1431,7 +1409,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         <ConclaveDiscussion
           key={conclaveKey}
           cast={conclaveGuests(run, viewerId)}
-          candidates={view.seats.filter(({ id }) => targets.includes(id))}
+          view={view}
+          humanId={run.humanId}
           vote={conclave ?? undefined}
           line={conclaveLine}
           step={conclaveStep}

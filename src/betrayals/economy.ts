@@ -1,5 +1,6 @@
 import type { RankedScore } from './challenges.ts'
 import type { CommandToken, Run } from './run.ts'
+import { FINALE_CAST_SIZE, NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 
 export const BETRAYALS_REWARD_AMOUNTS = {
   socialAction: 50,
@@ -41,7 +42,7 @@ const REWARD_RULES = {
     amount: BETRAYALS_REWARD_AMOUNTS.survivedNight,
     label: 'Survived the night',
   },
-  finalist: { amount: BETRAYALS_REWARD_AMOUNTS.finalist, label: 'Reached the Final Five' },
+  finalist: { amount: BETRAYALS_REWARD_AMOUNTS.finalist, label: 'Reached the finale' },
   'season-completed': {
     amount: BETRAYALS_REWARD_AMOUNTS.seasonCompleted,
     label: 'Reached the season result',
@@ -149,7 +150,10 @@ export function recordBetrayalsEconomy(previous: Run | null, next: Run): Run {
     ) {
       run = addReward(run, 'survived-night', before.day)
     }
-    if (run.phase === 'final-challenge' && run.seats.filter(({ exit }) => !exit).length === 5) {
+    if (
+      run.phase === 'final-challenge' &&
+      run.seats.filter(({ exit }) => !exit).length === FINALE_CAST_SIZE
+    ) {
       run = addReward(run, 'finalist')
     }
     if (run.phase === 'settled' && run.result) {
@@ -177,7 +181,11 @@ export function recordBetrayalsChallengeRewards(
     }
   } else if (previous.phase === 'safety') {
     run = addReward(run, 'safety-played', previous.day)
-    if (standings.slice(0, 2).some(({ contestantId }) => contestantId === previous.humanId)) {
+    if (
+      standings
+        .slice(0, NIGHT_SHIELD_COUNT)
+        .some(({ contestantId }) => contestantId === previous.humanId)
+    ) {
       run = addReward(run, 'safety-win', previous.day)
     }
   } else if (previous.phase === 'final-challenge') {
@@ -242,7 +250,10 @@ export function paidNightShieldOffer(run: Run | null, balance: number): PaidNigh
     return { ...offer, reason: 'Betrayers cannot be murdered by the Conclave.' }
   }
   if (run.seats.filter(({ exit }) => !exit).length < PAID_NIGHT_SHIELD_MIN_CAST) {
-    return { ...offer, reason: 'Night Shields are available while at least 6 players remain.' }
+    return {
+      ...offer,
+      reason: `Night Shields are available while at least ${PAID_NIGHT_SHIELD_MIN_CAST} players remain.`,
+    }
   }
   if (run.phase !== 'night') {
     return { ...offer, reason: 'Available after banishment, before tonight’s Conclave resolves.' }

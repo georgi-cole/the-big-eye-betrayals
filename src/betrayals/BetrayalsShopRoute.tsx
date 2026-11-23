@@ -1,4 +1,5 @@
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { useAppSelector } from '../store/hooks'
 import { selectCurrentProfile } from '../store/profilesSlice'
 import BetrayalsStore, { type BetrayalsStoreSection } from './BetrayalsStore'
@@ -30,7 +31,8 @@ export default function BetrayalsShopRoute() {
   function changeSection(next: BetrayalsStoreSection) {
     const destination =
       next === 'home' ? '/store' : next === 'wallet' ? '/wallet' : `/store/${next}`
-    if (location.pathname !== destination) navigate(destination, { state: location.state })
+    if (location.pathname !== destination)
+      navigate(destination, { replace: true, state: location.state })
   }
 
   function leaveStore() {
@@ -42,9 +44,11 @@ export default function BetrayalsShopRoute() {
   return (
     <main className="betrayals-shop-page">
       <header>
-        <button type="button" onClick={leaveStore}>
-          {returnToChangingRoom ? 'Back to changing room' : 'Back to game'}
-        </button>
+        <GameBackButton
+          className="betrayals-shop-page__back"
+          label={returnToChangingRoom ? 'Back to changing room' : 'Back to game'}
+          onClick={leaveStore}
+        />
         <h1>{section === 'wallet' ? 'Wallet' : 'Betrayals Store'}</h1>
       </header>
       <BetrayalsStore

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { usePacedReveal } from '../hooks/usePacedReveal'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import { tableDiscussion, tableTargets } from './table'
@@ -141,9 +142,11 @@ export function RoundTableDiscussion({
         <header className="round-table-room__head">
           <div className="round-table-room__topline">
             <span>Day {run.day}</span>
-            <button type="button" onClick={onBack}>
-              Back to castle
-            </button>
+            <GameBackButton
+              className="round-table-room__back"
+              label="Back to castle"
+              onClick={onBack}
+            />
           </div>
           <h2 id="round-table-room-title">Round Table</h2>
           {shieldName && <p>{shieldName} holds the Public Shield.</p>}

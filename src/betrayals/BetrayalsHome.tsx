@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { formatEyeoleans } from '../economy/eyeoleans'
+import HousematesBioCinematic from '../components/HousematesBioCinematic/HousematesBioCinematic'
 import KolequantSplash from '../components/KolequantSplash/KolequantSplash'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { BetrayalsUtilities } from './betrayalsPreferences'
@@ -7,9 +7,9 @@ import {
   BetrayalsUtilityChips,
   BetrayalsUtilityPanel,
   UtilityIcon,
-  type BetrayalsMilestones,
   type BetrayalsProfileControls,
 } from './BetrayalsUtilities'
+import type { BetrayalsMilestones } from './BetrayalsAchievements'
 import { ObservatoryWindow } from './ObservatoryWindow'
 import { useObservatorySky } from './observatoryWeather'
 import type { BetrayalsProductKey } from './commerce/catalog'
@@ -32,12 +32,11 @@ type HomeProps = {
   profiles?: BetrayalsProfileControls
   market?: import('./BetrayalsStore').BetrayalsStoreProps
   onOpenStore?: () => void
-  onOpenWallet?: () => void
   onUpgrade?: (product: BetrayalsProductKey) => void
   milestones?: BetrayalsMilestones
   name: string
   onNameChange: (name: string) => void
-  season?: { day: number; phase: string; settled: boolean }
+  seasonState?: 'active' | 'settled'
   onPlaySeason: () => void
   onReturnToSeason: () => void
   onResumeLegacy?: () => void
@@ -48,12 +47,11 @@ export function BetrayalsHome({
   profiles,
   market,
   onOpenStore,
-  onOpenWallet,
   onUpgrade,
   milestones,
   name,
   onNameChange,
-  season,
+  seasonState,
   onPlaySeason,
   onReturnToSeason,
   onResumeLegacy,
@@ -61,6 +59,8 @@ export function BetrayalsHome({
   const westLantern = useRef<HTMLSpanElement>(null)
   const eastLantern = useRef<HTMLSpanElement>(null)
   const [backdropReady, setBackdropReady] = useState(false)
+  const [playersOpen, setPlayersOpen] = useState(false)
+  const [shareNotice, setShareNotice] = useState('')
   const [opening, setOpening] = useState(() => !!profiles && !hasSeenOpening())
   const systemReducedMotion = usePresentationReducedMotion()
   const reducedMotion = utilities.preferences.reducedMotion || systemReducedMotion
@@ -85,7 +85,7 @@ export function BetrayalsHome({
 
   const player = profiles?.player
   const setup = profiles && !player?.portrait ? profiles : undefined
-  const continuing = season && !season.settled
+  const continuing = seasonState === 'active'
   const actionLabel = setup
     ? player
       ? 'Choose your look'
@@ -101,6 +101,28 @@ export function BetrayalsHome({
     else onPlaySeason()
   }
 
+  async function shareGame() {
+    const data = {
+      title: 'The Big Eye: Betrayals',
+      text: 'Enter the castle. Decide whom to trust.',
+      url: window.location.href,
+    }
+    try {
+      if (navigator.share) {
+        await navigator.share(data)
+        setShareNotice('Share sheet opened.')
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(data.url)
+        setShareNotice('Link copied.')
+      } else {
+        setShareNotice('Sharing is unavailable in this browser.')
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setShareNotice('The link could not be shared.')
+    }
+  }
+
   return (
     <>
       {showSplash && (
@@ -108,10 +130,13 @@ export function BetrayalsHome({
           duration={3400}
           ready={backdropReady}
           progress={backdropReady ? 100 : 0}
-          status="Opening the observatory"
+          status="Lighting the castle lanterns…"
           lanternTargets={[westLantern, eastLantern]}
           onFinish={finishOpening}
         />
+      )}
+      {playersOpen && (
+        <HousematesBioCinematic variant="betrayals" onComplete={() => setPlayersOpen(false)} />
       )}
       <main
         className="betrayals-layout betrayals-home"
@@ -148,23 +173,32 @@ export function BetrayalsHome({
             </span>
           </div>
         </div>
-        <header className="betrayals-home__navigation">
-          <BetrayalsUtilityChips utilities={utilities} profiles={profiles} showStore={false} />
-        </header>
+        {player && profiles && (
+          <button
+            type="button"
+            className="betrayals-home__compass"
+            aria-label="Profile"
+            title="Profile"
+            onClick={profiles.openProfile}
+          >
+            <span className="betrayals-home__compass-dial" aria-hidden="true">
+              {player.portrait ? (
+                <img src={player.portrait} alt="" />
+              ) : (
+                <UtilityIcon kind="profile" />
+              )}
+            </span>
+          </button>
+        )}
         <div className="betrayals-home__entrance">
           <div className="betrayals-home__identity">
-            <span className="betrayals-eye" aria-hidden="true" />
-            <p>The Big Eye</p>
+            <div className="betrayals-home__brand">
+              <span className="betrayals-eye" aria-hidden="true" />
+              <p>The Big Eye</p>
+            </div>
             <h1>Betrayals</h1>
           </div>
           <form className="betrayals-home__controls" onSubmit={selectPrimaryAction}>
-            {!setup && continuing && (
-              <p className="betrayals-home__progress">
-                Day {season.day}
-                <span aria-hidden="true">·</span>
-                {season.phase}
-              </p>
-            )}
             {!profiles && !continuing && (
               <label className="betrayals-home__guest">
                 Your name
@@ -180,7 +214,7 @@ export function BetrayalsHome({
               {actionLabel}
             </button>
             <div className="betrayals-home__secondary">
-              {(['achievements', 'store'] as const).map((panel) => (
+              {(['rules', 'store'] as const).map((panel) => (
                 <button
                   key={panel}
                   type="button"
@@ -192,24 +226,10 @@ export function BetrayalsHome({
                   }}
                 >
                   <UtilityIcon kind={panel} />
-                  {panel === 'achievements' ? 'Achievements' : 'Store'}
+                  {panel === 'rules' ? 'Rules' : 'Store'}
                 </button>
               ))}
             </div>
-            {onOpenWallet && (
-              <button
-                type="button"
-                className="betrayals-wallet-chip"
-                aria-haspopup="dialog"
-                aria-label={`Open Wallet, ${formatEyeoleans(market?.balance ?? 0)} Eyeros`}
-                onClick={() => {
-                  utilities.playEffect('ui:navigate', 0.45)
-                  onOpenWallet()
-                }}
-              >
-                Wallet <span aria-hidden="true">◈</span> {formatEyeoleans(market?.balance ?? 0)}
-              </button>
-            )}
             {setup ? (
               <button type="button" className="betrayals-home__link" onClick={setup.openAccount}>
                 Account sign-in
@@ -221,19 +241,25 @@ export function BetrayalsHome({
                     Resume previous season
                   </button>
                 )}
-                {season?.settled && (
+                {seasonState === 'settled' && (
                   <button type="button" className="betrayals-home__link" onClick={onReturnToSeason}>
                     View season result
                   </button>
                 )}
               </>
             )}
-            <a
-              className="betrayals-home__link betrayals-home__help"
-              href="mailto:kolequant@gmail.com?subject=The%20Big%20Eye%3A%20Betrayals%20help%20and%20feedback"
-            >
-              Help &amp; Feedback
-            </a>
+            <div className="betrayals-home__shortcuts">
+              <BetrayalsUtilityChips
+                utilities={utilities}
+                showStore={false}
+                showAchievements
+                onOpenPlayers={() => setPlayersOpen(true)}
+                onShare={() => void shareGame()}
+              />
+              <span className="betrayals-home__share-status" role="status" aria-live="polite">
+                {shareNotice}
+              </span>
+            </div>
           </form>
         </div>
         <BetrayalsUtilityPanel

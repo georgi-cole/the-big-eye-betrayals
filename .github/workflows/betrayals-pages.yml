@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/betrayals-pages.yml'
       - 'scripts/lib/betrayals-pages-incident.mjs'
+      - 'scripts/check-betrayals-rules.mjs'
       - 'tests/betrayals-pages-incident.test.mjs'
       - 'src/betrayals/**'
       - 'public/assets/betrayals/**'
@@ -39,6 +40,7 @@ jobs:
           cache: npm
       - uses: actions/configure-pages@v5
       - run: npm ci
+      - run: node scripts/check-betrayals-rules.mjs
       - run: node --test tests/betrayals-*.mjs
       - run: npx vitest run src/betrayals
       - run: npm run build

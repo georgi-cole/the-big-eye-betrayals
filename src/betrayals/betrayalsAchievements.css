@@ -1,0 +1,206 @@
+.betrayals-utility-dialog[data-betrayals-panel='achievements'] {
+  width: min(38rem, calc(100% - 1rem));
+  background: radial-gradient(ellipse at 65% 0%, #35251b, #12151a 68%);
+  box-shadow:
+    0 1.75rem 5rem #000b,
+    inset 0 0 0 3px #b1884b22;
+}
+
+.betrayals-honors {
+  display: grid;
+  gap: 0.9rem;
+  color: #f1e1c9;
+}
+
+.betrayals-honors__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid #a882515c;
+  border-radius: 0.55rem;
+  background: #14171c;
+}
+
+.betrayals-honors__tabs button {
+  min-height: 2.65rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #dfc8ac;
+  font-size: 0.81rem;
+}
+
+.betrayals-honors__tabs button[aria-pressed='true'] {
+  border-color: #b48b5e6b;
+  background: linear-gradient(155deg, #6e472c, #37251b);
+  color: #ffedcc;
+}
+
+.betrayals-honors__display {
+  padding: clamp(0.65rem, 3vw, 1rem);
+  border: 1px solid #9771478c;
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(165deg, #191a22aa, #171312f2 68%),
+    url('/assets/betrayals/council.jpg') center 34% / cover;
+  box-shadow:
+    inset 0 0 0 3px #c5945114,
+    0 8px 22px #0005;
+}
+
+.betrayals-honors h3 {
+  margin: 0;
+  color: #fae2bc;
+  font:
+    500 clamp(1.15rem, 4.6vw, 1.65rem)/1.2 Georgia,
+    serif;
+  overflow-wrap: anywhere;
+}
+
+.betrayals-honors__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0.7rem 0 0;
+}
+
+.betrayals-honors__stats > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.25rem;
+  padding: 0.48rem;
+  border: 1px solid #ac81465c;
+  border-radius: 0.42rem;
+  background: #191717e0;
+}
+
+.betrayals-honors__stats dt {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+  color: #d6c1a5;
+  font-size: 0.67rem;
+  line-height: 1.2;
+}
+
+.betrayals-honors__stats dd {
+  margin: 0;
+  color: #f8dba2;
+  font:
+    500 clamp(1.2rem, 6vw, 1.85rem)/1 Georgia,
+    serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.betrayals-honors__medallion {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border: 1px solid #bb8f586b;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #674a2d, #211914 76%);
+  color: #f3d4a1;
+}
+
+.betrayals-honors__medallion svg,
+.betrayals-honors__medallion img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+}
+
+.betrayals-honors__medallion svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.betrayals-honors__badges {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.betrayals-honors__badges > span {
+  color: #c8b5a2;
+  font-size: 0.74rem;
+}
+
+.betrayals-honors__badges ul {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.betrayals-honors__badges li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.3rem;
+  padding: 0.48rem 0.2rem;
+  border: 1px solid #7a6a575c;
+  border-radius: 0.5rem;
+  text-align: center;
+  background: #18171a;
+  color: #e5d3bf;
+  font-size: 0.71rem;
+}
+
+.betrayals-honors__badges li small {
+  color: #c2aea0;
+}
+
+.betrayals-honors__badges li[data-earned='false'] .betrayals-honors__medallion {
+  filter: grayscale(0.85) brightness(0.7);
+}
+
+.betrayals-honors__badges li[data-earned='true'] {
+  border-color: #ad7f4b99;
+  background: linear-gradient(150deg, #3a2a1d, #211a17 72%);
+}
+
+.betrayals-honors__badges li[data-earned='true'] small {
+  color: #f2ca88;
+}
+
+.betrayals-honors__rewards p {
+  margin: 0 0 0.5rem;
+  color: #d7c3a8;
+  font-size: 0.82rem;
+}
+
+.betrayals-honors__rewards dl {
+  margin: 0;
+  border-block: 1px solid #98724a66;
+}
+
+.betrayals-honors__rewards dl div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  padding: 0.64rem 0.25rem;
+  font-size: 0.8rem;
+}
+
+.betrayals-honors__rewards dl div + div {
+  border-top: 1px solid #98724a39;
+}
+
+.betrayals-honors__rewards dd {
+  margin: 0;
+  color: #f3d192;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}

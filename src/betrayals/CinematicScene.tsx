@@ -49,6 +49,7 @@ export type CinematicSceneData = {
   id: string
   kind: SceneKind
   title?: string
+  openingTitle?: string
   subtitle?: string
   cast?: readonly CinematicCastMember[]
   subject?: CinematicCastMember
@@ -528,7 +529,8 @@ export function CinematicScene({
       : scene.role === 'Betrayer'
         ? 'betrayer_laugh'
         : 'ceremony_reveal'
-  const title = departure && subject ? subject.name : (complete && scene.title) || current.title
+  const sceneTitle = complete ? scene.title : beat === 0 ? scene.openingTitle : undefined
+  const title = departure && subject ? subject.name : (sceneTitle ?? current.title)
   const caption = departure
     ? reveal && stageBeat === 1
       ? scene.role

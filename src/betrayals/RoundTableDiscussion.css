@@ -234,8 +234,11 @@
   cursor: default;
 }
 
-.round-table-room__topline button {
-  background: #170f13bf;
+.round-table-room__topline .game-back-button.round-table-room__back {
+  flex: 0 0 2rem !important;
+  border-color: #bd8d57 !important;
+  background: linear-gradient(145deg, #473025, #1c1113) !important;
+  color: #f1d7a2 !important;
 }
 
 .round-table-room__footer {

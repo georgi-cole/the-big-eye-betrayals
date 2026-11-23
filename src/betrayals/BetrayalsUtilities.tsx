@@ -9,6 +9,8 @@ import type { BetrayalsUtilities } from './betrayalsPreferences'
 import { FREE_BETRAYALS_LOOK_IDS, type BetrayalsLookId } from './betrayalsAppearance'
 import BetrayalsStore, { type BetrayalsStoreProps } from './BetrayalsStore'
 import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
+import { BetrayalsRules } from './BetrayalsRules'
+import { BetrayalsAchievements, type BetrayalsMilestones } from './BetrayalsAchievements'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
 import type { BetrayalsProductKey } from './commerce/catalog'
 import type { BetrayalsWallet } from './profileWallet'
@@ -24,13 +26,18 @@ export type BetrayalsProfileControls = {
   openAdvertisingPrivacy?: () => void
 }
 
-export type BetrayalsMilestones = { dayReached: number; won: boolean }
-
 const utilityGlyphs = {
   achievements:
     'M5 3h6v3a3 3 0 0 1-6 0V3Zm0 1H3v2a2 2 0 0 0 2 2m6-4h2v2a2 2 0 0 1-2 2M8 9v4m-3 0h6',
+  rules:
+    'M3 2.5h6a3 3 0 0 1 3 3v8H6a3 3 0 0 0-3 0v-11Zm10 0h-1v11h1a3 3 0 0 1 3 0v-11h-3ZM5 5h3m-3 2h3m4-2h2m-2 2h2',
   profile:
     'M10.5 5.2a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0m2 8v-.9c0-2.1-2-3.5-4.5-3.5s-4.5 1.4-4.5 3.5v.9',
+  players:
+    'M6 7a2.3 2.3 0 1 0 0-4.6A2.3 2.3 0 0 0 6 7Zm5.3-.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM1.7 14v-1c0-2 1.7-3.5 4.3-3.5s4.3 1.5 4.3 3.5v1H1.7Zm9-.8c0-1.2-.5-2.2-1.4-2.9.6-.5 1.3-.8 2.3-.8 1.9 0 3.2 1.2 3.2 2.8v.9h-4.1',
+  bug: 'M6 5.2a3 3 0 0 1 5.9 0M5 7h8m-9 2h10M2.5 6.5 4.3 8m11.2-1.5L13.7 8M2.5 12l2-1m10.8 1 2-1M6 4 4.7 2.5m6.5 1.5 1.5-1.5M5 13.5v-4a3.5 3.5 0 0 1 7 0v4a3.5 3.5 0 0 1-7 0Z',
+  share:
+    'M11.5 5.5 8.2 7.7m0 2.6 3.3 2.2M7 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm9-5a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm0 9a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
   music:
     'M6 11.2V4.4l7-1.6v6.8m-7 1.6c0 1-1 1.8-2.2 1.8s-2-.6-2-1.5 1-1.7 2.2-1.7c.8 0 1.5.3 2 .7m7-.9c0 1-1 1.8-2.2 1.8s-2-.6-2-1.5 1-1.7 2.2-1.7c.8 0 1.5.3 2 .7',
   settings:
@@ -50,44 +57,51 @@ export function BetrayalsUtilityChips({
   utilities,
   showSettings = true,
   showStore = true,
-  profiles,
+  showAchievements = false,
+  onOpenPlayers,
+  onShare,
 }: {
   utilities: BetrayalsUtilities
   showSettings?: boolean
   showStore?: boolean
-  profiles?: BetrayalsProfileControls
+  showAchievements?: boolean
+  onOpenPlayers?: () => void
+  onShare?: () => void
 }) {
   const { preferences, openPanel, playEffect, toggleMusic } = utilities
   return (
-    <div className="betrayals-utility-chips" role="group" aria-label="Game controls">
-      {profiles?.player && (
-        <button
-          type="button"
-          className="betrayals-utility-chip betrayals-utility-chip--profile"
-          onClick={profiles.openProfile}
-        >
-          {profiles.player.portrait ? (
-            <img src={profiles.player.portrait} alt="" />
-          ) : (
-            <UtilityIcon kind="profile" />
-          )}
-          Profile
-        </button>
-      )}
+    <nav className="betrayals-utility-chips" aria-label="Game controls">
       <button
         type="button"
         aria-pressed={preferences.musicOn}
         aria-label="Music"
+        title="Music"
         className="betrayals-utility-chip"
         onClick={toggleMusic}
       >
         <UtilityIcon kind="music" />
-        <span className="betrayals-utility-chip__label">Music</span>
         <span className="betrayals-utility-chip__lamp" aria-hidden="true" />
       </button>
+      {showAchievements && (
+        <button
+          type="button"
+          aria-label="Achievements"
+          aria-haspopup="dialog"
+          title="Achievements"
+          className="betrayals-utility-chip"
+          onClick={() => {
+            playEffect('ui:navigate', 0.45)
+            openPanel('achievements')
+          }}
+        >
+          <UtilityIcon kind="achievements" />
+        </button>
+      )}
       {showSettings && (
         <button
           type="button"
+          aria-label="Settings"
+          title="Settings"
           aria-haspopup="dialog"
           className="betrayals-utility-chip"
           onClick={() => {
@@ -96,12 +110,43 @@ export function BetrayalsUtilityChips({
           }}
         >
           <UtilityIcon kind="settings" />
-          <span className="betrayals-utility-chip__label">Settings</span>
+        </button>
+      )}
+      {onOpenPlayers && (
+        <button
+          type="button"
+          aria-label="Players"
+          title="Players"
+          className="betrayals-utility-chip"
+          onClick={onOpenPlayers}
+        >
+          <UtilityIcon kind="players" />
+        </button>
+      )}
+      <a
+        className="betrayals-utility-chip"
+        aria-label="Report a bug"
+        title="Report a bug"
+        href="mailto:kolequant@gmail.com?subject=The%20Big%20Eye%3A%20Report%20a%20bug"
+      >
+        <UtilityIcon kind="bug" />
+      </a>
+      {onShare && (
+        <button
+          type="button"
+          aria-label="Share The Big Eye"
+          title="Share The Big Eye"
+          className="betrayals-utility-chip"
+          onClick={onShare}
+        >
+          <UtilityIcon kind="share" />
         </button>
       )}
       {showStore && (
         <button
           type="button"
+          aria-label="Store"
+          title="Store"
           aria-haspopup="dialog"
           className="betrayals-utility-chip"
           onClick={() => {
@@ -110,10 +155,9 @@ export function BetrayalsUtilityChips({
           }}
         >
           <UtilityIcon kind="store" />
-          <span className="betrayals-utility-chip__label">Store</span>
         </button>
       )}
-    </div>
+    </nav>
   )
 }
 
@@ -318,28 +362,12 @@ function Store({
   )
 }
 
-function Achievements({ milestones }: { milestones?: BetrayalsMilestones }) {
-  const goals = [
-    { label: 'Enter the castle', achieved: (milestones?.dayReached ?? 0) >= 1 },
-    { label: 'Reach Day 2', achieved: (milestones?.dayReached ?? 0) >= 2 },
-    { label: 'Win the season', achieved: milestones?.won ?? false },
-  ]
-  return (
-    <section className="betrayals-achievements">
-      <p>Milestones from your current or most recent season.</p>
-      <ul>
-        {goals.map(({ label, achieved }) => (
-          <li key={label} data-achieved={achieved}>
-            <span>{label}</span>
-            <small>{achieved ? 'Unlocked' : 'Locked'}</small>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
+const panelTitles = {
+  settings: 'Settings',
+  store: 'Store',
+  achievements: 'Achievements',
+  rules: 'Rules',
 }
-
-const panelTitles = { settings: 'Settings', store: 'Store', achievements: 'Achievements' }
 
 function UtilityDialog({
   utilities,
@@ -373,6 +401,7 @@ function UtilityDialog({
     <dialog
       ref={dialogRef}
       className="betrayals-utility-dialog"
+      data-betrayals-panel={panel}
       data-betrayals-motion={preferences.reducedMotion ? 'reduced' : undefined}
       aria-label={title}
       onCancel={(event) => {
@@ -385,7 +414,13 @@ function UtilityDialog({
     >
       <div className="betrayals-utility-dialog__inner">
         <header className="betrayals-utility-dialog__header">
-          <h2>{title}</h2>
+          <h2>
+            {panel === 'rules'
+              ? 'The Castle Handbook'
+              : panel === 'achievements'
+                ? 'Hall of Fame'
+                : title}
+          </h2>
           <button
             type="button"
             className="betrayals-utility-dialog__close"
@@ -407,8 +442,14 @@ function UtilityDialog({
           ) : (
             <Store utilities={utilities} profiles={profiles} />
           )
+        ) : panel === 'rules' ? (
+          <BetrayalsRules />
         ) : (
-          <Achievements milestones={milestones} />
+          <BetrayalsAchievements
+            milestones={milestones}
+            wallet={profiles?.wallet}
+            name={profiles?.player?.name}
+          />
         )}
       </div>
     </dialog>

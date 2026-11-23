@@ -28,8 +28,7 @@
   letter-spacing: -0.06em;
 }
 
-.season-recap-preview button,
-.season-recap-preview a {
+.season-recap-preview button {
   min-width: 174px;
   padding: 13px 18px;
   border: 1px solid rgba(255, 255, 255, 0.22);
@@ -43,9 +42,4 @@
   text-decoration: none;
   text-transform: uppercase;
   cursor: pointer;
-}
-
-.season-recap-preview a {
-  color: rgba(255, 255, 255, 0.78);
-  background: rgba(255, 255, 255, 0.07);
 }

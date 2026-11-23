@@ -16,7 +16,6 @@ import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
 import { BetrayalsGuestProfile, type InvestigationControls } from './BetrayalsGuestProfile'
-import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
 import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
@@ -444,13 +443,20 @@ function CastleWire({
             <button
               type="button"
               className="ra-history-btn"
+              aria-label={showHistory ? 'Show latest activity' : `History · ${notes.length}`}
               aria-expanded={showHistory}
               onClick={() => setShowHistory(!showHistory)}
             >
-              {showHistory ? 'Close history' : 'History'}
-              <span className="ra-history-btn__count" aria-hidden="true">
-                {notes.length}
-              </span>
+              {showHistory ? (
+                'Latest'
+              ) : (
+                <>
+                  <span>History</span>
+                  <span className="ra-history-btn__count" aria-hidden="true">
+                    {notes.length}
+                  </span>
+                </>
+              )}
             </button>
           )}
         </span>
@@ -787,6 +793,7 @@ export function BetrayalsSocialPanel({
                   className="sp2-focus__clear"
                   type="button"
                   aria-label={`Deselect ${peer.name} and show roster`}
+                  title="Close guest profile"
                   onClick={() => chooseContact(undefined)}
                 >
                   ×
@@ -856,20 +863,15 @@ export function BetrayalsSocialPanel({
                   </div>
                   {!canAct && <p>{seasonEndedHint}</p>}
                 </div>
-                {investigation && hasRealityMode && (
+                {investigation && (
                   <BetrayalsGuestProfile
                     key={peer.id}
                     profile={investigation.profile(peer.id)}
                     investigation={investigation}
                     contacts={contacts}
                     name={label}
-                  />
-                )}
-                {!hasRealityMode && (
-                  <BetrayalsPremiumButton
-                    title="View full profile"
-                    detail="Personality, observations and private accounts · Reality Mode or VIP"
-                    onClick={() => onUpgrade?.('realityMode')}
+                    locked={!hasRealityMode}
+                    onUnlock={!hasRealityMode ? () => onUpgrade?.('realityMode') : undefined}
                   />
                 )}
               </>
@@ -897,11 +899,24 @@ export function BetrayalsSocialPanel({
 
           {!peer && investigation && (
             <button
-              className="sp2-action-button"
+              className="house-pulse__summary betrayals-social-pulse"
               type="button"
+              aria-label={hasMyPulse ? 'Open My Pulse' : 'Open My Pulse, VIP feature'}
+              aria-haspopup="dialog"
               onClick={() => investigation.openPulse()}
             >
-              My Pulse{!hasMyPulse && <span className="betrayals-feature-badge"> · VIP</span>}
+              <span className="house-pulse__mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M2.5 12s3.7-6 9.5-6 9.5 6 9.5 6-3.7 6-9.5 6-9.5-6-9.5-6Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </span>
+              <span>
+                <strong>My Pulse</strong>
+                <small>Day {day ?? '—'} · Your investigation log</small>
+              </span>
+              <em>Track your story, gathered intel and commitments.</em>
+              <b>{hasMyPulse ? 'Open My Pulse' : 'VIP · Unlock'}</b>
             </button>
           )}
           {!peer && intel}

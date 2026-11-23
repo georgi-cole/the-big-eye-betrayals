@@ -1,11 +1,11 @@
 .betrayals-wallet {
-  --wallet-gold: #dfbd79;
+  --wallet-gold: #f1c875;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1.2rem;
   min-width: 0;
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  color: #f4eee7;
+  color: #f7eee5;
   overflow-wrap: anywhere;
 }
 
@@ -31,23 +31,26 @@
   scroll-margin-top: 0.6rem;
 }
 .betrayals-wallet__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 2.75rem;
-  margin: -0.5rem 0 0.25rem;
-  padding: 0.2rem 0.15rem;
-  border: 0;
-  background: transparent;
-  color: #cdbfae;
-  font-size: 0.76rem;
+  justify-self: start;
+  margin: -0.35rem 0 0.25rem;
 }
-.betrayals-wallet__back > span {
-  font-size: 1.55rem;
-  line-height: 1;
+.betrayals-wallet__back.game-back-button {
+  border-color: #dfad60 !important;
+  background: linear-gradient(145deg, #74273b, #27101b) !important;
+  color: #ffe2a5 !important;
+  box-shadow:
+    inset 0 1px #fff0d52b,
+    0 0.4rem 1rem #0005 !important;
+}
+.betrayals-wallet__back.game-back-button:hover:not(:disabled) {
+  border-color: #ffe1a0 !important;
+  background: linear-gradient(145deg, #98364d, #351320) !important;
+  box-shadow:
+    inset 0 1px #fff0d533,
+    0 0 1rem #a93e4a55 !important;
 }
 .betrayals-wallet__eyebrow {
-  color: #c8ad80;
+  color: #e1b76e;
   font-size: 0.61rem;
   font-weight: 650;
   letter-spacing: 0.14em;
@@ -61,7 +64,7 @@
     serif;
 }
 .betrayals-wallet__header p {
-  color: #bdafc4;
+  color: #d2b9be;
   font-size: 0.8rem;
   line-height: 1.5;
 }

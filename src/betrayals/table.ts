@@ -23,6 +23,7 @@ import {
   publicCaseWeight,
 } from './investigationEvidence.ts'
 import { archiveInvestigationVotes, guestName } from './investigationRecords.ts'
+import { FINALE_CAST_SIZE, FINAL_SURVIVOR_COUNT } from './seasonPhases.ts'
 
 export type { Ballot } from './run.ts'
 
@@ -393,7 +394,7 @@ export function revealTable(run: Run, token: CommandToken): Run {
     ? 'settled'
     : outcome.blind
       ? 'end-vote'
-      : active.length === 5
+      : active.length === FINALE_CAST_SIZE
         ? 'final-challenge'
         : 'night'
   const revealedRole = seats.find(({ id }) => id === outcome.banishedId)?.exit?.revealedRole
@@ -430,6 +431,7 @@ export function revealTable(run: Run, token: CommandToken): Run {
     },
   }
   if (lastBetrayer) return settleRun(revealed, 'last-betrayer')
-  if (outcome.blind && active.length === 2) return settleRun(revealed, 'final-two')
+  if (outcome.blind && active.length === FINAL_SURVIVOR_COUNT)
+    return settleRun(revealed, 'final-two')
   return revealed
 }

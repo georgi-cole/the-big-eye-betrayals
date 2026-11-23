@@ -35,7 +35,7 @@
 .email-unsubscribe__home {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  width: auto;
   color: #d5c4ff;
 }
 

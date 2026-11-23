@@ -44,7 +44,7 @@
 }
 
 .betrayals-dock .betrayals-dock__side,
-.betrayals-dock .betrayals-dock__play {
+.betrayals-dock__play {
   box-sizing: border-box;
   appearance: none;
   -webkit-tap-highlight-color: transparent;
@@ -109,7 +109,7 @@
   vector-effect: non-scaling-stroke;
 }
 
-.betrayals-dock .betrayals-dock__metal-inlay {
+.betrayals-dock__metal-inlay {
   fill: #e6c590;
   stroke: #e6c590;
 }
@@ -173,7 +173,7 @@
   animation: none;
 }
 
-.betrayals-dock .betrayals-dock__play {
+.betrayals-dock__play {
   min-height: 50px;
   border: 0;
   border-radius: 14px 14px 6px 6px;
@@ -220,20 +220,22 @@
   filter: drop-shadow(0 0 6px #e7bd7766);
 }
 
-.betrayals-dock .betrayals-dock__play:enabled:hover {
+.betrayals-dock__play:enabled:hover {
   filter: brightness(1.14);
 }
 
-.betrayals-dock .betrayals-dock__play:enabled:active {
+.betrayals-dock__play:enabled:active {
   transform: scale(0.97);
 }
 
-.betrayals-dock :is(.betrayals-dock__side, .betrayals-dock__play):disabled {
+.betrayals-dock__side:disabled,
+.betrayals-dock__play:disabled {
   opacity: 0.48;
   cursor: default;
 }
 
-.betrayals-dock :is(.betrayals-dock__side, .betrayals-dock__play):focus-visible {
+.betrayals-dock__side:focus-visible,
+.betrayals-dock__play:focus-visible {
   outline: 2px solid #f7c899;
   outline-offset: 1px;
 }
@@ -254,7 +256,8 @@
     animation: none;
   }
 
-  .betrayals-dock :is(.betrayals-dock__side, .betrayals-dock__play),
+  .betrayals-dock__side,
+  .betrayals-dock__play,
   .betrayals-dock__icon-frame svg {
     transition: none;
   }

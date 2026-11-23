@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { formatEyeoleans } from '../economy/eyeoleans'
 import type { EyeoleanTransaction } from '../store/profilesSlice'
 import { BETRAYALS_PRODUCTS, type BetrayalsCurrencyProductKey } from './commerce/catalog'
@@ -115,14 +116,11 @@ export default function BetrayalsWallet({
   return (
     <section className="betrayals-wallet" aria-labelledby={titleId}>
       <header className="betrayals-wallet__header" ref={header}>
-        <button
-          type="button"
+        <GameBackButton
           className="betrayals-wallet__back"
           onClick={() => (topUp ? setTopUp(false) : onBack())}
-        >
-          <span aria-hidden="true">‹</span>
-          {topUp ? 'Back to wallet' : backLabel}
-        </button>
+          label={topUp ? 'Back to wallet' : backLabel}
+        />
         <span className="betrayals-wallet__eyebrow">Your castle currency</span>
         <h3 id={titleId} ref={title} tabIndex={-1}>
           {topUp ? 'Top up Eyeros' : 'Wallet'}

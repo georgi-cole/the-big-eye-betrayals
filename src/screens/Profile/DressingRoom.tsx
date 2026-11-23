@@ -214,12 +214,17 @@ export default function DressingRoom() {
   return (
     <>
       <main
-        className="dressing-room placeholder-screen"
+        className={
+          IS_BETRAYALS_EDITION
+            ? 'dressing-room dressing-room--betrayals placeholder-screen'
+            : 'dressing-room placeholder-screen'
+        }
         aria-hidden={lockIn ? true : undefined}
         inert={Boolean(lockIn)}
       >
         <div className="dressing-room__topbar">
           <GameBackButton
+            className="dressing-room__back"
             onClick={() =>
               navigate(backPath, {
                 state: creatingProfile ? undefined : { from: returnTo },
@@ -227,7 +232,15 @@ export default function DressingRoom() {
             }
             label={backLabel}
           />
-          <span>Changing room</span>
+          <span>
+            {IS_BETRAYALS_EDITION && (
+              <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                <path d="M23.5 10a4.5 4.5 0 1 1 4.5 4.5V17L41 25.5H7L20 17v-2.5" />
+                <path d="m11 27 2.5 14h21L37 27" />
+              </svg>
+            )}
+            Changing room
+          </span>
         </div>
         <h1>Choose your look</h1>
         <p className="dressing-room__subtitle">

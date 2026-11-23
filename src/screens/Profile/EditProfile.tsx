@@ -21,6 +21,7 @@ import { clearSeasonArchives } from '../../store/archivePersistence'
 import { withRunAutosaveSuspended } from '../../store/runAutosaveGate'
 import { persistCurrentRunSnapshot } from '../../store/store'
 import ConfirmExitModal from '../../components/ConfirmExitModal/ConfirmExitModal'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileOptionalDetails from '../../components/ProfileOptionalDetails/ProfileOptionalDetails'
 import ProfileEmailFields from '../../components/ProfileEmailFields/ProfileEmailFields'
 import {
@@ -91,6 +92,26 @@ export default function EditProfile() {
         : '/game'
   const editReturnPath = returnTo === '/profile-picker' ? '/profile-picker' : '/profile'
   const editReturnFrom = returnTo === '/profile-picker' ? '/profile' : returnTo
+
+  function handleCancel() {
+    if (creatingProfile) {
+      navigate('/profile/dressing-room', {
+        replace: true,
+        state: {
+          from: '/',
+          createProfile: true,
+          initialLookId: creationSelection.lookId,
+          adoptGuestRun: routeState?.adoptGuestRun === true,
+          ...(routeState?.fromPlayerAccount && { fromPlayerAccount: true }),
+          ...(routeState?.playerAccountId && {
+            playerAccountId: routeState.playerAccountId,
+          }),
+        },
+      })
+    } else {
+      navigate(editReturnPath, { replace: true, state: { from: editReturnFrom } })
+    }
+  }
 
   // Redirect if no profile is active
   useEffect(() => {
@@ -499,32 +520,24 @@ export default function EditProfile() {
 
       {/* Save / Cancel */}
       <div className="edit-profile__actions">
-        <button
-          type="button"
-          className="edit-profile__btn edit-profile__btn--cancel"
-          disabled={saving}
-          onClick={() => {
-            if (creatingProfile) {
-              navigate('/profile/dressing-room', {
-                replace: true,
-                state: {
-                  from: '/',
-                  createProfile: true,
-                  initialLookId: creationSelection.lookId,
-                  adoptGuestRun: routeState?.adoptGuestRun === true,
-                  ...(routeState?.fromPlayerAccount && { fromPlayerAccount: true }),
-                  ...(routeState?.playerAccountId && {
-                    playerAccountId: routeState.playerAccountId,
-                  }),
-                },
-              })
-            } else {
-              navigate(editReturnPath, { replace: true, state: { from: editReturnFrom } })
-            }
-          }}
-        >
-          {creatingProfile ? 'Back to looks' : 'Cancel'}
-        </button>
+        {creatingProfile ? (
+          <GameBackButton
+            className="edit-profile__back"
+            label="Back to looks"
+            showLabel
+            disabled={saving}
+            onClick={handleCancel}
+          />
+        ) : (
+          <button
+            type="button"
+            className="edit-profile__btn edit-profile__btn--cancel"
+            disabled={saving}
+            onClick={handleCancel}
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="button"
           className="edit-profile__btn edit-profile__btn--save"

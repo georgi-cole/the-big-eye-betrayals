@@ -1,4 +1,5 @@
 import StoreProductIcon from '../../components/StoreProductModal/StoreProductIcon'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import './VipMarketplacePreview.css'
 
 /** A clearly labelled navigation stand-in, not the production billing screen. */
@@ -14,9 +15,7 @@ export default function VipMarketplacePreview({
   return (
     <main className="room-vip-preview" aria-label="VIP marketplace preview">
       <header>
-        <button type="button" onClick={onBack} aria-label="Back to changing room" autoFocus>
-          ‹
-        </button>
+        <GameBackButton label="Back to changing room" onClick={onBack} autoFocus />
         <h1>BIGEYE MARKETFACE</h1>
       </header>
       <nav aria-label="Store categories">

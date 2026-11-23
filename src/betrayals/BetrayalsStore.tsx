@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Capacitor } from '@capacitor/core'
 import StoreProductIcon from '../components/StoreProductModal/StoreProductIcon'
 import { formatEyeoleans } from '../economy/eyeoleans'
@@ -34,6 +34,65 @@ export interface BetrayalsStoreProps {
   onSectionChange?: (section: BetrayalsStoreSection) => void
 }
 
+const STORE_TABS = [
+  { section: 'home', label: 'Featured', icon: 'publicMode', tone: 'featured' },
+  { section: 'vip', label: 'VIP', icon: 'vip', tone: 'vip' },
+  { section: 'features', label: 'Feature unlocks', icon: 'dramaMode', tone: 'features' },
+  { section: 'items', label: 'Season items', icon: 'survivalMode', tone: 'season' },
+] as const
+
+type MarketMarkTone =
+  | 'featured'
+  | 'vip'
+  | 'features'
+  | 'season'
+  | 'wallet'
+  | 'wardrobe'
+  | 'pulse'
+  | 'reality'
+  | 'noAds'
+
+function MarketMark({
+  tone,
+  className,
+  children,
+}: {
+  tone: MarketMarkTone
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <span
+      className={['betrayals-market__mark', `betrayals-market__mark--${tone}`, className]
+        .filter(Boolean)
+        .join(' ')}
+      aria-hidden="true"
+    >
+      {children}
+    </span>
+  )
+}
+
+function WalletMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" focusable="false">
+      <circle cx="24" cy="24" r="17" />
+      <circle cx="24" cy="24" r="12.5" />
+      <path d="m24 15 8 9-8 9-8-9 8-9Z" />
+      <circle cx="24" cy="24" r="2" />
+    </svg>
+  )
+}
+
+function WardrobeMark() {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" focusable="false">
+      <path d="M23.5 10a4.5 4.5 0 1 1 4.5 4.5V17l13 8.5H7L20 17v-2.5" />
+      <path d="m11 27 2.5 14h21L37 27M17 27l1.3 14m12.4-14-1.4 14" />
+    </svg>
+  )
+}
+
 export default function BetrayalsStore({
   profileId,
   profileName,
@@ -64,9 +123,6 @@ export default function BetrayalsStore({
   const activeSection = section ?? localSection
   const vip = getBetrayalsProduct('vip')
   const busy = commerce.purchasing !== null
-  const unlockedFeatures = [commerce.myPulse, commerce.realityMode, commerce.noAds].filter(
-    Boolean
-  ).length
 
   // A contextual offer is an entry request. Keeping that request in props must
   // not reopen it after the player deliberately goes Back or opens Wallet.
@@ -139,24 +195,13 @@ export default function BetrayalsStore({
     )
   }
 
-  function backToStore() {
-    return (
-      <button type="button" className="betrayals-market__back" onClick={() => openSection('home')}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m14 6-6 6 6 6M8 12h12" />
-        </svg>
-        Back to store
-      </button>
-    )
-  }
-
   function looksLink() {
     return (
       onOpenLooks && (
         <button type="button" className="betrayals-market__looks" onClick={onOpenLooks}>
-          <span className="betrayals-market__looks-mark" aria-hidden="true">
-            ✦
-          </span>
+          <MarketMark tone="wardrobe" className="betrayals-market__looks-mark">
+            <WardrobeMark />
+          </MarketMark>
           <span>
             <strong>The changing room</strong>
             <small>
@@ -188,6 +233,24 @@ export default function BetrayalsStore({
 
   return (
     <div className="betrayals-market" data-store-section={activeSection} ref={container}>
+      {activeSection !== 'wallet' && (
+        <nav className="betrayals-market__tabs" aria-label="Store categories">
+          {STORE_TABS.map((tab) => (
+            <button
+              type="button"
+              key={tab.section}
+              aria-pressed={activeSection === tab.section}
+              className={activeSection === tab.section ? 'is-active' : undefined}
+              onClick={() => openSection(tab.section)}
+            >
+              <MarketMark tone={tab.tone} className="betrayals-market__tab-mark">
+                <StoreProductIcon name={tab.icon} />
+              </MarketMark>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
       {activeSection === 'home' && (
         <section className="betrayals-market__hub" aria-label="Store overview">
           <div className="betrayals-market__heading">
@@ -201,9 +264,9 @@ export default function BetrayalsStore({
             aria-label={`Open wallet, ${formatEyeoleans(balance)} Eyeros`}
             onClick={() => openSection('wallet')}
           >
-            <span className="betrayals-market__wallet-mark" aria-hidden="true">
-              ◈
-            </span>
+            <MarketMark tone="wallet" className="betrayals-market__wallet-mark">
+              <WalletMark />
+            </MarketMark>
             <span>
               <strong>Wallet</strong>
               <small>Balance &amp; top-ups</small>
@@ -215,7 +278,9 @@ export default function BetrayalsStore({
             <span aria-hidden="true">›</span>
           </button>
           <article className="betrayals-market__vip-preview">
-            <StoreProductIcon name="vip" />
+            <MarketMark tone="vip" className="betrayals-market__vip-mark">
+              <StoreProductIcon name="vip" />
+            </MarketMark>
             <div>
               <span className="betrayals-market__eyebrow">
                 {commerce.vip ? 'VIP active' : 'One permanent unlock'}
@@ -233,48 +298,17 @@ export default function BetrayalsStore({
               {commerce.vip ? 'View VIP benefits' : 'Explore VIP'} <span aria-hidden="true">›</span>
             </button>
           </article>
-          <div className="betrayals-market__destinations">
-            <button
-              type="button"
-              className="betrayals-market__destination"
-              aria-label="Feature unlocks"
-              onClick={() => openSection('features')}
-            >
-              <StoreProductIcon name="dramaMode" />
-              <strong>Feature unlocks</strong>
-              <span>My Pulse, Reality Mode &amp; No Ads</span>
-              <small>
-                {unlockedFeatures ? `${unlockedFeatures} of 3 unlocked` : 'Choose individually'}
-              </small>
-            </button>
-            <button
-              type="button"
-              className="betrayals-market__destination"
-              aria-label="Season items"
-              onClick={() => openSection('items')}
-            >
-              <StoreProductIcon name="survivalMode" />
-              <strong>Season items</strong>
-              <span>Night Shields for your season</span>
-              <small>
-                {shield?.active
-                  ? 'Protected tonight'
-                  : shield?.available
-                    ? 'Night Shield available'
-                    : 'Spend Eyeros'}
-              </small>
-            </button>
-          </div>
           {looksLink()}
         </section>
       )}
 
       {activeSection === 'vip' && (
         <>
-          {backToStore()}
           <article className="betrayals-market__vip" data-product="vip">
             <div className="betrayals-market__vip-top">
-              <StoreProductIcon name="vip" />
+              <MarketMark tone="vip" className="betrayals-market__vip-mark">
+                <StoreProductIcon name="vip" />
+              </MarketMark>
               <span className="betrayals-market__eyebrow">
                 One-time purchase · Permanent access
               </span>
@@ -306,7 +340,6 @@ export default function BetrayalsStore({
 
       {activeSection === 'features' && (
         <>
-          {backToStore()}
           <section className="betrayals-market__section" aria-labelledby="betrayals-market-unlocks">
             <div className="betrayals-market__heading">
               <span className="betrayals-market__eyebrow">Choose your experience</span>
@@ -321,15 +354,20 @@ export default function BetrayalsStore({
                   data-product={key}
                   key={key}
                 >
-                  <StoreProductIcon
-                    name={
-                      key === 'myPulse'
-                        ? 'publicMode'
-                        : key === 'realityMode'
-                          ? 'dramaMode'
-                          : 'noAds'
-                    }
-                  />
+                  <MarketMark
+                    tone={key === 'myPulse' ? 'pulse' : key === 'realityMode' ? 'reality' : 'noAds'}
+                    className="betrayals-market__product-mark"
+                  >
+                    <StoreProductIcon
+                      name={
+                        key === 'myPulse'
+                          ? 'publicMode'
+                          : key === 'realityMode'
+                            ? 'dramaMode'
+                            : 'noAds'
+                      }
+                    />
+                  </MarketMark>
                   <div>
                     <h4>{product.title}</h4>
                     <p>{product.description}</p>
@@ -352,7 +390,6 @@ export default function BetrayalsStore({
 
       {activeSection === 'items' && (
         <>
-          {backToStore()}
           <section className="betrayals-market__section" aria-labelledby="betrayals-market-spend">
             <div className="betrayals-market__heading">
               <span className="betrayals-market__eyebrow">For your season</span>
@@ -369,7 +406,9 @@ export default function BetrayalsStore({
               <span aria-hidden="true">›</span>
             </button>
             <article className="betrayals-market__shield">
-              <StoreProductIcon name="survivalMode" />
+              <MarketMark tone="season" className="betrayals-market__product-mark">
+                <StoreProductIcon name="survivalMode" />
+              </MarketMark>
               <div>
                 <h4>Night Shield</h4>
                 <p>Protect yourself from murder for one night. Banishment votes still count.</p>

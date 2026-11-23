@@ -8,6 +8,7 @@ import { getSocialView, rapport } from './social.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
+import { FINALE_CAST_SIZE } from './seasonPhases.ts'
 
 type ConclaveProposal = {
   speakerId: string
@@ -446,7 +447,8 @@ export function revealDawn(run: Run, token: CommandToken): Run {
     day,
     lastDawn: { day, eliminatedId },
     revision: run.revision + 1,
-    phase: seats.filter(({ exit }) => !exit).length === 5 ? 'final-challenge' : 'dawn',
+    phase:
+      seats.filter(({ exit }) => !exit).length === FINALE_CAST_SIZE ? 'final-challenge' : 'dawn',
     immunityId: undefined,
     private: {
       ...run.private,

@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { unsubscribeProfileContact } from '../../services/backend/profileContact'
 import './EmailUnsubscribe.css'
 
 export default function EmailUnsubscribe() {
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const token = params.get('token') ?? ''
-  return <UnsubscribeForm key={token} token={token} />
+  return <UnsubscribeForm key={token} token={token} onBack={() => navigate('/')} />
 }
 
-function UnsubscribeForm({ token }: { token: string }) {
+function UnsubscribeForm({ token, onBack }: { token: string; onBack: () => void }) {
   const [status, setStatus] = useState<'ready' | 'saving' | 'done'>('ready')
   const [error, setError] = useState<string | null>(null)
 
@@ -57,9 +59,12 @@ function UnsubscribeForm({ token }: { token: string }) {
           {error && <p role="alert">{error}</p>}
         </>
       )}
-      <Link className="email-unsubscribe__home" to="/">
-        Back to The Big Eye
-      </Link>
+      <GameBackButton
+        className="email-unsubscribe__home"
+        label="Back to The Big Eye"
+        showLabel
+        onClick={onBack}
+      />
     </main>
   )
 }

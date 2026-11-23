@@ -162,7 +162,7 @@ describe('Betrayals private conversations', () => {
     const history = screen.getByRole('region', { name: 'Private notes' })
     fireEvent.click(within(history).getByRole('button', { name: 'Dismiss current result' }))
     expect(within(history).queryByText('Ren wanted to compare notes about Ivy.')).toBeNull()
-    fireEvent.click(within(history).getByRole('button', { name: 'History' }))
+    fireEvent.click(within(history).getByRole('button', { name: /^History/ }))
     expect(within(history).getByText('Ren wanted to compare notes about Ivy.')).toBeInTheDocument()
     expect(within(history).queryByText('Opal wanted to compare notes about Georgi.')).toBeNull()
     expect(onMove).not.toHaveBeenCalled()
@@ -189,7 +189,7 @@ describe('Betrayals private conversations', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 
-  it('offers locked profiles and advanced moves while a free player can still have a basic conversation', () => {
+  it('offers locked advanced moves while a free player can still have a basic conversation', () => {
     const onMove = vi.fn()
     const onUpgrade = vi.fn()
     const onGeneralMove = vi.fn()
@@ -218,8 +218,6 @@ describe('Betrayals private conversations', () => {
         name: /Ren/,
       })
     )
-    fireEvent.click(screen.getByRole('button', { name: /View full profile/ }))
-    expect(onUpgrade).toHaveBeenLastCalledWith('realityMode')
     fireEvent.click(screen.getByRole('button', { name: /Build trust/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Execute' }))
     expect(onMove).toHaveBeenCalledWith('rapport', undefined, 'ren')

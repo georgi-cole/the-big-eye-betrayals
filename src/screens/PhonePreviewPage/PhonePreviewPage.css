@@ -84,10 +84,8 @@
 .phone-preview-page__back {
   display: inline-flex;
   align-items: center;
-  padding: 0 0.82rem;
   font-size: 0.76rem;
   font-weight: 800;
-  text-decoration: none;
 }
 
 .phone-preview-page__devices {

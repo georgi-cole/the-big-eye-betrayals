@@ -31,22 +31,6 @@
   line-height: 1.4;
 }
 
-.betrayals-wallet-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 44px;
-  padding: 4px 10px;
-  border: 1px solid rgb(210 177 112 / 42%);
-  border-radius: 999px;
-  color: #f2d49a;
-  background: rgb(19 15 23 / 85%);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-
 .betrayals-brand-row {
   justify-content: space-between;
   gap: 8px;
@@ -60,8 +44,10 @@
 
 .betrayals-shop-page {
   min-height: 100dvh;
-  background: #101019;
-  color: #f5ead6;
+  background:
+    radial-gradient(ellipse at 50% -12%, #70283a58, transparent 48%),
+    linear-gradient(165deg, #1b0c15, #0d0a10 70%);
+  color: #f8ecdc;
   padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
 }
 
@@ -83,23 +69,12 @@
     serif;
 }
 
-.betrayals-shop-page > header button {
-  min-height: 44px;
-  padding: 0.35rem 0;
-  border: 0;
-  background: transparent;
-  color: #bcaebf;
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
+.betrayals-shop-page > header .betrayals-shop-page__back.game-back-button {
+  justify-self: start;
+  border-color: #dfad60 !important;
+  background: linear-gradient(145deg, #74273b, #27101b) !important;
+  color: #ffe2a5 !important;
 }
-
-.betrayals-shop-page > header button:focus-visible,
-.betrayals-wallet-chip:focus-visible {
-  outline: 2px solid #f6db9c;
-  outline-offset: 4px;
-}
-
 .betrayals-shop-page > .betrayals-market {
   max-width: 680px;
   margin: auto;

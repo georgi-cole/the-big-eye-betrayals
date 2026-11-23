@@ -59,7 +59,7 @@ describe('Betrayals Store journeys', () => {
     })
   })
 
-  it('opens a compact overview with destinations instead of every purchase card', () => {
+  it('opens a compact overview with persistent category tabs instead of every purchase card', () => {
     const openLooks = vi.fn()
     render(
       <BetrayalsStore
@@ -70,9 +70,12 @@ describe('Betrayals Store journeys', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: 'Store categories' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Featured' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'VIP' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Feature unlocks' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Season items' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
     expect(screen.getByRole('button', { name: /Open wallet/ })).toBeVisible()
     expect(screen.queryByRole('button', { name: /^Betrayals VIP —/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^My Pulse —/ })).not.toBeInTheDocument()
@@ -84,7 +87,7 @@ describe('Betrayals Store journeys', () => {
     expect(commerce.purchase).not.toHaveBeenCalled()
   })
 
-  it('opens VIP benefits on demand and returns to the overview', () => {
+  it('opens VIP benefits from its tab and returns to the overview tab', () => {
     render(<BetrayalsStore profileId="profile-a" />)
     fireEvent.click(screen.getByRole('button', { name: 'Explore VIP' }))
 
@@ -93,7 +96,7 @@ describe('Betrayals Store journeys', () => {
     expect(screen.queryByRole('button', { name: /^My Pulse —/ })).not.toBeInTheDocument()
     expect(commerce.purchase).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Featured' }))
     expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
     expect(screen.queryByRole('button', { name: /^Betrayals VIP —/ })).not.toBeInTheDocument()
   })
@@ -123,8 +126,11 @@ describe('Betrayals Store journeys', () => {
     (key, name) => {
       render(<BetrayalsStore profileId="profile-a" focusProduct={key} />)
       expect(screen.getByRole('button', { name })).toBeVisible()
-      fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
-      expect(screen.getByRole('button', { name: 'Feature unlocks' })).toBeVisible()
+      fireEvent.click(screen.getByRole('button', { name: 'Featured' }))
+      expect(screen.getByRole('button', { name: 'Featured' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
       expect(commerce.purchase).not.toHaveBeenCalled()
     }
@@ -240,7 +246,7 @@ describe('Betrayals Store journeys', () => {
       <BetrayalsStore section="features" focusProduct="myPulse" onSectionChange={changeSection} />
     )
     expect(screen.getByRole('button', { name: 'My Pulse — £2.49' })).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Featured' }))
     expect(changeSection).toHaveBeenLastCalledWith('home')
     expect(changeSection).toHaveBeenCalledTimes(2)
   })

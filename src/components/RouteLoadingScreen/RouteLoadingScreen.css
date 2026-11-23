@@ -79,6 +79,34 @@
   height: 100%;
   animation-delay: 0.24s;
 }
+
+.route-loading-screen[data-edition='betrayals'] {
+  color: #f1d5b0;
+  background:
+    radial-gradient(ellipse at 50% 45%, #74502d46, transparent 52%),
+    radial-gradient(ellipse at 18% 12%, #29404765, transparent 58%),
+    linear-gradient(155deg, #111b21, #151316 56%, #0c0b10);
+}
+
+.route-loading-screen[data-edition='betrayals']::after {
+  border-color: #d0a56d30;
+  box-shadow:
+    0 0 0 44px #d0a56d0c,
+    0 0 0 88px #d0a56d08;
+}
+
+.route-loading-screen[data-edition='betrayals'] p {
+  font:
+    500 1.05rem/1.4 Georgia,
+    serif;
+  letter-spacing: 0.025em;
+}
+
+.route-loading-screen[data-edition='betrayals'] .route-loading-screen__signal span {
+  background: linear-gradient(#f3d4a1, #957047);
+  box-shadow: 0 0 12px #e1ad6061;
+}
+
 @keyframes route-signal {
   to {
     opacity: 0.32;

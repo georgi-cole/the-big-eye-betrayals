@@ -12,13 +12,15 @@ type DockAction = {
   attentionKey?: string
 }
 
+type PlayAction = {
+  label: string
+  faceLabel?: string
+  onClick: () => void
+  disabled?: boolean
+}
+
 export interface BetrayalsDockProps {
-  play?: {
-    label: string
-    faceLabel?: string
-    onClick: () => void
-    disabled?: boolean
-  }
+  play?: PlayAction
   home?: DockAction
   social?: DockAction
   incoming?: DockAction
@@ -61,6 +63,26 @@ function Glyph({ target }: { target: DockTarget | 'play' }) {
         </>
       )}
     </svg>
+  )
+}
+
+export function BetrayalsPlayButton({ label, faceLabel = 'Play', onClick, disabled }: PlayAction) {
+  return (
+    <button
+      className="betrayals-dock__play"
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+    >
+      <span className="betrayals-dock__play-glyph">
+        <Glyph target="play" />
+      </span>
+      <span className="betrayals-dock__label" aria-hidden="true">
+        {faceLabel}
+      </span>
+    </button>
   )
 }
 
@@ -118,23 +140,7 @@ export function BetrayalsDock({
       <div className="betrayals-dock__shell">
         {home && <DockButton target="home" label="Home" action={home} />}
         {social && <DockButton target="social" label="Social" action={social} />}
-        {play && (
-          <button
-            className="betrayals-dock__play"
-            type="button"
-            onClick={play.onClick}
-            aria-label={play.label}
-            title={play.label}
-            disabled={play.disabled}
-          >
-            <span className="betrayals-dock__play-glyph">
-              <Glyph target="play" />
-            </span>
-            <span className="betrayals-dock__label" aria-hidden="true">
-              {play.faceLabel ?? 'Play'}
-            </span>
-          </button>
-        )}
+        {play && <BetrayalsPlayButton {...play} />}
         {incoming && (
           <DockButton target="incoming" label="Inbox" faceLabel="Inbox" action={incoming} />
         )}

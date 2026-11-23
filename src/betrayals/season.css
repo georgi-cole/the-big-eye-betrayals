@@ -111,10 +111,38 @@
 }
 
 .betrayals-wordmark {
-  gap: 8px;
-  font-size: clamp(1rem, 5vw, 1.4rem);
-  letter-spacing: -0.035em;
-  color: #f2e0ce;
+  gap: 0.32rem;
+  color: #f5dab7;
+}
+
+.betrayals-layout .betrayals-home__identity h1,
+.betrayals-wordmark__signature {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.065em;
+}
+
+.betrayals-wordmark__signature {
+  font-size: clamp(1.18rem, 5.1vw, 1.52rem);
+  line-height: 1.1;
+  text-shadow:
+    0 1px #442921,
+    0 0 0.9rem #c78f5357;
+}
+
+.betrayals-wordmark__signature::first-letter {
+  color: #f6be81;
+}
+
+.betrayals-home__identity h1::first-letter,
+.betrayals-wordmark__signature::first-letter {
+  font-size: 1.18em;
+}
+
+.betrayals-wordmark .betrayals-eye {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .betrayals-eye {
@@ -155,7 +183,7 @@
   align-items: center;
   justify-self: end;
   min-width: 0;
-  gap: clamp(3px, 1.7vw, 10px);
+  gap: 0.42rem;
 }
 
 .betrayals-phase-strip__copy {
@@ -163,6 +191,13 @@
   gap: 2px;
   min-width: 0;
   text-align: right;
+}
+
+.betrayals-phase-strip__tools {
+  display: flex;
+  align-items: center;
+  flex: none;
+  background: radial-gradient(ellipse, #d09a5430, #d09a5414 47%, transparent 75%);
 }
 
 .betrayals-phase-strip__group {
@@ -183,6 +218,7 @@
 }
 
 .betrayals-phase-strip__log,
+.betrayals-phase-strip__store,
 .betrayals-log__close {
   display: grid;
   flex: none;
@@ -203,12 +239,30 @@
 
 .betrayals-phase-strip__log:hover,
 .betrayals-phase-strip__log[aria-expanded='true'],
+.betrayals-phase-strip__store:hover,
 .betrayals-log__close:hover {
   background-color: #c6a16c1f;
   color: #fff0d4;
 }
 
+.betrayals-phase-strip__tools button {
+  inline-size: 2.03rem;
+  block-size: 2.18rem;
+  border-radius: 0.4rem;
+  background: transparent;
+}
+
+.betrayals-phase-strip__tools button:is(:hover, [aria-expanded='true']) {
+  background: radial-gradient(circle, #e3b67148, transparent 70%);
+  color: #fff0d4;
+}
+
+.betrayals-phase-strip__tools button:focus-visible {
+  outline-offset: -3px;
+}
+
 .betrayals-phase-strip__log svg,
+.betrayals-phase-strip__store svg,
 .betrayals-log__close svg,
 .betrayals-status svg {
   width: 17px;

@@ -29,11 +29,11 @@ import { getPlayableLastRun } from '../../modes/seasonRulesets'
 import { withRunAutosaveSuspended } from '../../store/runAutosaveGate'
 import { persistCurrentRunSnapshot } from '../../store/store'
 import ConfirmExitModal from '../../components/ConfirmExitModal/ConfirmExitModal'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { resizeAndCompressImage } from '../../utils/imageUtils'
 import { imageIdToDataUrl, saveImage } from '../../utils/imageDb'
 import { pruneProfilePhotos } from '../../utils/imageDb'
 import { savedProfilePhotoIds } from '../../appearance/profilePhotos'
-import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileSeasonStatus from '../../components/ProfileSeasonStatus/ProfileSeasonStatus'
 import { IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
 import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
@@ -870,16 +870,15 @@ export default function ProfilePicker() {
                     />
                     <ProfileOptionalDetails value={newBio} onChange={setNewBio} />
                     <div className="profile-picker__create-actions">
-                      <button
-                        type="button"
-                        className="profile-picker__btn--cancel"
+                      <GameBackButton
+                        className="profile-picker__create-back"
+                        label="Back to looks"
+                        showLabel
                         disabled={savingProfile}
                         onClick={() => {
                           setCreateStep('look')
                         }}
-                      >
-                        Back to looks
-                      </button>
+                      />
                       <button
                         type="button"
                         className="profile-picker__btn profile-picker__btn--create"

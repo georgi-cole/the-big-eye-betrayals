@@ -11,6 +11,7 @@ import type { BetrayalsRewardEvent } from './economy'
 export type BetrayalsWallet = {
   balance: number
   transactions?: readonly EyeoleanTransaction[]
+  recordedTransactionIds?: readonly string[]
   claimRewards: (events: readonly BetrayalsRewardEvent[]) => Promise<boolean>
   spend: (
     transactionId: string,
@@ -35,11 +36,11 @@ export function createBetrayalsWallet(
   async function persist() {
     return saveProfilesStateChecked(source.getState().profiles) && (await flushDurablePersistence())
   }
+  const profile = source.getState().profiles.profiles.find((entry) => entry.id === profileId)
   return {
     balance,
-    transactions:
-      source.getState().profiles.profiles.find((profile) => profile.id === profileId)
-        ?.eyeoleanTransactions ?? [],
+    transactions: profile?.eyeoleanTransactions ?? [],
+    recordedTransactionIds: profile?.betrayalsWalletTransactionIds ?? [],
     async claimRewards(events) {
       if (!source.getState().profiles.profiles.some((profile) => profile.id === profileId))
         return false

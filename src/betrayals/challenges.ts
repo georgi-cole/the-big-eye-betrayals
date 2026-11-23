@@ -4,6 +4,7 @@ import type { CommandToken, Run } from './run.ts'
 import { prepareShieldConversations } from './shieldSocial.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
 import { recordBetrayalsChallengeRewards } from './economy.ts'
+import { NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 
 export type RankedScore = {
   contestantId: string
@@ -103,7 +104,9 @@ export function resolveChallenge(
     )
   }
   if (run.phase === 'safety') {
-    const nightShieldIds = standings.slice(0, 2).map(({ contestantId }) => contestantId)
+    const nightShieldIds = standings
+      .slice(0, NIGHT_SHIELD_COUNT)
+      .map(({ contestantId }) => contestantId)
     return recordBetrayalsChallengeRewards(
       run,
       prepareShieldConversations({
@@ -142,7 +145,7 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
   const names = new Map(view.seats.map(({ id, name }) => [id, name]))
   return standings.rows.map(({ contestantId, score, forfeited }, index) => {
     const own = activeViewer && contestantId === actorId
-    const shield = index < 2
+    const shield = index < NIGHT_SHIELD_COUNT
     const revealName =
       standings.publicResults || own || (shield && view.teammateIds.includes(contestantId))
     return {

@@ -117,21 +117,23 @@ describe('Betrayals Store and Wallet routes', () => {
     expect(commerce.purchase).not.toHaveBeenCalled()
   })
 
-  it('updates section deep links and restores the right section through browser Back', async () => {
+  it('updates section deep links through the persistent category tabs', () => {
     const { router } = setup('/store/features')
     expect(screen.getByRole('heading', { name: 'My Pulse' })).toBeVisible()
-    expect(screen.queryByRole('button', { name: 'Explore VIP' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
+    expect(screen.getByRole('button', { name: 'Feature unlocks' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Featured' }))
     expect(router.state.location.pathname).toBe('/store')
+    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Season items' }))
     expect(router.state.location.pathname).toBe('/store/items')
     expect(screen.getByRole('heading', { name: 'Night Shield' })).toBeVisible()
-    await act(async () => router.navigate(-1))
-    expect(router.state.location.pathname).toBe('/store')
-    expect(screen.getByRole('button', { name: 'Explore VIP' })).toBeVisible()
-    await act(async () => router.navigate(-1))
-    expect(router.state.location.pathname).toBe('/store/features')
-    expect(screen.getByRole('heading', { name: 'My Pulse' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Season items' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
   })
 
   it('keeps top-ups disabled without a profile and routes profile selection back to Wallet', () => {
@@ -153,7 +155,6 @@ describe('Betrayals Store and Wallet routes', () => {
       state: { returnTo: '/profile/dressing-room', returnState },
     })
     expect(screen.getByRole('heading', { name: 'Betrayals VIP' })).toBeVisible()
-    fireEvent.click(screen.getByRole('button', { name: 'Back to store' }))
     fireEvent.click(screen.getByRole('button', { name: 'Feature unlocks' }))
     expect(router.state.location.pathname).toBe('/store/features')
     fireEvent.click(screen.getByRole('button', { name: 'Back to changing room' }))

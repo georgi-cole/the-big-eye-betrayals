@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { ageBandForAge, declarePlayerAge } from '../../safety/playerSafety'
 import { usePlayerSafety } from '../../safety/usePlayerSafety'
 import { usesContextualAdTreatment } from './adAudience'
@@ -147,21 +148,21 @@ export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: 
           <a href="mailto:kolequant@gmail.com?subject=The%20Big%20Eye%20ad%20report">
             Report an ad
           </a>
-          <button
-            type="button"
-            className="player-safety__secondary"
+          <GameBackButton
+            label={
+              returnToCompetition
+                ? 'Back to competition'
+                : betrayals
+                  ? 'Back to Betrayals'
+                  : 'Back to settings'
+            }
+            showLabel
             onClick={() => {
               if (returnToCompetition) navigate('/game', { replace: true })
               else if (openedFromSettings) navigate(-1)
               else navigate(betrayals ? '/' : '/settings', { replace: true })
             }}
-          >
-            {returnToCompetition
-              ? 'Back to competition'
-              : betrayals
-                ? 'Back to Betrayals'
-                : 'Back to settings'}
-          </button>
+          />
         </div>
       </section>
     </main>

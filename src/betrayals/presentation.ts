@@ -59,6 +59,24 @@ export type NightRoom = {
   silhouette: 'narrow' | 'broad'
 }
 
+const dawnLossLines = [
+  (name: string) => `Everyone looked around. ${name} was nowhere to be found.`,
+  (name: string) => `The sun came up, but ${name} didn’t.`,
+  (name: string) => `The guests gathered at dawn. ${name}’s chair stayed empty.`,
+  (name: string) => `Morning light reached the castle. ${name} never walked through the door.`,
+]
+
+export function dawnBroadcast(run: Pick<Run, 'lastDawn' | 'seats' | 'publicSeed'>) {
+  if (!run.lastDawn) return 'The observatory opens.'
+  const { day, eliminatedId } = run.lastDawn
+  if (!eliminatedId) return 'Everyone returned.'
+  const guest = run.seats.find(({ id }) => id === eliminatedId)
+  if (!guest) return 'One guest was missing when the castle woke.'
+  // Keep the broadcast consistent if the player reloads or revisits this morning.
+  const variant = ((run.publicSeed >>> 0) + day) % dawnLossLines.length
+  return dawnLossLines[variant](guest.name)
+}
+
 export function castleWeather(run: Run, day = run.day): CastleWeather {
   const mix = Math.imul(run.publicSeed ^ Math.imul(day, 3851), 0x45d9f3b)
   return weather[((mix ^ (mix >>> 16)) >>> 0) % weather.length]
@@ -119,6 +137,7 @@ export function cinematicFor(
       return {
         ...scene,
         subject: subject ? guests([subject])[0] : undefined,
+        openingTitle: beforeDawn ? undefined : 'What happened during the night…',
         // The same night always gets the same view, independent of the victim.
         nightRoom: {
           sky: nightSkies[skyIndex % nightSkies.length],
