@@ -7,13 +7,11 @@ import {
   useBetrayalsUtilities,
 } from './betrayalsPreferences'
 import { BetrayalsUtilityChips, BetrayalsUtilityPanel } from './BetrayalsUtilities'
-import type { Phase } from './run'
 
 vi.mock('../services/sound/SoundManager', () => ({
   SoundManager: {
     init: vi.fn(),
     unlockFromGesture: vi.fn(),
-    stopAllMusic: vi.fn(),
     setMusicVolume: vi.fn(),
     setMusicMuted: vi.fn(),
     setDesiredMusic: vi.fn(),
@@ -23,8 +21,8 @@ vi.mock('../services/sound/SoundManager', () => ({
   },
 }))
 
-function UtilitiesHarness({ phase, playing }: { phase?: Phase; playing?: boolean }) {
-  const utilities = useBetrayalsUtilities(phase, playing)
+function UtilitiesHarness() {
+  const utilities = useBetrayalsUtilities()
   return (
     <>
       <BetrayalsUtilityChips utilities={utilities} />
@@ -51,22 +49,30 @@ describe('Betrayals game controls', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('starts the phase soundtrack on demand and releases it during a challenge', () => {
-    const view = render(<UtilitiesHarness phase="dawn" />)
-    const music = screen.getByRole('button', { name: 'Music', pressed: false })
+  it('enables music by default and remembers when a player turns it off', () => {
+    const view = render(<UtilitiesHarness />)
+    const music = screen.getByRole('button', { name: 'Music', pressed: true })
     fireEvent.click(music)
-    expect(music).toHaveAttribute('aria-pressed', 'true')
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('nominations', 'betrayals')
+    expect(music).toHaveAttribute('aria-pressed', 'false')
+    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(true)
     expect(SoundManager.unlockFromGesture).toHaveBeenCalled()
-
-    view.rerender(<UtilitiesHarness phase="immunity" playing />)
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('none', 'betrayals')
-    view.rerender(<UtilitiesHarness phase="night" />)
-    expect(SoundManager.setDesiredMusic).toHaveBeenLastCalledWith('nominations_horror', 'betrayals')
+    expect(vi.mocked(SoundManager.setDesiredMusic).mock.calls).toEqual([['none', 'betrayals']])
 
     view.unmount()
-    render(<UtilitiesHarness phase="night" />)
+    render(<UtilitiesHarness />)
+    expect(screen.getByRole('button', { name: 'Music', pressed: false })).toBeInTheDocument()
+  })
+
+  it('replaces the old music default and keeps other saved preferences', () => {
+    localStorage.setItem(
+      'betrayals.preferences.v1',
+      JSON.stringify({ musicOn: false, musicVolume: 0.2, soundOn: false })
+    )
+    render(<UtilitiesHarness />)
     expect(screen.getByRole('button', { name: 'Music', pressed: true })).toBeInTheDocument()
+    expect(SoundManager.setMusicMuted).toHaveBeenLastCalledWith(false)
+    expect(SoundManager.setMusicVolume).toHaveBeenLastCalledWith(0.2)
+    expect(SoundManager.setCategoryEnabled).toHaveBeenCalledWith('tv', false)
   })
 
   it('applies sound and motion settings, then restores them on the next visit', () => {

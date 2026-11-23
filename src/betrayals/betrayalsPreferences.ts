@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { isBetrayalsLook, type BetrayalsLookId } from './betrayalsAppearance'
 import { SFX_SOUND_CATEGORIES } from '../services/sound/audioSettingsSync'
-import type { MusicTrack } from '../services/sound/musicTracks'
 import { SoundManager } from '../services/sound/SoundManager'
-import type { Phase, RealityPreset, RunOptions } from './run'
+import type { RealityPreset, RunOptions } from './run'
 
 const STORAGE_KEY = 'betrayals.preferences.v1'
+const MUSIC_PREFERENCE_VERSION = 2
 
 export { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance'
 type UtilityPanel = 'settings' | 'store' | 'achievements'
@@ -22,29 +22,13 @@ type Preferences = {
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
-  musicOn: false,
+  musicOn: true,
   musicVolume: 0.45,
   soundOn: true,
   soundVolume: 0.55,
   reducedMotion: false,
   lookId: null,
 }
-
-const PHASE_MUSIC = {
-  'role-reveal': 'season_start',
-  dawn: 'nominations',
-  social: 'social',
-  immunity: 'competition',
-  safety: 'competition',
-  'round-table': 'nominations',
-  'table-reveal': 'nominations_horror',
-  night: 'nominations_horror',
-  'night-resolved': 'nominations_horror',
-  'final-challenge': 'competition',
-  'final-banishment': 'final_three_week',
-  'end-vote': 'final_three_week',
-  settled: 'final_modal',
-} satisfies Record<Phase, MusicTrack>
 
 function validVolume(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -59,10 +43,13 @@ export function isSeasonRealityMode(value: unknown): value is 'off' | 'casual' |
 function readPreferences(): Preferences {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    const saved: Partial<Preferences> | null = raw ? JSON.parse(raw) : null
+    const saved: (Partial<Preferences> & { musicPreferenceVersion?: number }) | null = raw
+      ? JSON.parse(raw)
+      : null
     if (!saved) return DEFAULT_PREFERENCES
     return {
-      musicOn: saved.musicOn === true,
+      // The original default saved false even before the player touched the control.
+      musicOn: saved.musicPreferenceVersion !== MUSIC_PREFERENCE_VERSION || saved.musicOn !== false,
       musicVolume: validVolume(saved.musicVolume, DEFAULT_PREFERENCES.musicVolume),
       soundOn: saved.soundOn !== false,
       soundVolume: validVolume(saved.soundVolume, DEFAULT_PREFERENCES.soundVolume),
@@ -79,10 +66,9 @@ function readPreferences(): Preferences {
   }
 }
 
-export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeason?: RunOptions) {
+export function useBetrayalsUtilities(lastSeason?: RunOptions) {
   const [preferences, setPreferences] = useState(readPreferences)
   const [panel, setPanel] = useState<UtilityPanel | null>(null)
-  const track = phase ? PHASE_MUSIC[phase] : 'nominations'
   const { musicOn, musicVolume, soundOn, soundVolume } = preferences
   const seasonOptions: RunOptions = {
     publicMode: preferences.seasonPublicMode ?? lastSeason?.publicMode ?? false,
@@ -93,6 +79,8 @@ export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeas
 
   useEffect(() => {
     void SoundManager.init()
+    // Scene themes are owned by the Betrayals soundtrack controller.
+    void SoundManager.setDesiredMusic('none', 'betrayals')
 
     function removeUnlockListeners() {
       document.removeEventListener('click', unlock, true)
@@ -106,15 +94,15 @@ export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeas
 
     document.addEventListener('click', unlock, true)
     document.addEventListener('keydown', unlock, true)
-    return () => {
-      removeUnlockListeners()
-      SoundManager.stopAllMusic()
-    }
+    return removeUnlockListeners
   }, [])
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences))
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...preferences, musicPreferenceVersion: MUSIC_PREFERENCE_VERSION })
+      )
     } catch {
       // Use the current session's preferences when browser storage is unavailable.
     }
@@ -127,10 +115,6 @@ export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeas
   useEffect(() => {
     SoundManager.setMusicMuted(!musicOn)
   }, [musicOn])
-
-  useEffect(() => {
-    void SoundManager.setDesiredMusic(musicOn && !suspended ? track : 'none', 'betrayals')
-  }, [musicOn, suspended, track])
 
   useEffect(() => {
     for (const category of SFX_SOUND_CATEGORIES) {

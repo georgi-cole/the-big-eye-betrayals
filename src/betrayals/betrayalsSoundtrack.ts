@@ -383,7 +383,7 @@ export class BetrayalsSoundtrackController {
   }
 }
 
-export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene): void {
+export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene | null): void {
   const controllerRef = useRef<BetrayalsSoundtrackController | null>(null)
 
   useEffect(() => {
@@ -404,10 +404,10 @@ export function useBetrayalsSoundtrack(scene: BetrayalsMusicScene): void {
       SoundManager.unlockFromGesture()
       controllerRef.current?.resumeFromGesture()
     }
-    document.addEventListener('pointerdown', unlockAndResume, true)
+    document.addEventListener('click', unlockAndResume, true)
     document.addEventListener('keydown', unlockAndResume, true)
     return () => {
-      document.removeEventListener('pointerdown', unlockAndResume, true)
+      document.removeEventListener('click', unlockAndResume, true)
       document.removeEventListener('keydown', unlockAndResume, true)
     }
   }, [])

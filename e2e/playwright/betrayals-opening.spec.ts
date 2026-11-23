@@ -1,5 +1,46 @@
 import { expect, test } from '@playwright/test'
 
+test('the Pages landing route plays the full Betrayals intro soundtrack', async ({ page }) => {
+  const originalMusicRequests: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.includes('/assets/music/')) {
+      originalMusicRequests.push(request.url())
+    }
+  })
+  await page.addInitScript(() => {
+    const play = HTMLMediaElement.prototype.play
+    HTMLMediaElement.prototype.play = async function (this: HTMLMediaElement) {
+      if (this instanceof HTMLAudioElement && this.src.includes('/music/streamed/')) {
+        document.documentElement.dataset.attemptedSoundtrack = this.src
+      }
+      await play.call(this)
+      if (this instanceof HTMLAudioElement) {
+        const record = () => {
+          if (!this.paused && this.volume > 0) {
+            document.documentElement.dataset.playingAudio = this.currentSrc
+          }
+        }
+        record()
+        this.addEventListener('volumechange', record)
+      }
+    }
+  })
+
+  await page.goto('./#/')
+  await expect(page.getByRole('heading', { name: 'Betrayals', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Music', pressed: true })).toBeVisible()
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-attempted-soundtrack',
+    /\/introhub-main-the-four-note-motif\.mp3$/
+  )
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-playing-audio',
+    /\/assets\/betrayals\/music\/streamed\/introhub-main-the-four-note-motif\.mp3$/
+  )
+  expect(originalMusicRequests).toEqual([])
+})
+
 for (const viewport of [
   { width: 390, height: 844 },
   { width: 320, height: 568 },

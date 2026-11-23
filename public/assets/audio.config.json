@@ -1,5 +1,30 @@
 {
   "version": 1,
+  "unbundledMusic": [
+    "music/challenge_group_1.mp3",
+    "music/competition.mp3",
+    "music/dressing_room.mp3",
+    "music/final_modal.mp3",
+    "music/final_three_week.mp3",
+    "music/glass_bridge.mp3",
+    "music/jury_voting.mp3",
+    "music/move into me confessional.mp3",
+    "music/move into me instrumental general.mp3",
+    "music/nominations_horror.mp3",
+    "music/nominations.mp3",
+    "music/public_voting.mp3",
+    "music/quick_tap.mp3",
+    "music/risk_wheel.mp3",
+    "music/season_recap.mp3",
+    "music/season_start.mp3",
+    "music/social.mp3",
+    "music/veto.mp3",
+    "music/weekend_1.mp3",
+    "music/weekend_2.mp3",
+    "music/weekend_3.mp3",
+    "music/wildcard_western.mp3",
+    "sounds/cinematic/Intro_hub_loop.mp3"
+  ],
   "featureAliases": [
     "risk_wheel",
     "quick_tap",
@@ -135,14 +160,6 @@
       "loop": false
     },
     {
-      "path": "sounds/minigames/move_into_me_alternative.mp3",
-      "key": "minigame:move_into_me_alternative",
-      "category": "minigame",
-      "preload": false,
-      "volume": 1,
-      "loop": false
-    },
-    {
       "path": "sounds/minigames/minigame_quicktap_booster.mp3",
       "key": "minigame:quicktap_booster",
       "category": "minigame",
@@ -225,14 +242,6 @@
     {
       "path": "sounds/minigames/minigame_risk_wheel_winner.mp3",
       "key": "minigame:risk_wheel_winner",
-      "category": "minigame",
-      "preload": false,
-      "volume": 1,
-      "loop": false
-    },
-    {
-      "path": "sounds/minigames/social_module_original.mp3",
-      "key": "minigame:social_module_original",
       "category": "minigame",
       "preload": false,
       "volume": 1,

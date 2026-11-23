@@ -186,14 +186,14 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     if (inboxReads) setDurableItem(inboxReadsKey, JSON.stringify(inboxReads))
   }, [inboxReads, inboxReadsKey])
 
-  const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing, run?.options)
+  const utilities = useBetrayalsUtilities(run?.options)
   const systemReducedMotion = usePresentationReducedMotion()
   const playNightFilm = !utilities.preferences.reducedMotion && !systemReducedMotion
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = profiles ? player?.portrait : getBetrayalsPortrait(utilities.preferences.lookId)
   const needsLook = Boolean(profiles && !portrait)
   const soundtrackScene = resolveBetrayalsSoundtrackScene(run, homeOpen, run?.presentation?.[0])
-  useBetrayalsSoundtrack(soundtrackScene)
+  useBetrayalsSoundtrack(utilities.preferences.musicOn && !playing ? soundtrackScene : null)
 
   function openIncoming() {
     utilities.playEffect('ui:navigate', 0.45)
