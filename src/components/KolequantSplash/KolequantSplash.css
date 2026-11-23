@@ -197,6 +197,11 @@
   transition: width 180ms linear;
 }
 
+.kq-splash[data-splash-variant='lanterns'] .kq-splash__bar-fill {
+  background: linear-gradient(90deg, #f7d5aa, #d08a53);
+  box-shadow: 0 0 16px #e3a15d66;
+}
+
 .kq-splash__footer {
   position: absolute;
   z-index: 1;

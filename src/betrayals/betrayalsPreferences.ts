@@ -8,7 +8,7 @@ import type { Phase, RealityPreset, RunOptions } from './run'
 const STORAGE_KEY = 'betrayals.preferences.v1'
 
 export { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance'
-type UtilityPanel = 'settings' | 'store'
+type UtilityPanel = 'settings' | 'store' | 'achievements'
 
 type Preferences = {
   musicOn: boolean

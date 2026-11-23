@@ -249,6 +249,50 @@
   content: '';
 }
 
+.betrayals-home__secondary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.betrayals-home__secondary button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid #aa80505c;
+  border-radius: 0.58rem;
+  background: linear-gradient(155deg, #2f2424e8, #19171ee8 76%);
+  color: #f3dec4;
+  box-shadow: inset 0 1px #f2c29412;
+  font:
+    620 clamp(0.72rem, 3.6vw, 0.83rem) system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.betrayals-home__secondary button:is(:hover, :focus-visible) {
+  border-color: #d4a671aa;
+  color: #fff0d9;
+}
+
+.betrayals-home__link.betrayals-home__help {
+  display: grid;
+  place-items: center;
+  color: #c5ad94;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.betrayals-home__link.betrayals-home__help:is(:hover, :focus-visible) {
+  color: #fff0d5;
+  text-decoration: underline;
+  text-underline-offset: 0.24em;
+}
+
 .betrayals-home__link {
   justify-self: center;
   min-height: 2.75rem;
@@ -281,4 +325,10 @@
   .betrayals-home__flame::after {
     animation: none;
   }
+}
+
+.betrayals-home[data-betrayals-motion='reduced'] .betrayals-home__lantern::before,
+.betrayals-home[data-betrayals-motion='reduced'] .betrayals-home__flame,
+.betrayals-home[data-betrayals-motion='reduced'] .betrayals-home__flame::after {
+  animation: none;
 }
