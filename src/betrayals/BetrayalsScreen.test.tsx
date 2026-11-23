@@ -122,6 +122,36 @@ describe('Betrayals season review', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
+  it('opens the paired Home Hub destinations from a profile', () => {
+    const openDressingRoom = vi.fn()
+    sessionStorage.setItem('betrayals.observatoryOpening.v1', 'true')
+    render(
+      <BetrayalsScreen
+        profiles={{
+          player: { id: 'intro-profile', name: 'Georgi', portrait: '/georgi.webp' },
+          openProfile: vi.fn(),
+          openAccount: vi.fn(),
+          openDressingRoom,
+        }}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Start season' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Help & Feedback' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('mailto:kolequant@gmail.com')
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Achievements' }))
+    const achievements = within(screen.getByRole('dialog', { name: 'Achievements' }))
+    expect(achievements.getByText('Enter the castle').parentElement).toHaveTextContent('Locked')
+    fireEvent.click(achievements.getByRole('button', { name: 'Close achievements' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Store' }))
+    const store = within(screen.getByRole('dialog', { name: 'Store' }))
+    fireEvent.click(store.getByRole('button', { name: 'The Heiress' }))
+    expect(openDressingRoom).toHaveBeenCalledWith('pc-015')
+  })
+
   it('takes over Tilt Labyrinth results once, preserving the time, ranking and shields', async () => {
     const initial = startRun(
       { id: 'human', name: 'Georgi' },
