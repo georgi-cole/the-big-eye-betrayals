@@ -12,6 +12,7 @@ import { isGuestSaveReminderEvent } from '../../store/guestSaveReminder'
 import { selectCurrentProfile, selectIsGuest } from '../../store/profilesSlice'
 import { imageIdToDataUrl } from '../../utils/imageDb'
 import { isPlayerSignInConfigured } from '../../services/backend/config'
+import { betrayalsProfileArt, IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
 import './Profile.css'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 
@@ -38,10 +39,11 @@ export default function Profile() {
   const isGameActive = useAppSelector((s) => s.game.status === 'active')
   const userPlayer = useAppSelector((s) => s.game.players.find((p) => p.isUser) ?? null)
   const gameInProgress =
-    isGameActive || week > 1 || (phase !== 'season_start' && phase !== 'week_start')
-  const returnTo = (location.state as { from?: string } | null)?.from === '/' ? '/' : '/game'
+    !IS_BETRAYALS_EDITION &&
+    (isGameActive || week > 1 || (phase !== 'season_start' && phase !== 'week_start'))
+  const returnTo = IS_BETRAYALS_EDITION || routeState?.from === '/' ? '/' : '/game'
   const goBack = () => navigate(returnTo, { replace: true })
-  const showAccount = isPlayerSignInConfigured()
+  const showAccount = IS_BETRAYALS_EDITION || isPlayerSignInConfigured()
   const openAccount = () => navigate('/profile/account', { state: { profileFrom: returnTo } })
 
   useEffect(() => {
@@ -73,14 +75,14 @@ export default function Profile() {
   }, [profile?.photoId])
 
   useEffect(() => {
-    if (!profile && !isGuest)
-      navigate(showAccount ? '/profile/account' : '/profile-picker', {
+    if (!profile && (!isGuest || IS_BETRAYALS_EDITION))
+      navigate(showAccount && !IS_BETRAYALS_EDITION ? '/profile/account' : '/profile-picker', {
         replace: true,
-        state: showAccount ? { entryFrom: returnTo } : { from: returnTo },
+        state: showAccount && !IS_BETRAYALS_EDITION ? { entryFrom: returnTo } : { from: returnTo },
       })
   }, [profile, isGuest, showAccount, returnTo, navigate])
 
-  if (isGuest) {
+  if (isGuest && !IS_BETRAYALS_EDITION) {
     return (
       <div className="placeholder-screen profile-screen">
         <div className="profile-screen__guest-banner">
@@ -140,7 +142,7 @@ export default function Profile() {
   const currentSelection = userPlayer?.appearance ?? appearanceFromAssetUrl(userPlayer?.avatar)
   const heroSelection =
     gameInProgress && userPlayer ? currentSelection : profile.appearanceSelection
-  const heroAsset = getAppearanceAsset(heroSelection, 'casual')
+  const heroAsset = getAppearanceAsset(heroSelection, IS_BETRAYALS_EDITION ? 'formal' : 'casual')
   const heroFigure = heroAsset ? joinPublicAssetPath(heroAsset) : null
   const heroLook =
     heroSelection?.kind === 'catalog'
@@ -187,7 +189,7 @@ export default function Profile() {
         <div
           className="profile-screen__hero"
           style={{
-            backgroundImage: `linear-gradient(90deg, rgba(18, 13, 25, 0.2) 0%, rgba(18, 13, 25, 0.1) 50%, rgba(18, 13, 25, 0.02) 82%), linear-gradient(0deg, rgba(13, 10, 18, 0.32), transparent 24%), url("${joinPublicAssetPath('assets/dressing-room/profile-scene.webp')}")`,
+            backgroundImage: `linear-gradient(90deg, rgba(18, 13, 25, 0.2) 0%, rgba(18, 13, 25, 0.1) 50%, rgba(18, 13, 25, 0.02) 82%), linear-gradient(0deg, rgba(13, 10, 18, 0.32), transparent 24%), url("${joinPublicAssetPath(IS_BETRAYALS_EDITION ? betrayalsProfileArt : 'assets/dressing-room/profile-scene.webp')}")`,
             backgroundPosition: 'center top',
             backgroundRepeat: 'no-repeat',
             backgroundSize: 'cover',

@@ -14,7 +14,7 @@
   margin-block-end: 6px;
 }
 
-.betrayals-dock__utility:has(.betrayals-dock__vote-slot:empty) {
+.betrayals-dock__utility:has(.betrayals-dock__vote-slot:only-child:empty) {
   display: none;
 }
 

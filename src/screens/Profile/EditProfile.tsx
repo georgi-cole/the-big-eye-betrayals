@@ -30,6 +30,7 @@ import {
 import { normalizeProfileBio } from '../../components/ProfileOptionalDetails/profileBio'
 import ProfilePhotoPreview from '../../components/ProfilePhotoPreview/ProfilePhotoPreview'
 import { coerceAppearanceSelection, type AppearanceSelection } from '../../appearance/catalog'
+import { IS_BETRAYALS_EDITION, isBetrayalsLook } from '../../betrayals/betrayalsAppearance'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
 import { warmSelectedAppearance } from '../../appearance/preloadAppearance'
@@ -73,14 +74,18 @@ export default function EditProfile() {
   const creatingProfile =
     routeState?.createProfile === true &&
     creationSelection.kind === 'catalog' &&
-    hasAppearanceLookAccess(creationSelection.lookId, null, isVip)
+    (IS_BETRAYALS_EDITION
+      ? isBetrayalsLook(creationSelection.lookId)
+      : hasAppearanceLookAccess(creationSelection.lookId, null, isVip))
   const requestedReturnTo = routeState?.from
   const returnTo =
     requestedReturnTo === '/' ||
     requestedReturnTo === '/profile' ||
     requestedReturnTo === '/profile-picker'
       ? requestedReturnTo
-      : '/game'
+      : IS_BETRAYALS_EDITION
+        ? '/'
+        : '/game'
   const editReturnPath = returnTo === '/profile-picker' ? '/profile-picker' : '/profile'
   const editReturnFrom = returnTo === '/profile-picker' ? '/profile' : returnTo
 
@@ -236,7 +241,9 @@ export default function EditProfile() {
         )
           return
         if (!canCommit()) return
-        if (routeState?.adoptGuestRun) {
+        if (IS_BETRAYALS_EDITION) {
+          withRunAutosaveSuspended(() => dispatch(createProfile(accountProfileDetails)))
+        } else if (routeState?.adoptGuestRun) {
           withRunAutosaveSuspended(() => dispatch(createProfile(accountProfileDetails)))
           persistCurrentRunSnapshot()
           await flushSavePersistence()

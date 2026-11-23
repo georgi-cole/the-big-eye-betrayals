@@ -1,29 +1,44 @@
+.betrayals-roster__portrait,
+.betrayals-cine__tile {
+  container-type: size;
+  --betrayals-portrait-focus-y: 0.42;
+}
+
 .betrayals-sleep-mask {
   position: absolute;
   z-index: 1;
-  inset: var(--sleep-mask-top, 33%) auto auto 50%;
-  width: 64%;
-  height: 24%;
-  border: 1px solid #83758c;
-  border-radius: 38% 38% 46% 46% / 56% 56% 70% 70%;
-  background: radial-gradient(ellipse at 50% 0%, #534358, #221b2b 55%, #0d0c18 100%);
-  box-shadow:
-    inset 0 -2px #62536c66,
-    0 2px 6px #0a0611a0;
-  transform: translateX(-50%);
   pointer-events: none;
 }
 
-.betrayals-sleep-mask[data-symbolic] {
-  inset: 27% auto auto 50%;
-  width: 29%;
+.betrayals-sleep-mask:not([data-symbolic]) {
+  /* Project the fit through the same square cover crop as the portrait. */
+  --sleep-portrait-size: max(100cqw, 100cqh);
+  left: calc(50% + var(--sleep-portrait-size) * var(--sleep-eye-x));
+  top: calc(
+    var(--betrayals-portrait-focus-y) * 100% + var(--sleep-portrait-size) *
+      (var(--sleep-eye-y) - var(--betrayals-portrait-focus-y))
+  );
+  width: calc(var(--sleep-portrait-size) * var(--sleep-mask-width));
+  filter: drop-shadow(0 1px 3px #04050ac0);
+  transform: translate(-50%, -50%) rotate(var(--sleep-mask-angle));
+}
+
+.betrayals-sleep-mask > img {
+  display: block;
+  width: 100%;
   height: auto;
-  aspect-ratio: 1;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: inset 2px 3px #d4cee9;
-  transform: translateX(-50%) rotate(-24deg);
+}
+
+.betrayals-sleep-mask[data-symbolic] {
+  inset: 24% 18% auto auto;
+}
+
+.betrayals-sleep-mask[data-symbolic]::after {
+  color: #c4d6f0;
+  content: 'Zz';
+  font:
+    italic 700 0.65rem Georgia,
+    serif;
 }
 
 .betrayals-cine__tile[data-awake='true'] .betrayals-sleep-mask {

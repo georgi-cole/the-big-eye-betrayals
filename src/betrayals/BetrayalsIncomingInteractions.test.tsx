@@ -45,6 +45,7 @@ describe('Betrayals incoming inbox', () => {
           onClose={() => {}}
           onRespond={(id, response) => {
             onMove(id, response)
+            if (response === 'request-shield' || response === 'ask-shield-plans') return
             setItems((current) =>
               current.map((item) => (item.id === id ? { ...item, response } : item))
             )

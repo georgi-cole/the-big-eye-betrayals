@@ -8,6 +8,7 @@ export interface BetrayalsBroadcastProps {
   cueKey?: string | number
   mode?: 'default' | 'ceremony' | 'night' | 'daybreak' | 'immunity' | 'safety' | 'finale'
   art?: string
+  opener?: ReactNode
   interactive?: boolean
 }
 
@@ -18,6 +19,7 @@ export function BetrayalsBroadcast({
   cueKey,
   mode = 'default',
   art,
+  opener,
   interactive = false,
 }: BetrayalsBroadcastProps) {
   return (
@@ -29,6 +31,7 @@ export function BetrayalsBroadcast({
     >
       <div className="betrayals-broadcast__glass">
         {art && <img key={art} className="betrayals-broadcast__art" src={art} alt="" />}
+        {opener}
         <div className="betrayals-broadcast__grain" aria-hidden="true" />
         <span className="betrayals-broadcast__lamp" aria-hidden="true" />
         <div

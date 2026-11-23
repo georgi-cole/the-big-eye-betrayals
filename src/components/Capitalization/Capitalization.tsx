@@ -51,11 +51,7 @@ const CAPITALIZATION_CONTINENT_ART: Record<CapitalizationContinent, string> = {
 }
 
 type CapitalizationPhase = 'spinning' | 'question' | 'answerReview' | 'scoreboard'
-type CapitalizationContext = 'loh' | 'battleBack'
-
-interface CapitalizationProps extends GenericMinigameProps {
-  context?: CapitalizationContext
-}
+type CapitalizationContext = NonNullable<GenericMinigameProps['context']>
 
 interface CapitalizationScoreboard {
   question: CapitalizationQuestion
@@ -105,7 +101,7 @@ export default function Capitalization({
   participants,
   seed,
   context = 'loh',
-}: CapitalizationProps) {
+}: GenericMinigameProps) {
   const aiCapability = useSeasonAiCapability()
   const { t } = useI18n()
   const resolvedParticipants = useMemo(
@@ -748,9 +744,12 @@ function Scoreboard({
     )
     .join(', ')
   const isBattleBackContext = context === 'battleBack'
+  const winnerName = winner?.participantName ?? 'A player'
   const finalWinnerSummary = isBattleBackContext
-    ? `${winner?.participantName ?? 'A player'} has won the right to return to the game.`
-    : `${winner?.participantName ?? 'A player'} is ready to be crowned LOH.`
+    ? `${winnerName} has won the right to return to the game.`
+    : context === 'challenge'
+      ? `${winnerName} wins the challenge.`
+      : `${winnerName} is ready to be crowned LOH.`
 
   return (
     <section
@@ -844,7 +843,7 @@ function Scoreboard({
               : 'Next globe spin starts when you continue.'}
         </span>
         <button type="button" onClick={onContinue}>
-          {scoreboard.final && !isBattleBackContext ? 'Crown LOH' : 'Continue'}
+          {scoreboard.final && context === 'loh' ? 'Crown LOH' : 'Continue'}
         </button>
       </div>
     </section>

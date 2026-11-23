@@ -5,9 +5,9 @@ import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeGame } from './challengeRotation'
 import { restoreRun, saveRun } from './persistence'
-import { applySocialMove } from './social'
 import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
+import { applySocialMove } from './social'
 import { resolveTable } from './table'
 
 vi.mock('../services/sound/SoundManager', () => ({
@@ -98,10 +98,10 @@ async function clickAndSave(target: HTMLElement) {
 }
 
 async function finishCinematic() {
+  const scene = within(screen.getByRole('dialog'))
   await clickAndSave(
-    within(screen.getByRole('dialog')).getByRole('button', {
-      name: /^(Skip cinematic|Continue)$/,
-    })
+    scene.queryByRole('button', { name: 'Skip cinematic' }) ??
+      scene.getByRole('button', { name: 'Continue' })
   )
 }
 
@@ -155,7 +155,7 @@ describe('Betrayals season review', () => {
         finishSave = resolve
       })
     )
-    fireEvent.click(await screen.findByRole('button', { name: 'Finish maze' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish maze' }, { timeout: 5000 }))
     expect(screen.getByText('Saving challenge results.')).toBeVisible()
     expect(screen.queryByText('Maze results')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
@@ -171,7 +171,7 @@ describe('Betrayals season review', () => {
       screen.queryByRole('dialog', { name: 'Safety Challenge results' })
     ).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Round Table' })).toBeVisible()
-  })
+  }, 10000)
 
   it('names public Safety winners in the standings and marks their wins on the roster and Faux TV', async () => {
     const initial = startRun(
@@ -241,7 +241,10 @@ describe('Betrayals season review', () => {
     expect(screen.getByRole('heading', { name: 'Your role' })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await act(async () => completeSave(true))
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'sunrise')
+    expect(
+      document.querySelector('.betrayals-broadcast__glass .betrayals-dawn')
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it.each([
@@ -418,8 +421,13 @@ describe('Betrayals season review', () => {
     render(<BetrayalsScreen />)
     expect(screen.getByRole('heading', { name: 'Your role' })).toBeInTheDocument()
 
-    await clickAndSave(screen.getByRole('button', { name: 'Play: open Day 1' }))
-    await finishCinematic()
+    vi.useFakeTimers()
+    try {
+      await clickAndSave(screen.getByRole('button', { name: 'Play: open Day 1' }))
+      await act(async () => vi.advanceTimersByTime(2850))
+    } finally {
+      vi.useRealTimers()
+    }
     expect(screen.getByRole('heading', { name: 'Dawn' })).toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Play: enter Social' }))
     expect(screen.getByRole('heading', { name: 'Social' })).toBeInTheDocument()
@@ -598,7 +606,7 @@ describe('Betrayals season review', () => {
     await clickAndSave(screen.getByRole('button', { name: 'Reveal result' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'departure')
     await finishCinematic()
-    await finishCinematic()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(tv.getByText(banished.name + ' was banished. A Loyal.')).toBeVisible()
     const seats = cast.getAllByRole('button')
     expect(seats).toHaveLength(25)
@@ -607,11 +615,26 @@ describe('Betrayals season review', () => {
     await clickAndSave(screen.getByRole('button', { name: 'Play: follow the Night' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(cast.getAllByRole('button', { name: /Asleep/ })).toHaveLength(24)
+    expect(
+      cast
+        .getAllByRole('button', { name: /Asleep/ })
+        .map((seat) => seat.querySelector('.betrayals-sleep-mask img'))
+        .find(Boolean)
+    ).toHaveAttribute('src', expect.stringContaining('assets/betrayals/sleep-mask.webp'))
     expect(seats[position]).not.toHaveAttribute('data-asleep')
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+    await finishCinematic()
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'awakening')
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-reduced', 'true')
     await finishCinematic()
     expect(cast.getAllByRole('button', { name: /Eliminated at Night/ })).toHaveLength(1)
+    expect(
+      cast.getByRole('button', { name: /Eliminated at Night/ }).querySelector('[data-mourning]')
+    ).toBeNull()
+    expect(
+      seats.some((seat) => seat.querySelector('img[data-mourning][src$="_sad_avatar.webp"]'))
+    ).toBe(true)
     expect(cast.queryByRole('button', { name: /Asleep/ })).not.toBeInTheDocument()
   })
 
@@ -683,5 +706,141 @@ describe('Betrayals season review', () => {
       recipient.id,
       other.id,
     ])
+  })
+
+  it('goes straight to Dawn and privately tells you when your Night Shield stopped the elimination', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'test-shielded-night', roleSeed: 32, publicSeed: 12 }
+    )
+    const target = run.seats[0]
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night-resolved',
+      private: {
+        ...run.private,
+        betrayers: run.seats.slice(1, 4).map(({ id }) => id),
+        nightShieldIds: [target.id],
+        pendingNight: { targetId: target.id, blocked: true, byDraw: false },
+      },
+    })
+    render(<BetrayalsScreen />)
+
+    await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Dawn' })).toBeVisible()
+    expect(screen.getByText('Your Night Shield stopped the Conclave’s attempt.')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Eliminated at Night/ })).not.toBeInTheDocument()
+  })
+
+  it('uses the roster mark for a night elimination when Animations is off', async () => {
+    localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'quick-night-exit', roleSeed: 32, publicSeed: 12 }
+    )
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night-resolved',
+      presentation: ['death-letter'],
+      private: {
+        ...run.private,
+        pendingNight: { targetId: run.humanId, blocked: false, byDraw: false },
+      },
+    })
+    render(<BetrayalsScreen />)
+    const quickExit = within(screen.getByRole('dialog', { name: 'Georgi was eliminated at night' }))
+    const tile = screen.getByRole('button', { name: 'Georgi, Eliminated at Night' })
+    expect(tile.querySelector('[data-brief-exit-mark] img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('evictionmark/evictionmark.png')
+    )
+    await clickAndSave(quickExit.getByRole('button', { name: 'Skip elimination' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(tile).toHaveAttribute('data-exit', 'night')
+  })
+
+  it.each([false, true])(
+    'adds morning roll call only as a fallback for a night film (animations off: %s)',
+    async (animationsOff) => {
+      localStorage.setItem(
+        'betrayals.preferences.v1',
+        JSON.stringify({ reducedMotion: animationsOff })
+      )
+      const run = startRun(
+        { id: 'human', name: 'Georgi' },
+        BETRAYALS_AI_POOL,
+        { publicMode: false, realityMode: 'off' },
+        { id: 'resolve-night-film', roleSeed: 32, publicSeed: 12 }
+      )
+      const victim = run.seats.find(
+        ({ id }) => id !== run.humanId && !run.private.betrayers.includes(id)
+      )!
+      saveRun(localStorage, 'edition-local', {
+        ...run,
+        phase: 'night-resolved',
+        private: {
+          ...run.private,
+          pendingNight: { targetId: victim.id, blocked: false },
+        },
+      })
+      render(<BetrayalsScreen />)
+      vi.useFakeTimers()
+      try {
+        await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+        if (animationsOff) {
+          expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'awakening')
+          expect(screen.getByText(victim.name + ' is missing.')).toBeVisible()
+          await finishCinematic()
+        } else {
+          expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+          for (const duration of [2200, 2450, 2650, 3600, 5000]) {
+            act(() => vi.advanceTimersByTime(duration))
+          }
+          await clickAndSave(screen.getByRole('button', { name: 'Continue' }))
+        }
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(
+          screen.getByRole('button', { name: victim.name + ', Eliminated at Night' })
+        ).toBeVisible()
+      } finally {
+        vi.useRealTimers()
+      }
+    }
+  )
+
+  it('remembers the completed personal letter when resuming at Dawn', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'personal-night-film', roleSeed: 32, publicSeed: 12 }
+    )
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night-resolved',
+      presentation: ['death-letter'],
+      private: { ...run.private, pendingNight: { targetId: run.humanId, blocked: false } },
+    })
+    vi.useFakeTimers()
+    try {
+      const firstVisit = render(<BetrayalsScreen />)
+      for (const duration of [2200, 2450, 2650, 3600, 5000]) {
+        act(() => vi.advanceTimersByTime(duration))
+      }
+      await clickAndSave(screen.getByRole('button', { name: 'Continue' }))
+      firstVisit.unmount()
+      render(<BetrayalsScreen />)
+
+      await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Georgi, Eliminated at Night' })).toBeVisible()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

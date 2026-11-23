@@ -11,7 +11,7 @@ import {
 import { getAdAvailabilityMessage, subscribeAdAvailability } from './adAvailability'
 import '../../safety/PlayerSafetyScreen.css'
 
-export default function AdvertisingPrivacy() {
+export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const openedFromSettings =
@@ -33,7 +33,9 @@ export default function AdvertisingPrivacy() {
   return (
     <main className="player-safety">
       <section className="player-safety__card" aria-labelledby="advertising-privacy-title">
-        <p className="player-safety__eyebrow">THE BIG EYE</p>
+        <p className="player-safety__eyebrow">
+          {betrayals ? 'THE BIG EYE: BETRAYALS' : 'THE BIG EYE'}
+        </p>
         <h1 id="advertising-privacy-title">Advertising privacy</h1>
         {!record ? (
           <form onSubmit={submitAge}>
@@ -58,10 +60,16 @@ export default function AdvertisingPrivacy() {
           </form>
         ) : !usesContextualAdTreatment() ? (
           <>
-            <p>
-              Standard play includes automatic ad breaks. No Ads and VIP remove those breaks.
-              Rewarded ads are optional: choose Watch Ad when you want a reward.
-            </p>
+            {betrayals ? (
+              <p>
+                Rewarded ads are optional. You can choose to watch one when a reward is offered.
+              </p>
+            ) : (
+              <p>
+                Standard play includes automatic ad breaks. No Ads and VIP remove those breaks.
+                Rewarded ads are optional: choose Watch Ad when you want a reward.
+              </p>
+            )}
             <p>
               Google may receive device information, your IP address, and ad interactions. Manage
               Google's privacy choices below. Ads are subject to availability and privacy
@@ -106,9 +114,13 @@ export default function AdvertisingPrivacy() {
             )}
           </>
         ) : (
-          <p>Rewarded ads and Survival run purchases are available to adults only.</p>
+          <p>
+            {betrayals
+              ? 'Rewarded ads are available to adults only.'
+              : 'Rewarded ads and Survival run purchases are available to adults only.'}
+          </p>
         )}
-        {usesContextualAdTreatment() && (
+        {!betrayals && usesContextualAdTreatment() && (
           <p>
             Standard play may include short contextual ad breaks. These ads are selected without
             behavioral profiling. They apply to players under 18 and when no age is on file.
@@ -135,10 +147,14 @@ export default function AdvertisingPrivacy() {
             onClick={() => {
               if (returnToCompetition) navigate('/game', { replace: true })
               else if (openedFromSettings) navigate(-1)
-              else navigate('/settings', { replace: true })
+              else navigate(betrayals ? '/' : '/settings', { replace: true })
             }}
           >
-            {returnToCompetition ? 'Back to competition' : 'Back to settings'}
+            {returnToCompetition
+              ? 'Back to competition'
+              : betrayals
+                ? 'Back to Betrayals'
+                : 'Back to settings'}
           </button>
         </div>
       </section>

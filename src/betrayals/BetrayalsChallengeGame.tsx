@@ -13,9 +13,9 @@ import tiltLabyrinth from '../features/tiltLabyrinth/tiltLabyrinthSlice'
 import type { CompetitionResult, ReactMinigameCompletion } from '../minigames/competitionResult'
 import { CompetitionResultContext, HostResultsContext } from '../minigames/competitionResultContext'
 import reactComponents from '../minigames/reactComponents'
-import { type ChallengeGame, challengePlayers, challengeSeed } from './challengeRotation'
-import { challengeRelationships } from './challengeRelationships'
 import { isSocialChallengeGameKey } from '../minigames/socialChallenges/shared'
+import { challengeRelationships } from './challengeRelationships'
+import { type ChallengeGame, challengePlayers, challengeSeed } from './challengeRotation'
 import type { Run } from './run'
 
 const QuickTap = lazy(() => import('../minigames/quickTapRace/QuickTapRaceCanvasGame'))
@@ -81,6 +81,12 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
   const field = { participantIds, participants, seed }
   const usesSocialChoices = isSocialChallengeGameKey(game.key) || game.key === 'riskWheelAbyss'
   const prizeType: 'LOH' | 'POS' = run.phase === 'safety' ? 'POS' : 'LOH'
+  const competitionTitle =
+    run.phase === 'safety'
+      ? 'Night Shield'
+      : run.phase === 'immunity'
+        ? 'Immunity'
+        : 'Final Challenge'
 
   function finishField(completion?: ReactMinigameCompletion, score?: number) {
     if (game.reactComponentKey === 'GlassBridge') {
@@ -158,7 +164,7 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
       minigame = (
         <HoldTheWall
           {...hosted}
-          competitionTitle={run.phase === 'immunity' ? 'Full Immunity' : undefined}
+          competitionTitle={run.phase === 'immunity' ? 'Full Immunity' : competitionTitle}
         />
       )
       break
@@ -193,23 +199,37 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
       )
       break
     case 'ClosestWithoutGoingOver':
-      minigame = <DontGoOver {...hosted} />
+      minigame = <DontGoOver {...hosted} competitionTitle={competitionTitle} />
       break
     case 'GlassBridge':
       minigame = <CrystalPath {...hosted} />
       break
     case 'CrystalPathShattered':
-      minigame = <CrystalPathInfinity {...hosted} />
+      minigame = <CrystalPathInfinity {...hosted} competitionTitle={competitionTitle} />
       break
     case 'TrapAuction':
-      minigame = <TrapAuction {...hosted} autoStart />
+      minigame = (
+        <TrapAuction
+          {...hosted}
+          autoStart
+          competitionTitle={competitionTitle}
+          currency={{ singular: 'token', plural: 'tokens', symbol: '◆' }}
+        />
+      )
       break
     case 'ChainOfGreed':
       minigame = <ChainOfGreed {...field} soloRushOnly onFinish={onFinish} />
       break
     case 'HouseOfDarkness':
-      minigame = <DeckOfDarkness {...field} reportLifespan onFinish={onFinish} />
+      minigame = (
+        <DeckOfDarkness {...field} aiDifficulty="competitive" reportLifespan onFinish={onFinish} />
+      )
       break
+    case 'Capitalization': {
+      const Capitalization = reactComponents.Capitalization
+      minigame = <Capitalization {...field} context="challenge" onFinish={onFinish} />
+      break
+    }
     default: {
       if (!game.reactComponentKey || !reactComponents[game.reactComponentKey]) {
         throw new Error(`Missing Betrayals minigame: ${game.key}`)

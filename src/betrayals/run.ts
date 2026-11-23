@@ -45,6 +45,7 @@ export const NIGHT_SHIELD_MOVES = [
   'shield-tip',
 ] as const
 export type NightShieldClaim = 'has' | 'none'
+export type NightShieldPlan = 'keep' | 'open-to-gift' | 'private'
 
 export type SocialReaction =
   | 'wary'
@@ -89,9 +90,12 @@ export type SocialEntry = {
     | 'found-alliance'
     | 'consult-alliance'
     | 'alliance-update'
+    | 'shield-request'
+    | 'shield-plans'
     | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
   shieldReply?: NightShieldClaim | 'private'
+  shieldPlan?: NightShieldPlan
   accepted?: boolean
   alliance?: CastleAlliance
   allianceChange?: 'invite' | 'leave' | 'rename' | 'remove' | 'dissolve'
@@ -169,11 +173,18 @@ export type Run = {
     lastShieldSave?: { day: number; id: string }
     safetyStandings?: { day: number; publicResults?: boolean; rows: SafetyStanding[] }
     pendingTable?: TableReceipt
-    pendingNight?: { targetId: string | null; blocked: boolean; byDraw?: boolean }
+    conclaveVote?: { nominations: Ballot[]; runoff?: Ballot[] }
+    pendingNight?: {
+      targetId: string | null
+      blocked: boolean
+      byDraw?: boolean
+      filmPlayed?: boolean
+    }
   }
   publicSeed: number
   pot: number
   challengeHistory?: string[]
+  seasonRewards?: import('./seasonRewards.ts').SeasonRewards
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
   witnessLead?: import('./intel.ts').WitnessLead
@@ -359,11 +370,12 @@ export function viewFor(run: Run, actorId: string | null) {
       name,
       portrait,
       exit: exit ? { ...exit } : undefined,
-      finaleRole: run.result
-        ? run.private.betrayers.includes(id)
-          ? 'betrayer'
-          : 'loyal'
-        : undefined,
+      finaleRole:
+        run.result && run.seasonRewards?.finaleRevealed
+          ? run.private.betrayers.includes(id)
+            ? 'betrayer'
+            : 'loyal'
+          : undefined,
       fullImmunity: !exit && id === run.immunityId,
       publicShield:
         !exit &&

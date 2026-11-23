@@ -35,6 +35,7 @@ import { pruneProfilePhotos } from '../../utils/imageDb'
 import { savedProfilePhotoIds } from '../../appearance/profilePhotos'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileSeasonStatus from '../../components/ProfileSeasonStatus/ProfileSeasonStatus'
+import { IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
 import ProfileOptionalDetails from '../../components/ProfileOptionalDetails/ProfileOptionalDetails'
 import ProfileEmailFields from '../../components/ProfileEmailFields/ProfileEmailFields'
 import {
@@ -85,7 +86,9 @@ export default function ProfilePicker() {
     ? '/profile/account'
     : requestedReturnTo === '/' || requestedReturnTo === '/profile'
       ? requestedReturnTo
-      : '/game'
+      : IS_BETRAYALS_EDITION
+        ? '/'
+        : '/game'
 
   const profiles = useAppSelector(selectAllProfiles)
   const activeProfileId = useAppSelector(selectActiveProfileId)
@@ -101,9 +104,10 @@ export default function ProfilePicker() {
 
   const isGameActive = useAppSelector(
     (s) =>
-      s.game.status === 'active' ||
-      s.game.week > 1 ||
-      (s.game.phase !== 'season_start' && s.game.phase !== 'week_start')
+      !IS_BETRAYALS_EDITION &&
+      (s.game.status === 'active' ||
+        s.game.week > 1 ||
+        (s.game.phase !== 'season_start' && s.game.phase !== 'week_start'))
   )
   const hasGuestRunProgress = useAppSelector(
     (s) =>
@@ -207,7 +211,7 @@ export default function ProfilePicker() {
       state: {
         from: '/',
         createProfile: true,
-        adoptGuestRun: isGuest && hasGuestRunProgress,
+        adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
         ...(playerAccount && { playerAccountId: playerAccount.id }),
         ...(manageOnly && { fromPlayerAccount: true }),
       },
@@ -251,6 +255,11 @@ export default function ProfilePicker() {
 
   const commitSwitch = useCallback(
     (id: string) => {
+      if (IS_BETRAYALS_EDITION) {
+        withRunAutosaveSuspended(() => dispatch(selectActiveProfile(id)))
+        navigate('/profile', { replace: true, state: { from: returnTo } })
+        return
+      }
       // Inspect the target profile before changing activeProfileId. This closes a
       // window where visibility autosave could otherwise write the old profile's
       // in-memory game under the newly selected profile ID.
@@ -642,7 +651,7 @@ export default function ProfilePicker() {
                       </button>
                     </div>
                   </div>
-                  {!manageOnly && isActive && <ProfileSeasonStatus />}
+                  {!IS_BETRAYALS_EDITION && !manageOnly && isActive && <ProfileSeasonStatus />}
                 </div>
               )
             })}
@@ -693,12 +702,12 @@ export default function ProfilePicker() {
                     // Keep the legacy in-place draft mounted until the router commits the
                     // transition. In production the Changing room route replaces it in the
                     // same interaction; this also gives a safe fallback if navigation fails.
-                    setShowCreateForm(true)
+                    if (!IS_BETRAYALS_EDITION) setShowCreateForm(true)
                     navigate('/profile/dressing-room', {
                       state: {
                         from: '/',
                         createProfile: true,
-                        adoptGuestRun: isGuest && hasGuestRunProgress,
+                        adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
                         ...(playerAccount && { playerAccountId: playerAccount.id }),
                         ...(manageOnly && { fromPlayerAccount: true }),
                       },
@@ -878,7 +887,7 @@ export default function ProfilePicker() {
           </>
         )}
 
-        {!manageOnly && !showCreateForm && (
+        {!IS_BETRAYALS_EDITION && !manageOnly && !showCreateForm && (
           <>
             <div className="profile-picker__divider">
               <span className="profile-picker__divider-line" />

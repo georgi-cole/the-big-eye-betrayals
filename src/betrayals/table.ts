@@ -16,6 +16,7 @@ import { getSocialView, settleVotePacts } from './social.ts'
 import { finishShieldConversations } from './shieldSocial.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { activeLead, canPresentEvidence, evidenceSpeech, voluntaryWitness } from './intel.ts'
+import { tableDialogue } from './tableDialogue.ts'
 
 export type { Ballot } from './run.ts'
 
@@ -178,54 +179,9 @@ export function tableArgumentPressure(
   )
 }
 
-function toSpeech(run: Run, argument: TableArgument): TableSpeech {
-  const { speakerId, targetId, stance, tone, basis } = argument
-  if (stance === 'defend') {
-    return {
-      speakerId,
-      targetId,
-      verb: 'defends',
-      argument:
-        'There are other explanations. I want to hear a stronger reason before we put their name down.',
-    }
-  }
-  if (stance === 'question') {
-    return {
-      speakerId,
-      targetId,
-      verb: 'questions',
-      argument:
-        basis === 'conversation'
-          ? 'Their name came up earlier. What did anyone actually see?'
-          : 'Can we hear who they suspect and why? I am still deciding.',
-    }
-  }
-  const aimedAtSpeaker = run.lastTable?.revealedBallots?.some(
-    ({ voterId, targetId: votedFor }) => voterId === targetId && votedFor === speakerId
-  )
-  const reason = aimedAtSpeaker
-    ? 'They voted for me last time. I want to know what that vote was based on.'
-    : basis === 'record'
-      ? 'Several people wrote their name down last time. I want to hear why they did.'
-      : basis === 'conversation'
-        ? 'I have heard their name in private. I think we should discuss it in the room.'
-        : 'It is still a hunch, but they are the person I most want us to look at.'
-  return {
-    speakerId,
-    targetId,
-    verb: tone === 'forceful' ? 'presses the case against' : 'names',
-    argument: tone === 'forceful' ? reason + ' My vote is going there.' : reason,
-  }
-}
-
 export function tableDiscussion(run: Run): TableSpeech[] {
   const tableArguments = argumentsAtTable(run)
-  return [
-    ...evidenceSpeech({ ...run, tableArguments }),
-    ...tableArguments
-      .filter((argument) => !argument.evidence)
-      .map((argument) => toSpeech(run, argument)),
-  ]
+  return [...evidenceSpeech({ ...run, tableArguments }), ...tableDialogue(run, tableArguments)]
 }
 
 export function tableSwayResponse(run: Run): string | undefined {

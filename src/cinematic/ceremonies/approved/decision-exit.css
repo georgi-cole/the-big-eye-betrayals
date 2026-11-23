@@ -122,3 +122,22 @@
   opacity: 0;
   pointer-events: none;
 }
+
+:host([data-edition='betrayals']) {
+  background: #080a0b;
+}
+
+:host([data-edition='betrayals']) .exit-camera {
+  filter: brightness(0.82) grayscale(1) sepia(0.18);
+}
+
+:host([data-edition='betrayals']) .handoff-veil {
+  background: radial-gradient(ellipse at 50% 23%, #4f4430, #191a17 40%, #080a0b 80%);
+}
+
+:host([data-edition='betrayals']) .exit-brand-title {
+  padding-inline: 0.5rem;
+  font-size: clamp(0.92rem, 4.15vw, 1.65rem);
+  letter-spacing: 0.15em;
+  text-shadow: 0 2px 12px #100d08;
+}

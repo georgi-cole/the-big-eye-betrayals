@@ -4,6 +4,8 @@ import { usePresentationReducedMotion } from '../services/presentation/usePresen
 import { tableDiscussion, tableTargets } from './table'
 import type { Run, Seat, TableSway } from './run'
 import { leadForPlayer } from './intel'
+import { RoundTableShot } from './RoundTableShot'
+import { PortraitGallery } from './PortraitGallery'
 import { WitnessLeadCard } from './WitnessLeadCard'
 import './RoundTableDiscussion.css'
 
@@ -53,12 +55,14 @@ export function RoundTableDiscussion({
   const previewLength = Math.min(4, speeches.length)
   const preview = usePacedReveal(previewLength, {
     firstDelay: 250,
-    stepDelay: 750,
+    stepDelay: 1120,
     immediate: motionReduced,
   })
   const visible = transcriptOpen || motionReduced ? speeches.length : preview.visible
   const complete = visible >= speeches.length
   const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
+  const featuredIds = speeches.slice(0, 4).map(({ speakerId }) => speakerId)
+  const speakerId = !transcriptOpen && visible > 0 ? speeches[visible - 1]?.speakerId : undefined
   const candidates = tableTargets(run, run.humanId)
   const target = candidates.includes(targetId) ? seats.get(targetId) : undefined
 
@@ -102,7 +106,7 @@ export function RoundTableDiscussion({
         onBack()
       }}
     >
-      <div className="round-table-room__frame">
+      <div className="round-table-room__frame" data-case={caseOpen || undefined}>
         <div className="round-table-room__camera" aria-hidden="true">
           <img src={art} alt="" />
         </div>
@@ -116,6 +120,18 @@ export function RoundTableDiscussion({
           <h2 id="round-table-room-title">Round Table</h2>
           {shieldName && <p>{shieldName} holds the Public Shield.</p>}
         </header>
+
+        {!caseOpen && (
+          <div className="round-table-room__shot">
+            <RoundTableShot
+              cast={run.seats}
+              featuredIds={featuredIds}
+              focusId={speakerId}
+              close={Boolean(speakerId)}
+              reducedMotion={motionReduced}
+            />
+          </div>
+        )}
 
         <section className="round-table-room__body" aria-label="Round Table proceedings">
           <div className="round-table-room__status">
@@ -175,35 +191,21 @@ export function RoundTableDiscussion({
               <h3 ref={caseHeading} tabIndex={-1}>
                 Who do you want to discuss?
               </h3>
-              <ul className="round-table-room__candidates" aria-label="Eligible contestants">
-                {candidates.map((id) => (
-                  <li key={id}>
-                    <button
-                      type="button"
-                      aria-pressed={targetId === id}
-                      onClick={() => setTargetId(id)}
-                    >
-                      <Portrait guest={seats.get(id)} />
-                      <span>{seats.get(id)?.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <PortraitGallery
+                guests={run.seats.filter(({ id }) => candidates.includes(id))}
+                target={target}
+                reducedMotion={motionReduced}
+                onSelect={setTargetId}
+              />
             </div>
           )}
         </section>
 
         <footer className="round-table-room__footer">
-          {caseOpen && (
+          {caseOpen && target && (
             <>
               <p>
-                {target ? (
-                  <>
-                    You have the floor. How do you want to handle <strong>{target.name}</strong>?
-                  </>
-                ) : (
-                  'Choose a guest from the table.'
-                )}
+                How do you want to handle <strong>{target.name}</strong>?
               </p>
               <div className="round-table-room__stances">
                 {lead && targetId === lead.suspectId && target && (
@@ -228,30 +230,20 @@ export function RoundTableDiscussion({
                 )}
                 <button
                   type="button"
-                  disabled={!target}
                   onClick={() => onSway({ targetId, tone: 'careful', stance: 'question' })}
                 >
                   Ask for a reason
                 </button>
                 <button
                   type="button"
-                  disabled={!target}
                   onClick={() => onSway({ targetId, tone: 'careful', stance: 'defend' })}
                 >
                   Defend
                 </button>
-                <button
-                  type="button"
-                  disabled={!target}
-                  onClick={() => onSway({ targetId, tone: 'careful' })}
-                >
+                <button type="button" onClick={() => onSway({ targetId, tone: 'careful' })}>
                   Make a case
                 </button>
-                <button
-                  type="button"
-                  disabled={!target}
-                  onClick={() => onSway({ targetId, tone: 'forceful' })}
-                >
+                <button type="button" onClick={() => onSway({ targetId, tone: 'forceful' })}>
                   Press hard
                 </button>
               </div>

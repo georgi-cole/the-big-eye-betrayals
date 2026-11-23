@@ -35,6 +35,7 @@ import {
   chooseHouseOfDarknessAiCharm,
   getHouseOfDarknessAiAbility,
   simulateHouseOfDarknessAiMemory,
+  type HouseOfDarknessAiDifficulty,
 } from './houseOfDarknessAiBalance'
 import {
   buildPortraitPairBoard,
@@ -67,6 +68,7 @@ interface Props {
   autoStart?: boolean
   premiumPresentation?: boolean
   reportLifespan?: boolean
+  aiDifficulty?: HouseOfDarknessAiDifficulty
   previewStage?: 'round6' | 'final2'
   relationships?: RelationshipsMap
   alliances?: StrategicAllianceSnapshot[]
@@ -240,6 +242,7 @@ export default function HouseOfDarknessComp({
   seed,
   premiumPresentation = false,
   reportLifespan = false,
+  aiDifficulty = 'standard',
   previewStage,
   relationships,
   alliances,
@@ -445,6 +448,7 @@ export default function HouseOfDarknessComp({
         baseAbility: aiProfiles[player.id]?.sessionAbility ?? 55,
         round: simulatedRound,
         health: player.health,
+        difficulty: aiDifficulty,
       })
       const choice = chooseHouseOfDarknessAiCharm({
         playerId: player.id,
@@ -545,7 +549,7 @@ export default function HouseOfDarknessComp({
         },
       }
     },
-    [aiProfiles, alliances, relationships, sessionSeed]
+    [aiDifficulty, aiProfiles, alliances, relationships, sessionSeed]
   )
 
   const simulateAfterHumanDeath = useCallback(
