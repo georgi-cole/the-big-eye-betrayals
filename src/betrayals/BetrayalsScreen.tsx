@@ -11,9 +11,9 @@ import { BetrayalsBroadcast } from './BetrayalsBroadcast'
 import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
 import { BetrayalsConclave, ConclaveDiscussion } from './BetrayalsConclave'
 import { BetrayalsDock } from './BetrayalsDock'
-import { BetrayalsGameLog } from './BetrayalsGameLog'
 import { BetrayalsHome } from './BetrayalsHome'
 import { BetrayalsRewardActions, type SeasonReward } from './BetrayalsRewardActions'
+import { BetrayalsPulse, type PulseLocation } from './BetrayalsPulse'
 import { gameLogFor, recordGameActivity } from './gameLog'
 import { recordSeasonCheckpoints, rewindOffer, rewindSeason } from './seasonRewards'
 import { BetrayalsIncomingInteractions } from './BetrayalsIncomingInteractions'
@@ -45,6 +45,13 @@ import { DawnWeather } from './DawnWeather'
 import { chooseTarget, resolutionPerspective } from './strategy'
 import { advanceDayBeat } from './daySocial'
 import { askWitness, leadForPlayer } from './intel'
+import {
+  applyInvestigationAction,
+  investigationActionReason,
+  observationsRemaining,
+} from './investigation'
+import type { InvestigationAction } from './investigation'
+import { profileForGuest, pulseView } from './pulseView'
 import { WitnessLeadCard } from './WitnessLeadCard'
 import {
   advanceTableRound,
@@ -160,7 +167,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const [selected, setSelected] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
   const [incomingOpen, setIncomingOpen] = useState(false)
-  const [logOpen, setLogOpen] = useState(false)
+  const [pulse, setPulse] = useState<PulseLocation>()
   const [homeOpen, setHomeOpen] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
@@ -267,7 +274,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     const restored = rewindSeason(active)
     if (!offer || !restored) return false
     setSelected(undefined)
-    setLogOpen(false)
+    setPulse(undefined)
     setClosedDiscussion(undefined)
     setCountReady(undefined)
     setConclaveProgress(undefined)
@@ -385,7 +392,20 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const countKey = [run.id, run.day, stage, activeCast.length, run.tableCount?.round].join(':')
   const selectedSeat = view.seats.find(({ id }) => id === selected)
   const isTarget = !!selected && targets.includes(selected)
-  const gameLogEntries = logOpen ? [...gameLogFor(run)].reverse().sort((a, b) => b.day - a.day) : []
+  const investigate = (action: InvestigationAction) => {
+    void apply((active) => applyInvestigationAction(active, token, action))
+  }
+  const investigation = {
+    open: stage === 'social' && participating,
+    remaining: observationsRemaining(run),
+    profile: (id: string) => profileForGuest(run, id),
+    reason: (action: InvestigationAction) => investigationActionReason(run, action),
+    act: investigate,
+    openPulse: (guestId?: string) => {
+      utilities.playEffect('ui:navigate', 0.45)
+      setPulse({ tab: guestId ? 'Intel' : 'Today', guestId })
+    },
+  }
   const conversation = participating ? getSocialView(run, run.humanId) : []
   const lead = leadForPlayer(run)
   const recent = conversation
@@ -868,14 +888,11 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             <button
               className="betrayals-phase-strip__log"
               type="button"
-              aria-label="Open game log"
+              aria-label="Open My Pulse"
               aria-haspopup="dialog"
-              aria-expanded={logOpen}
-              title="Game log"
-              onClick={() => {
-                utilities.playEffect('ui:navigate', 0.45)
-                setLogOpen(true)
-              }}
+              aria-expanded={Boolean(pulse)}
+              title="My Pulse"
+              onClick={() => investigation.openPulse()}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
@@ -963,7 +980,17 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           </p>
         )}
 
-        {logOpen && <BetrayalsGameLog entries={gameLogEntries} onClose={() => setLogOpen(false)} />}
+        {pulse && (
+          <BetrayalsPulse
+            day={run.day}
+            humanId={run.humanId}
+            entries={gameLogFor(run)}
+            view={pulseView(run)}
+            initial={pulse}
+            onClose={() => setPulse(undefined)}
+            onAction={investigate}
+          />
+        )}
 
         <BetrayalsDock
           play={play}
@@ -1045,6 +1072,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             day={run.day}
             conversation={conversation}
             recent={recent}
+            investigation={investigation}
             intel={
               lead &&
               stage === 'social' && (
@@ -1138,6 +1166,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             setClosedDiscussion(discussionKey)
           }}
           onAskWitness={() => apply((active) => askWitness(active, token))}
+          investigation={investigation}
           onSway={(choice) => {
             utilities.playEffect('tv:ceremony_transition', 0.45)
             apply((active) => recordTableSway(active, token, choice))

@@ -1,6 +1,7 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32 } from '../store/rng.ts'
 import { incidentPressure } from './intel.ts'
+import { investigationPressure } from './investigationEvidence.ts'
 import { nightShieldReads } from './nightShields.ts'
 import { getSocialView, hasAlliance, relationship } from './perception.ts'
 import { hashId, viewFor } from './run.ts'
@@ -32,6 +33,10 @@ export function resolutionPerspective(
 ): Perspective {
   const view = viewFor(run, actorId)
   const morningExit = run.lastDawn?.day === run.day && run.lastDawn.eliminatedId
+  const evidence = new Map(incidentPressure(run, actorId))
+  for (const [id, weight] of investigationPressure(run, actorId)) {
+    evidence.set(id, (evidence.get(id) ?? 0) + weight)
+  }
   return {
     actorId,
     role: view.role ?? 'loyal',
@@ -47,7 +52,7 @@ export function resolutionPerspective(
     dawnClue: morningExit
       ? run.lastTable?.revealedBallots?.find(({ voterId }) => voterId === morningExit)?.targetId
       : undefined,
-    evidence: incidentPressure(run, actorId),
+    evidence,
     shieldReads: run.phase === 'night' ? nightShieldReads(run, actorId) : undefined,
   }
 }

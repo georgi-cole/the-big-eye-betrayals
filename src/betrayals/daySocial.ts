@@ -1,55 +1,16 @@
 import { REALITY_PRESET_TUNING } from '../modes/realityMode.ts'
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32, seededPickN } from '../store/rng.ts'
+import { openInvestigationDay } from './castleIncidents.ts'
 import { advancePreparation, commandToken, eligibleBanishmentTargets } from './run.ts'
 import type { Run } from './run.ts'
 import { relationship } from './perception.ts'
-import { applySocialMove, getSocialView, hasAlliance, hasSocialStrain, rapport } from './social.ts'
+import { applySocialMove, getSocialView, hasAlliance, hasSocialStrain } from './social.ts'
 import type { SocialMove } from './social.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 
-function prepareLead(run: Run): Run {
-  if (run.phase !== 'social' || run.witnessLead?.day === run.day) return run
-  if (run.seats.find((seat) => seat.id === run.humanId)?.exit) return run
-  const guests = run.seats.filter(({ id, exit }) => !exit && id !== run.humanId)
-  if (guests.length < 5) return run
-
-  const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 2347))
-  // Leave room for ordinary vote planning and quieter days between disputes.
-  if (run.witnessLead && (run.witnessLead.day === run.day - 1 || random() < 0.26)) return run
-  const [speaker] = seededPickN(random, guests, 1)
-  const targets = eligibleBanishmentTargets(run, speaker.id).filter((id) => id !== run.humanId)
-  const pitchId = chooseTarget(resolutionPerspective(run, speaker.id, targets), 'case')
-  if (!pitchId) return run
-  const contacts = seededPickN(
-    random,
-    guests.filter(({ id }) => id !== speaker.id && id !== pitchId),
-    guests.length - 2
-  )
-  contacts.sort(
-    (a, b) =>
-      rapport(run.social, speaker.id, b.id) +
-      rapport(run.social, run.humanId, b.id) -
-      rapport(run.social, speaker.id, a.id) -
-      rapport(run.social, run.humanId, a.id)
-  )
-  const [source, witness, relay] = contacts
-  return {
-    ...run,
-    revision: run.revision + 1,
-    witnessLead: {
-      day: run.day,
-      suspectId: speaker.id,
-      pitchId,
-      sourceId: source.id,
-      witnessId: witness.id,
-      relayId: relay.id,
-    },
-  }
-}
-
 export function advanceDayBeat(run: Run): Run {
-  if (run.phase === 'dawn') return prepareLead(advancePreparation(run, commandToken(run)))
+  if (run.phase === 'dawn') return openInvestigationDay(advancePreparation(run, commandToken(run)))
   if (run.phase !== 'social') return run
   let active = run
   const preset = run.options.realityMode

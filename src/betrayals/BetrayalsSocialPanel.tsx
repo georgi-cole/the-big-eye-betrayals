@@ -15,6 +15,7 @@ import type { AllianceMoveDetails, GeneralSocialMove } from './generalSocial'
 import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
+import { BetrayalsGuestProfile, type InvestigationControls } from './BetrayalsGuestProfile'
 import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
 import {
@@ -229,6 +230,7 @@ type Props = {
   conversation?: readonly SocialEntry[]
   recent?: SocialEntry
   intel?: React.ReactNode
+  investigation?: InvestigationControls
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
   onGeneralMove?: (
@@ -526,6 +528,7 @@ export function BetrayalsSocialPanel({
   conversation = [],
   recent,
   intel,
+  investigation,
   onClose,
   onMove,
   onGeneralMove,
@@ -867,6 +870,24 @@ export function BetrayalsSocialPanel({
             )}
           </section>
 
+          {peer && investigation && (
+            <BetrayalsGuestProfile
+              key={peer.id}
+              profile={investigation.profile(peer.id)}
+              investigation={investigation}
+              contacts={contacts}
+              name={label}
+            />
+          )}
+          {!peer && investigation && (
+            <button
+              className="sp2-action-button"
+              type="button"
+              onClick={() => investigation.openPulse()}
+            >
+              My Pulse
+            </button>
+          )}
           {!peer && intel}
           {!peer && canAct && onGeneralMove && (
             <BetrayalsGeneralActions
