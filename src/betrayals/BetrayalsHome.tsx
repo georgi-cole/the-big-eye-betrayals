@@ -14,6 +14,7 @@ import { ObservatoryWindow } from './ObservatoryWindow'
 import { useObservatorySky } from './observatoryWeather'
 import type { BetrayalsProductKey } from './commerce/catalog'
 import './betrayalsHome.css'
+import './ceremonyActions.css'
 
 const observatory = import.meta.env.BASE_URL + 'assets/betrayals/observatory.jpg'
 const splashSession = 'betrayals.observatoryOpening.v1'
@@ -210,7 +211,7 @@ export function BetrayalsHome({
                 />
               </label>
             )}
-            <button type="submit" className="betrayals-primary betrayals-home__play">
+            <button type="submit" className="betrayals-ceremony-action--primary">
               {actionLabel}
             </button>
             <div className="betrayals-home__secondary">
@@ -218,6 +219,7 @@ export function BetrayalsHome({
                 <button
                   key={panel}
                   type="button"
+                  className="betrayals-ceremony-action--secondary"
                   aria-haspopup="dialog"
                   onClick={() => {
                     utilities.playEffect('ui:navigate', 0.45)

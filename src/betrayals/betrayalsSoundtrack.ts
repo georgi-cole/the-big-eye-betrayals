@@ -44,7 +44,7 @@ export const BETRAYALS_SOUNDTRACKS: Readonly<Record<BetrayalsMusicScene, Soundtr
   'intro-hub': soundtrack('introhub-main-the-four-note-motif.mp3', 0, true, 0.62),
   'inside-castle': soundtrack('inside-the-castle-quietly-suspenseful.mp3', 0, true, 0.58),
   'round-table': soundtrack('the-round-table-candlelit-intrigue.mp3', 0, true, 0.58),
-  conclave: soundtrack('the-conclave-the-hollow-withdrawal.mp3', 0, true, 0.58),
+  conclave: soundtrack('the-conclave-the-hollow-withdrawal.mp3', 0, true, 0.38),
   murder: soundtrack('the-murder-the-castles-final-bell.mp3', 210, true, 0.66),
   'loyals-win': soundtrack('loyals-win-the-final-chord.mp3', 0, false, 0.72),
   'betrayers-win': soundtrack('the-betrayers-win-the-hollow-withdrawal.mp3', 90, false, 0.72),

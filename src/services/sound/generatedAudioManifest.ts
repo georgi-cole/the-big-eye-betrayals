@@ -567,6 +567,38 @@ export const GENERATED_AUDIO_ASSETS = [
     "loop": false
   },
   {
+    "key": "tv:ceremony_conclave_chair",
+    "category": "tv",
+    "relativePath": "sounds/ceremonies/conclave_chair.wav",
+    "preload": false,
+    "volume": 0.35,
+    "loop": false
+  },
+  {
+    "key": "tv:ceremony_conclave_cloth",
+    "category": "tv",
+    "relativePath": "sounds/ceremonies/conclave_cloth.wav",
+    "preload": false,
+    "volume": 0.3,
+    "loop": false
+  },
+  {
+    "key": "tv:ceremony_conclave_seal",
+    "category": "tv",
+    "relativePath": "sounds/ceremonies/conclave_seal.wav",
+    "preload": false,
+    "volume": 0.5,
+    "loop": false
+  },
+  {
+    "key": "tv:ceremony_conclave_steps",
+    "category": "tv",
+    "relativePath": "sounds/ceremonies/conclave_steps.wav",
+    "preload": false,
+    "volume": 0.5,
+    "loop": false
+  },
+  {
     "key": "tv:ceremony_departureFoley",
     "category": "tv",
     "relativePath": "sounds/ceremonies/departureFoley.wav",

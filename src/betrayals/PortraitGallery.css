@@ -51,7 +51,7 @@
   min-height: 0;
 }
 
-.round-table-room .betrayals-gallery__track button {
+:is(.round-table-room, .betrayals-conclave-dialog) .betrayals-gallery__track button {
   display: grid;
   place-items: center;
   width: 100%;
@@ -76,6 +76,12 @@
   max-width: 100%;
   aspect-ratio: 1;
   filter: drop-shadow(0 6px 9px #0a0808b8);
+}
+
+.betrayals-painting__art {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 1;
 }
 
 .betrayals-painting__window {
@@ -130,7 +136,7 @@
   pointer-events: none;
 }
 
-.round-table-room .betrayals-gallery__nav button {
+:is(.round-table-room, .betrayals-conclave-dialog) .betrayals-gallery__nav button {
   min-width: 44px;
   padding: 0 8px;
   background: #1d1511ed;
@@ -169,7 +175,7 @@
   filter: drop-shadow(0 0 14px #ec9a483b) drop-shadow(0 12px 16px #050304dd);
 }
 
-.round-table-room .betrayals-gallery__return {
+:is(.round-table-room, .betrayals-conclave-dialog) .betrayals-gallery__return {
   position: absolute;
   bottom: 6px;
   min-height: 38px;
@@ -196,7 +202,7 @@
   }
 }
 
-.round-table-room[data-motion='reduced'] .betrayals-gallery__focus::before,
-.round-table-room[data-motion='reduced'] .betrayals-gallery__subject {
+.betrayals-gallery[data-motion='reduced'] .betrayals-gallery__focus::before,
+.betrayals-gallery[data-motion='reduced'] .betrayals-gallery__subject {
   animation: none;
 }

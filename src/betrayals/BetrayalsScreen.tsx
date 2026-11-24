@@ -284,7 +284,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       ) {
         utilities.playEffect('tv:ceremony_reveal', 0.72)
       } else if (next.phase === 'table-reveal' || next.phase === 'night-resolved') {
-        utilities.playEffect('tv:ceremony_impact', 0.57)
+        if (!cues.includes('conclave-seal')) utilities.playEffect('tv:ceremony_impact', 0.57)
       } else if (next.phase !== 'settled') {
         utilities.playEffect('tv:ceremony_transition', 0.4)
       }
@@ -582,7 +582,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
   const conclave = getConclaveView(run, viewerId, selected)
-  const conclaveLines = conclave ? [...(conclave.shieldBriefing ?? []), ...conclave.proposals] : []
+  const conclaveLines = conclave?.discussion ?? []
   const conclaveKey = `${run.id}:${run.day}`
   const conclaveStep = conclaveProgress?.key === conclaveKey ? conclaveProgress.step : 0
   const conclaveLine = conclaveLines[conclaveStep]
@@ -1410,7 +1410,6 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           key={conclaveKey}
           cast={conclaveGuests(run, viewerId)}
           view={view}
-          humanId={run.humanId}
           vote={conclave ?? undefined}
           line={conclaveLine}
           step={conclaveStep}

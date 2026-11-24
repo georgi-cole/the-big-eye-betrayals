@@ -5,6 +5,7 @@ import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
 import { challengeGame } from './challengeRotation'
 import { investigationFor } from './investigationRecords'
+import { getConclaveView } from './night'
 import { restoreRun, saveRun } from './persistence'
 import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
@@ -1110,6 +1111,61 @@ describe('Betrayals season review', () => {
     ).toBe(true)
     expect(cast.queryByRole('button', { name: /Asleep/ })).not.toBeInTheDocument()
   })
+
+  it.each([true, false])(
+    'keeps the Conclave discussion and ballot connected with animations %s',
+    async (animated) => {
+      const run = startRun(
+        { id: 'human', name: 'Georgi' },
+        BETRAYALS_AI_POOL,
+        { publicMode: false, realityMode: 'off' },
+        { id: 'conclave-presentation', roleSeed: 32, publicSeed: 12 }
+      )
+      const night = {
+        ...run,
+        phase: 'night' as const,
+        presentation: ['conclave-arrival' as const],
+        private: {
+          ...run.private,
+          betrayers: run.seats.slice(0, 4).map(({ id }) => id),
+          hiddenBetrayerIds: [run.seats[3].id],
+        },
+      }
+      const vote = getConclaveView(night, run.humanId)!
+      const firstLine = vote.discussion[0]
+      const secondLine = vote.discussion[1]
+      if (!animated) {
+        localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+      }
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+      saveRun(localStorage, 'edition-local', night)
+      render(<BetrayalsScreen />)
+
+      if (animated) {
+        const room = screen.getByRole('dialog', { name: 'The Conclave' })
+        const conclave = within(room)
+        const film = room.querySelector('.conclave-film')
+        await clickAndSave(conclave.getByRole('button', { name: 'Skip cinematic' }))
+        expect(conclave.getByText(firstLine.argument)).toBeVisible()
+        expect(room.querySelector('.conclave-film')).toBe(film)
+        fireEvent.click(conclave.getByRole('button', { name: 'Continue' }))
+        expect(conclave.getByText(secondLine.argument)).toBeVisible()
+        expect(room.querySelector('.conclave-film')).toBe(film)
+        fireEvent.click(conclave.getByRole('button', { name: 'Skip to ballot' }))
+        const ballot = within(conclave.getByRole('region', { name: 'Night ballot' }))
+        expect(conclave.getByRole('button', { name: 'Lock Night choice' })).toBeDisabled()
+        fireEvent.click(ballot.getAllByRole('button')[0])
+        expect(conclave.getByRole('button', { name: 'Lock Night choice' })).toBeEnabled()
+      } else {
+        expect(screen.queryByRole('dialog', { name: 'The Conclave' })).not.toBeInTheDocument()
+        const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+        expect(tv.getByText(firstLine.argument)).toBeVisible()
+        fireEvent.click(screen.getByRole('button', { name: 'Play: next Conclave speaker' }))
+        expect(tv.getByText(secondLine.argument)).toBeVisible()
+        expect(tv.queryByText(firstLine.argument)).not.toBeInTheDocument()
+      }
+    }
+  )
 
   it('lets a gift recipient bluff in the Inbox and pass the shield on in Social', async () => {
     const run = startRun(

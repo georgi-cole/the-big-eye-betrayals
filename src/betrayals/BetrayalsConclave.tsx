@@ -1,14 +1,14 @@
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
-import CinematicSkipButton from '../components/CinematicSkipButton/CinematicSkipButton'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
-import { BetrayalsPlayButton } from './BetrayalsDock'
 import type { CinematicCastMember } from './CinematicScene'
 import { ConclaveFilm } from './ConclaveFilm'
-import { conclaveOpeningBeats } from './conclaveDirection'
+import { conclaveCueVolume, conclaveOpeningBeats, conclaveRevealed } from './conclaveDirection'
+import { PortraitGallery } from './PortraitGallery'
+import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
 import type { ConclaveLine, ConclaveView } from './night'
-import { Roster } from './Roster'
 import type { viewFor } from './run'
 import './BetrayalsConclave.css'
+import './ceremonyActions.css'
 
 export function BetrayalsConclave({
   line,
@@ -27,12 +27,6 @@ export function BetrayalsConclave({
           <div>
             <p className="betrayals-conclave__speaker">
               <strong>{line.speakerName}</strong>
-              {line.nomineeName && (
-                <>
-                  {' '}
-                  nominates <strong>{line.nomineeName}</strong>
-                </>
-              )}
             </p>
             <p>{line.argument}</p>
           </div>
@@ -61,7 +55,6 @@ export function BetrayalsConclave({
 export function ConclaveDiscussion({
   cast,
   view,
-  humanId,
   vote,
   line,
   step,
@@ -78,7 +71,6 @@ export function ConclaveDiscussion({
 }: {
   cast: readonly CinematicCastMember[]
   view: ReturnType<typeof viewFor>
-  humanId: string
   vote?: ConclaveView
   line?: ConclaveLine
   step: number
@@ -93,6 +85,7 @@ export function ConclaveDiscussion({
   playEffect?: (key: string, volume?: number) => void
   onFinishFilm: (completion: 'played' | 'skipped') => void
 }) {
+  const reducedMotion = usePresentationReducedMotion()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const [openingStep, setOpeningStep] = useState(0)
@@ -109,13 +102,14 @@ export function ConclaveDiscussion({
   }, [])
   const candidates = view.seats.filter(({ id }) => vote?.targetIds.includes(id))
   const selected = candidates.find(({ id }) => id === selectedId)
-  const actors = cast.filter(({ concealed }) => !concealed)
   const cameraBeat = opening
     ? conclaveOpeningBeats(cast, opening === 'first')[openingStep]
     : undefined
   const hold = cameraBeat?.hold
-  const cue = cameraBeat?.cue
-  const playCue = useEffectEvent((sound: string) => playEffect?.('tv:ceremony_' + sound, 0.58))
+  const cue = verdict ? 'conclave_seal' : cameraBeat?.cue
+  const playCue = useEffectEvent((sound: string) =>
+    playEffect?.('tv:ceremony_' + sound, conclaveCueVolume(sound))
+  )
   useEffect(() => {
     if (!surfaceReady) return
     if (cue) playCue(cue)
@@ -123,21 +117,13 @@ export function ConclaveDiscussion({
     const timer = window.setTimeout(() => setOpeningStep((index) => index + 1), hold)
     return () => window.clearTimeout(timer)
   }, [cue, hold, openingStep, surfaceReady])
-  const revealed = new Set(
-    actors.slice(0, cameraBeat?.visibleCount ?? actors.length).map(({ id }) => id)
-  )
+  const revealed = conclaveRevealed(cast, cameraBeat?.visibleCount)
   const filmStage = opening ? 'opening' : verdict ? 'verdict' : line ? 'discussion' : 'ballot'
-  const skip = () => (opening ? onFinishFilm('skipped') : line && onSkip())
-  const advanceLabel =
-    opening || verdict
-      ? 'Continue'
-      : line
-        ? step + 1 < total
-          ? 'Next speaker'
-          : 'Open ballot'
-        : vote?.runoff
-          ? 'Lock runoff vote'
-          : 'Lock Night choice'
+  const frame = verdict ? 'sealed' : (cameraBeat?.frame ?? (line ? 'portrait' : 'table'))
+  function skip() {
+    if (opening || verdict) onFinishFilm('skipped')
+    else if (line) onSkip()
+  }
 
   return (
     <dialog
@@ -146,6 +132,7 @@ export function ConclaveDiscussion({
       aria-labelledby={titleId}
       data-ballot={filmStage === 'ballot' || undefined}
       data-stage={filmStage}
+      data-frame={frame}
       onCancel={(event) => {
         event.preventDefault()
         skip()
@@ -154,44 +141,42 @@ export function ConclaveDiscussion({
       <div className="betrayals-conclave-dialog__shot">
         <ConclaveFilm
           cast={cast}
-          entering={cameraBeat?.entering}
+          frame={frame}
           revealed={revealed}
-          unmaskingId={cameraBeat?.unmaskingId}
-          focusId={cameraBeat?.focusId}
-          speakerId={opening || verdict ? undefined : line?.speakerId}
-          emphasize={filmStage === 'discussion' && step === total - 1 && Boolean(line?.nomineeName)}
-          letter={verdict ? 'sealed' : undefined}
-          interactive={filmStage === 'discussion'}
+          focusId={opening ? cameraBeat?.focusId : line?.speakerId}
+          discussion={filmStage === 'discussion'}
           onSurfaceReady={() => setSurfaceReady(true)}
-          reducedMotion={false}
         />
       </div>
-      <header>
+      <header className="betrayals-conclave-dialog__navigation">
+        {!opening && !verdict && step > 0 && !vote?.runoff && (
+          <GameBackButton label="Back" onClick={onBack} />
+        )}
         <h1 id={titleId}>The Conclave</h1>
         {(opening || (line && !verdict)) && (
-          <CinematicSkipButton
-            ariaLabel={opening ? 'Skip cinematic' : 'Skip to ballot'}
-            label={opening ? 'Skip' : 'Skip to ballot'}
-            indicator={opening ? 'close' : 'forward'}
+          <button
+            type="button"
+            className="betrayals-ceremony-action--secondary betrayals-conclave-dialog__skip"
+            aria-label={opening ? 'Skip cinematic' : 'Skip to ballot'}
             onClick={skip}
-          />
+          >
+            Skip
+          </button>
         )}
       </header>
       {opening || verdict ? (
         <div className="betrayals-conclave-dialog__ceremony" aria-live="polite">
-          <h2>{cameraBeat?.title ?? 'The Conclave adjourns'}</h2>
+          {verdict ? (
+            <h2>Sealed</h2>
+          ) : (
+            cameraBeat?.focusId && cameraBeat.title && <h2>{cameraBeat.title}</h2>
+          )}
           {verdict && <p>{verdict}</p>}
         </div>
       ) : line ? (
         <div className="betrayals-conclave-dialog__caption" aria-live="polite">
           <p>
             <strong>{line.speakerName}</strong>
-            {line.nomineeName && (
-              <>
-                {' '}
-                nominates <strong>{line.nomineeName}</strong>
-              </>
-            )}
           </p>
           <blockquote>{line.argument}</blockquote>
         </div>
@@ -203,30 +188,44 @@ export function ConclaveDiscussion({
           >
             <h2>{vote.runoff ? 'Runoff ballot' : 'Who do you nominate?'}</h2>
             {vote.runoff && <p>First ballot · {vote.runoff}. Highest count decides the runoff.</p>}
-            <div className="betrayals-conclave-dialog__candidates">
-              <Roster
-                view={{ ...view, seats: candidates }}
-                humanId={humanId}
-                selectedId={selected?.id}
-                onSelect={onSelect}
-              />
-            </div>
+            <PortraitGallery
+              variant="conclave"
+              guests={candidates}
+              target={selected}
+              reducedMotion={reducedMotion}
+              onSelect={onSelect}
+            />
             {selected && vote.ownArgument && <p aria-live="polite">{vote.ownArgument}</p>}
           </section>
         )
       )}
       <footer>
-        {!opening && !verdict && step > 0 && !vote?.runoff && (
-          <GameBackButton label="Back" onClick={onBack} />
+        {opening || verdict ? (
+          !hold && (
+            <button
+              type="button"
+              className="betrayals-ceremony-action--primary"
+              onClick={() => onFinishFilm('played')}
+            >
+              Continue
+            </button>
+          )
+        ) : (
+          <button
+            type="button"
+            className="betrayals-ceremony-action--primary"
+            disabled={!line && candidates.length > 0 && !selected}
+            onClick={onAdvance}
+          >
+            {line
+              ? step + 1 < total
+                ? 'Continue'
+                : 'Open ballot'
+              : vote?.runoff
+                ? 'Lock runoff vote'
+                : 'Lock Night choice'}
+          </button>
         )}
-        <BetrayalsPlayButton
-          label={advanceLabel}
-          faceLabel={advanceLabel}
-          disabled={
-            opening || verdict ? Boolean(hold) : !line && candidates.length > 0 && !selected
-          }
-          onClick={opening || verdict ? () => onFinishFilm('played') : onAdvance}
-        />
       </footer>
     </dialog>
   )

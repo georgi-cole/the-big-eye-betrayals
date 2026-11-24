@@ -20,7 +20,7 @@ import { sadBetrayalsPortrait } from './betrayalsAppearance'
 import type { CastleWeather, NightRoom } from './presentation'
 import { WeatherAtmosphere } from './WeatherAtmosphere'
 import { ConclaveFilm } from './ConclaveFilm'
-import { conclaveOpeningBeats } from './conclaveDirection'
+import { conclaveCueVolume, conclaveOpeningBeats, conclaveRevealed } from './conclaveDirection'
 import './CinematicScene.css'
 
 export type CinematicCastMember = {
@@ -28,6 +28,7 @@ export type CinematicCastMember = {
   name: string
   portrait?: string
   concealed?: boolean
+  conclaveSeat?: number
   human?: boolean
   exit?: { day: number }
 }
@@ -99,7 +100,7 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
     backdrop: chamber,
     beats: [
       { title: 'The decision is made', hold: 1650 },
-      { title: 'Sealed in wax', hold: 1450, cue: 'impact' },
+      { title: 'Sealed in wax', hold: 1450, cue: 'conclave_seal' },
       { title: 'The Conclave adjourns' },
     ],
   },
@@ -506,9 +507,7 @@ export function CinematicScene({
   const hold = scene.repeat ? Math.min(current.hold ?? 0, 480) : current.hold
   const complete = beat === beats.length - 1
   const arrival = arrivalBeats?.[beat]
-  const revealedConclave = new Set(
-    knownConclave.slice(0, arrival?.visibleCount ?? knownConclave.length).map(({ id }) => id)
-  )
+  const revealedConclave = conclaveRevealed(conclaveCast ?? [], arrival?.visibleCount)
   const subject = scene.concealed || scene.subject?.concealed ? undefined : scene.subject
   const deathLetter = scene.kind === 'death-letter'
   const art = scene.backdrop ?? backdrop
@@ -638,10 +637,15 @@ export function CinematicScene({
     lastCue.current = beat
     if (scene.kind === 'finale' && complete) playEffect?.('tv:finale_winner_stinger', 0.72)
     else if (departure && stageBeat === 1 && !motionReduced) playEffect?.('tv:' + roleCue, 0.72)
-    else if (current.cue) playEffect?.('tv:ceremony_' + current.cue, 0.6)
+    else if (current.cue)
+      playEffect?.(
+        'tv:ceremony_' + current.cue,
+        conclaveCast?.length ? conclaveCueVolume(current.cue) : 0.6
+      )
   }, [
     beat,
     complete,
+    conclaveCast,
     current.cue,
     departure,
     motionReduced,
@@ -673,11 +677,9 @@ export function CinematicScene({
         {conclaveCast?.length ? (
           <ConclaveFilm
             cast={conclaveCast}
-            entering={arrival?.entering}
+            frame={conclaveSeal && stageBeat > 0 ? 'sealed' : (arrival?.frame ?? 'table')}
             revealed={revealedConclave}
-            unmaskingId={arrival?.unmaskingId}
             focusId={arrival?.focusId}
-            letter={conclaveSeal ? (stageBeat > 0 ? 'sealed' : 'open') : undefined}
             reducedMotion={motionReduced}
           />
         ) : deathLetter ? (
@@ -714,7 +716,9 @@ export function CinematicScene({
         <div className="betrayals-cine__edge" aria-hidden="true" />
         <div className="betrayals-cine__caption" aria-live="polite" aria-atomic="true">
           <div key={title + ':' + (caption || '')} className="betrayals-cine__caption-beat">
-            <h2 id={titleId}>{title}</h2>
+            <h2 id={titleId} hidden={!title}>
+              {title || 'The Conclave'}
+            </h2>
             {caption && <p>{caption}</p>}
           </div>
         </div>

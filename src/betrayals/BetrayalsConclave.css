@@ -65,14 +65,49 @@
   pointer-events: none;
 }
 
-.betrayals-conclave-dialog header,
-.betrayals-conclave-dialog footer {
-  display: flex;
-  gap: 0.66rem;
-  justify-content: space-between;
+.betrayals-conclave-dialog__navigation {
+  display: grid;
+  grid-template-columns: minmax(3rem, 1fr) auto minmax(3rem, 1fr);
   align-items: center;
+  gap: 0.35rem;
+  min-height: 2.75rem;
+  text-align: center;
 }
-
+.betrayals-conclave-dialog__navigation .game-back-button {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+}
+.betrayals-conclave-dialog__navigation h1 {
+  grid-column: 2;
+  grid-row: 1;
+}
+.betrayals-conclave-dialog__navigation .betrayals-conclave-dialog__skip {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  min-width: 3rem;
+}
+.betrayals-conclave-dialog footer {
+  display: grid;
+  place-items: end center;
+  width: min(100%, 36rem);
+  min-height: 3.1rem;
+  justify-self: center;
+}
+.betrayals-conclave-dialog .betrayals-ceremony-action--primary {
+  min-height: 3.1rem;
+  min-width: 8.5rem;
+  max-width: 100%;
+  padding-inline: 1.7rem;
+  font-size: clamp(0.85rem, 3.9vw, 1.06rem);
+}
+.betrayals-conclave-dialog .betrayals-ceremony-action--primary::after {
+  right: 0.75rem;
+}
+.betrayals-conclave-dialog[data-ballot] .betrayals-conclave-dialog__shot {
+  filter: blur(7px) brightness(0.61);
+}
 .betrayals-conclave-dialog h1,
 .betrayals-conclave-dialog h2 {
   margin: 0;
@@ -89,17 +124,8 @@
   font-size: clamp(1.35rem, 5vw, 2.2rem);
 }
 
-.betrayals-conclave-dialog footer .betrayals-dock__play {
-  min-width: 5.8rem;
-  margin-inline-start: auto;
-  padding-inline: 0.65rem;
-}
-
-.betrayals-conclave-dialog header .cinematic-skip-button {
-  position: relative;
-  inset: auto;
-  z-index: auto;
-  flex-shrink: 0;
+.betrayals-conclave-dialog button:disabled {
+  opacity: 0.49;
 }
 
 .betrayals-conclave-dialog__caption,
@@ -115,15 +141,27 @@
 }
 
 .betrayals-conclave-dialog__caption {
-  margin-block-end: 0.3rem;
+  margin-block-end: 0.65rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0 0.35rem;
+  text-shadow:
+    0 2px 12px #000,
+    0 1px 3px #000;
 }
 .betrayals-conclave-dialog__caption p {
-  margin: 0 0 0.3rem;
-  color: #e5bc89;
+  margin: 0 0 0.5rem;
+  color: #dfba8b;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .betrayals-conclave-dialog__caption blockquote {
   margin: 0;
-  line-height: 1.45;
+  max-width: 32rem;
+  font-size: clamp(1.05rem, 3.8vw, 1.35rem);
+  line-height: 1.4;
 }
 
 .betrayals-conclave-dialog__ceremony {
@@ -141,35 +179,71 @@
 }
 
 .betrayals-conclave-dialog__ballot {
+  align-self: center;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 0.55rem;
-  max-height: min(74dvh, 100%);
+  gap: 0.65rem;
+  background: linear-gradient(155deg, #211719f5, #100e12f7);
+  overflow-y: auto;
 }
-
 .betrayals-conclave-dialog__ballot p {
   margin: 0;
   color: #e5cfb2;
 }
-
-.betrayals-conclave-dialog__candidates {
-  grid-row: 3;
+.betrayals-conclave-dialog__ballot .betrayals-gallery {
+  height: clamp(10rem, 33dvh, 18rem);
   min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 0.2rem;
+  border-color: #685343;
 }
-
-.betrayals-conclave-dialog__candidates .betrayals-roster {
-  grid-template-rows: none;
+.betrayals-conclave-dialog .betrayals-gallery__track {
+  grid-template-rows: minmax(0, 1fr);
+  grid-auto-columns: minmax(5rem, 40%);
+  padding: 0.75rem 0.9rem;
+  gap: 0.65rem;
+  background:
+    linear-gradient(130deg, #130c11ab, #130e12a8),
+    url('/assets/betrayals/portrait-wall.webp') left center / auto 100% repeat-x local;
+  scroll-snap-type: x proximity;
 }
-
-.betrayals-conclave-dialog__candidates .betrayals-roster > li {
-  aspect-ratio: 0.88;
+.betrayals-conclave-dialog .betrayals-gallery__track > li {
+  scroll-snap-align: center;
 }
-
-.betrayals-conclave-dialog__candidates .betrayals-roster__seat:focus-visible {
-  outline: 2px solid #f3c897;
-  outline-offset: 1px;
+.betrayals-conclave-dialog .betrayals-gallery__track button {
+  color: inherit;
+  cursor: inherit;
+}
+.betrayals-conclave-dialog .betrayals-gallery__track:has(> li:last-child:nth-child(-n + 2)) {
+  grid-auto-columns: minmax(0, 1fr);
+}
+.betrayals-conclave-dialog .betrayals-painting[data-caption-below] {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  gap: 0.3rem;
+  width: min(100cqw, calc(100cqh - 1.7rem), 10rem);
+  aspect-ratio: auto;
+}
+.betrayals-conclave-dialog .betrayals-painting__art {
+  width: 100%;
+  height: auto;
+}
+.betrayals-conclave-dialog .betrayals-painting__frame {
+  filter: saturate(0.65) brightness(0.82);
+}
+.betrayals-conclave-dialog .betrayals-painting__caption {
+  width: 100%;
+  min-height: 1.65rem;
+  padding: 0.25rem 0.4rem;
+  cursor: inherit;
+  overflow-wrap: anywhere;
+}
+.betrayals-conclave-dialog [aria-pressed='true'] .betrayals-painting__frame {
+  filter: brightness(1.15) drop-shadow(0 0 5px #f2b9669e);
+}
+.betrayals-conclave-dialog [aria-pressed='true'] .betrayals-painting__caption {
+  color: #fff2d3;
+  filter: brightness(1.16) drop-shadow(0 0 0.4rem #f2b96666);
+}
+.betrayals-conclave-dialog .betrayals-gallery__track button:focus-visible {
+  outline: 2px solid #edc699;
 }

@@ -4,28 +4,40 @@ import { ANTIQUE_PORTRAIT_FRAME_URL } from '../appearance/portraitFraming'
 import type { Seat } from './run'
 import './PortraitGallery.css'
 
+type GalleryGuest = Pick<Seat, 'id' | 'name' | 'portrait'>
+
 const base = import.meta.env.BASE_URL
 
-function Painting({ guest }: { guest: Seat }) {
+function Painting({ guest, captionBelow }: { guest: GalleryGuest; captionBelow?: boolean }) {
   const formal = getAppearanceAsset(appearanceFromAssetUrl(guest.portrait), 'formal')
   const [fallback, setFallback] = useState(false)
   const portrait = formal && !fallback ? base + formal : guest.portrait
   return (
-    <div className="betrayals-painting">
-      <div className="betrayals-painting__window" aria-hidden="true">
-        {portrait ? (
-          <img src={portrait} alt="" draggable={false} onError={() => setFallback(true)} />
-        ) : (
-          <span>{guest.name[0]}</span>
-        )}
+    <div className="betrayals-painting" data-caption-below={captionBelow || undefined}>
+      <div className="betrayals-painting__art">
+        <div className="betrayals-painting__window" aria-hidden="true">
+          {portrait ? (
+            <img src={portrait} alt="" draggable={false} onError={() => setFallback(true)} />
+          ) : (
+            <span>{guest.name[0]}</span>
+          )}
+        </div>
+        <img
+          className="betrayals-painting__frame"
+          src={ANTIQUE_PORTRAIT_FRAME_URL}
+          alt=""
+          draggable={false}
+        />
       </div>
-      <img
-        className="betrayals-painting__frame"
-        src={ANTIQUE_PORTRAIT_FRAME_URL}
-        alt=""
-        draggable={false}
-      />
-      <span className="betrayals-painting__plaque">{guest.name}</span>
+      <span
+        className={
+          captionBelow
+            ? 'betrayals-ceremony-action--secondary betrayals-painting__caption'
+            : 'betrayals-painting__plaque'
+        }
+      >
+        {guest.name}
+      </span>
     </div>
   )
 }
@@ -35,19 +47,27 @@ export function PortraitGallery({
   target,
   reducedMotion,
   onSelect,
+  variant,
 }: {
-  guests: readonly Seat[]
-  target?: Seat
+  guests: readonly GalleryGuest[]
+  target?: GalleryGuest
   reducedMotion: boolean
   onSelect: (id: string) => void
+  variant?: 'conclave'
 }) {
+  const swipeOnly = variant === 'conclave'
+  const focus = swipeOnly ? undefined : target
   const gallery = useRef<HTMLDivElement>(null)
   const track = useRef<HTMLUListElement>(null)
   const selectedButton = useRef<HTMLButtonElement>(null)
   const drag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null)
   const [origin, setOrigin] = useState<CSSProperties>()
 
-  function focusPainting(guest: Seat, button: HTMLButtonElement) {
+  function focusPainting(guest: GalleryGuest, button: HTMLButtonElement) {
+    if (swipeOnly) {
+      onSelect(target?.id === guest.id ? '' : guest.id)
+      return
+    }
     const wall = gallery.current?.getBoundingClientRect()
     if (wall) {
       const picture = button.getBoundingClientRect()
@@ -81,12 +101,18 @@ export function PortraitGallery({
   }
 
   return (
-    <div className="betrayals-gallery" ref={gallery} data-focused={Boolean(target) || undefined}>
+    <div
+      className="betrayals-gallery"
+      data-motion={reducedMotion ? 'reduced' : undefined}
+      ref={gallery}
+      data-focused={Boolean(focus) || undefined}
+      data-variant={variant}
+    >
       <ul
         className="betrayals-gallery__track"
         ref={track}
         aria-label="Eligible contestants"
-        inert={Boolean(target)}
+        inert={Boolean(focus)}
         onPointerDown={(event) => {
           if (event.pointerType === 'mouse' && event.button === 0) {
             drag.current = {
@@ -108,16 +134,21 @@ export function PortraitGallery({
       >
         {guests.map((guest) => (
           <li key={guest.id}>
-            <button type="button" onClick={(event) => focusPainting(guest, event.currentTarget)}>
-              <Painting guest={guest} />
+            <button
+              type="button"
+              aria-label={guest.name}
+              aria-pressed={swipeOnly ? guest.id === target?.id : undefined}
+              onClick={(event) => focusPainting(guest, event.currentTarget)}
+            >
+              <Painting guest={guest} captionBelow={swipeOnly} />
             </button>
           </li>
         ))}
       </ul>
-      {target ? (
+      {focus ? (
         <div className="betrayals-gallery__focus">
-          <div key={target.id} className="betrayals-gallery__subject" style={origin}>
-            <Painting guest={target} />
+          <div key={focus.id} className="betrayals-gallery__subject" style={origin}>
+            <Painting guest={focus} />
           </div>
           <button
             ref={(button) => button?.focus({ preventScroll: true })}
@@ -128,7 +159,7 @@ export function PortraitGallery({
             Choose another guest
           </button>
         </div>
-      ) : (
+      ) : !swipeOnly ? (
         <div className="betrayals-gallery__nav">
           {[-1, 1].map((direction) => (
             <button
@@ -146,7 +177,7 @@ export function PortraitGallery({
             </button>
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

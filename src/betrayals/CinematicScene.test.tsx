@@ -4,6 +4,7 @@ import { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance
 import { ConclaveDiscussion } from './BetrayalsConclave'
 import { BETRAYALS_AI_POOL } from './cast'
 import { CinematicScene } from './CinematicScene'
+import { conclaveOpeningBeats, conclaveRevealed } from './conclaveDirection'
 import { cinematicFor, dawnBroadcast, presentationAfter } from './presentation'
 import { startRun, viewFor } from './run'
 
@@ -19,7 +20,10 @@ const known = { id: 'ash', name: 'Ash', portrait: '/assets/skins/Ash_avatar.webp
 const hidden = { id: 'alien', name: 'Hidden identity', portrait: '/hidden.webp', concealed: true }
 
 describe('Betrayals cinematic scenes', () => {
-  afterEach(() => vi.useRealTimers())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   it('reveals only known conclave participants and waits for the player to continue', () => {
     vi.useFakeTimers()
@@ -36,23 +40,51 @@ describe('Betrayals cinematic scenes', () => {
       />
     )
     expect(screen.queryByText(known.name)).not.toBeInTheDocument()
-    const camera = container.querySelector('.conclave-film__canvas')
-    expect(container.querySelector('[data-group="2"]')).toHaveAttribute('data-entering', 'true')
-    act(() => vi.advanceTimersByTime(3450))
-    expect(container.querySelector('[data-group="2"]')).not.toHaveAttribute('data-entering')
-    act(() => vi.advanceTimersByTime(970))
-    expect(screen.getByText('The hoods come down')).toBeInTheDocument()
-    expect(container.querySelector('[data-group="2"]')).toHaveAttribute('data-focus', known.id)
-    expect(container.querySelector('.conclave-film__canvas')).toBe(camera)
-    act(() => vi.advanceTimersByTime(1980))
+    const camera = container.querySelector('.conclave-film')
+    expect(camera).toHaveAttribute('data-frame', 'corridor')
+    act(() => vi.advanceTimersByTime(1700))
+    expect(camera).toHaveAttribute('data-frame', 'latch')
+    act(() => vi.advanceTimersByTime(1020))
+    expect(camera).toHaveAttribute('data-frame', 'entry')
+    act(() => vi.advanceTimersByTime(2600))
+    expect(camera).toHaveAttribute('data-frame', 'table')
+    act(() => vi.advanceTimersByTime(1850))
+    expect(camera).toHaveAttribute('data-frame', 'hood')
+    expect(screen.queryByText(known.name)).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(2150))
     expect(screen.getByText(known.name)).toBeInTheDocument()
-    expect(container.querySelector('.conclave-film__canvas')).toBe(camera)
+    expect(camera).toHaveAttribute('data-frame', 'portrait')
+    expect(camera).toHaveAttribute('data-focus', known.id)
     expect(screen.queryByText(hidden.name)).not.toBeInTheDocument()
     expect(container.querySelector(`[src="${hidden.portrait}"]`)).not.toBeInTheDocument()
     expect(onComplete).not.toHaveBeenCalled()
-    act(() => vi.advanceTimersByTime(1120))
+    act(() => vi.advanceTimersByTime(2550))
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     expect(onComplete).toHaveBeenCalledOnce()
+  })
+
+  it('uncovers the known guests one at a time while preserving hidden identities', () => {
+    const player = { id: 'human', name: 'Player', human: true }
+    const second = { id: 'finn', name: 'Finn' }
+    const cast = [known, hidden, player, second]
+    const first = conclaveOpeningBeats(cast, true)
+    const revealed = (frame: (typeof first)[number]) => [
+      ...conclaveRevealed(cast, frame.visibleCount),
+    ]
+    expect(
+      first
+        .filter(({ frame }) => frame !== 'portrait')
+        .slice(0, -1)
+        .map(revealed)
+    ).toEqual([[player.id], [player.id], [player.id], [player.id], [player.id]])
+    expect(first.filter(({ frame }) => frame === 'portrait').map(revealed)).toEqual([
+      [player.id, known.id],
+      [player.id, known.id, second.id],
+    ])
+    expect(conclaveOpeningBeats(cast, false).map(revealed)).toEqual([
+      [player.id, known.id, second.id],
+      [player.id, known.id, second.id],
+    ])
   })
 
   it('opens later conclaves with the current guests already unmasked', () => {
@@ -68,73 +100,88 @@ describe('Betrayals cinematic scenes', () => {
         onComplete={vi.fn()}
       />
     )
-    expect(container.querySelector('[data-group="3"]')).not.toHaveAttribute('data-entering')
-    act(() => vi.advanceTimersByTime(1800))
+    expect(container.querySelector('[data-group="3"]')).toHaveAttribute('data-frame', 'table')
+    act(() => vi.advanceTimersByTime(700))
     expect(screen.getByText('Ash · Finn · Rune')).toBeVisible()
   })
 
-  it('shares the main controls and roster for both Conclave ballots', () => {
+  it('keeps the discussion and ballot accessible after skipping the opening film', () => {
+    vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
+      this: HTMLDialogElement
+    ) {
+      this.open = true
+    })
     const run = startRun(
       { id: 'human', name: 'Georgi' },
       BETRAYALS_AI_POOL,
       { publicMode: false, realityMode: 'off' },
       { id: 'conclave-ballot', roleSeed: 32, publicSeed: 12 }
     )
-    const [, first, second] = run.seats
+    const [, candidate, runoffCandidate] = run.seats
+    const line = { speakerId: known.id, speakerName: known.name, argument: 'What about Finn?' }
     const props = {
       cast: [known],
       view: viewFor(run, run.humanId),
-      humanId: run.humanId,
-      vote: { targetIds: [first.id, second.id], proposals: [] },
-      step: 1,
-      total: 3,
+      vote: { targetIds: [candidate.id], proposals: [], discussion: [line] },
+      step: 0,
+      total: 1,
       onSelect: vi.fn(),
       onAdvance: vi.fn(),
       onBack: vi.fn(),
       onSkip: vi.fn(),
       onFinishFilm: vi.fn(),
     }
-    const preview = render(
-      <ConclaveDiscussion
-        {...props}
-        line={{ speakerId: known.id, speakerName: known.name, argument: 'Watch the quiet ones.' }}
-      />
-    )
-    const dialog = within(screen.getByRole('dialog', { name: 'The Conclave' }))
-    expect(dialog.getByRole('button', { name: 'Back' })).toHaveClass('game-back-button')
-    expect(dialog.getByRole('button', { name: 'Next speaker' })).toHaveClass('betrayals-dock__play')
-    fireEvent.click(dialog.getByRole('button', { name: 'Skip to ballot' }))
+    const { rerender } = render(<ConclaveDiscussion {...props} opening="first" />)
+    const openingSkip = screen.getByRole('button', { name: 'Skip cinematic' })
+    expect(openingSkip).toHaveTextContent(/^Skip$/)
+    expect(openingSkip.closest('header')).not.toBeNull()
+    fireEvent.click(openingSkip)
+    expect(props.onFinishFilm).toHaveBeenCalledWith('skipped')
+
+    rerender(<ConclaveDiscussion {...props} line={line} />)
+    expect(screen.getByText(line.argument)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip to ballot' }))
     expect(props.onSkip).toHaveBeenCalledOnce()
 
-    preview.rerender(<ConclaveDiscussion {...props} />)
-    const ballot = within(dialog.getByRole('list', { name: 'Contestant roster' }))
-    expect(ballot.getAllByRole('button')).toHaveLength(2)
-    const nominee = ballot.getByRole('button', { name: first.name })
-    expect(nominee).toHaveClass('betrayals-roster__seat')
-    expect(dialog.getByRole('button', { name: 'Lock Night choice' })).toBeDisabled()
-    fireEvent.click(nominee)
-    expect(props.onSelect).toHaveBeenCalledWith(first.id)
-
-    preview.rerender(
-      <ConclaveDiscussion
-        {...props}
-        selectedId={first.id}
-        vote={{ targetIds: [second.id], proposals: [], runoff: second.name }}
-      />
+    rerender(<ConclaveDiscussion {...props} step={1} />)
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(back).toHaveClass('game-back-button')
+    expect(back.closest('header')).not.toBeNull()
+    fireEvent.click(back)
+    expect(props.onBack).toHaveBeenCalledOnce()
+    const lock = screen.getByRole('button', { name: 'Lock Night choice' })
+    expect(lock).toBeDisabled()
+    expect(within(lock.closest('footer')!).getAllByRole('button')).toEqual([lock])
+    expect(screen.queryByRole('button', { name: 'Scroll portraits right' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose another guest' })).not.toBeInTheDocument()
+    const painting = screen.getByRole('button', { name: candidate.name })
+    expect(within(painting).getByText(candidate.name)).toHaveClass(
+      'betrayals-ceremony-action--secondary'
     )
-    expect(ballot.queryByRole('button', { name: first.name })).toBeNull()
-    expect(dialog.getByRole('button', { name: 'Lock runoff vote' })).toBeDisabled()
-
-    preview.rerender(
-      <ConclaveDiscussion
-        {...props}
-        selectedId={second.id}
-        vote={{ targetIds: [second.id], proposals: [], runoff: second.name }}
-      />
-    )
-    expect(ballot.getByRole('button', { name: second.name, pressed: true })).toBeVisible()
-    fireEvent.click(dialog.getByRole('button', { name: 'Lock runoff vote' }))
+    expect(painting).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(painting)
+    expect(props.onSelect).toHaveBeenLastCalledWith(candidate.id)
+    rerender(<ConclaveDiscussion {...props} selectedId={candidate.id} step={1} />)
+    expect(painting).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(painting)
+    expect(props.onSelect).toHaveBeenLastCalledWith('')
+    fireEvent.click(screen.getByRole('button', { name: 'Lock Night choice' }))
     expect(props.onAdvance).toHaveBeenCalledOnce()
+
+    const runoff = { ...props.vote, targetIds: [runoffCandidate.id], runoff: runoffCandidate.name }
+    rerender(<ConclaveDiscussion {...props} vote={runoff} selectedId={candidate.id} step={1} />)
+    expect(screen.queryByRole('button', { name: candidate.name })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lock runoff vote' })).toBeDisabled()
+    rerender(
+      <ConclaveDiscussion {...props} vote={runoff} selectedId={runoffCandidate.id} step={1} />
+    )
+    expect(screen.getByRole('button', { name: runoffCandidate.name, pressed: true })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Lock runoff vote' })).toBeEnabled()
+
+    rerender(<ConclaveDiscussion {...props} verdict="Finn was chosen." />)
+    expect(screen.getByText('Finn was chosen.')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(props.onFinishFilm).toHaveBeenLastCalledWith('played')
   })
 
   it('queues every night’s conclave for active Betrayers and omits secret and banished identities', () => {
@@ -144,7 +191,7 @@ describe('Betrayals cinematic scenes', () => {
       { publicMode: false, realityMode: 'off' },
       { id: 'conclave-replay', roleSeed: 32, publicSeed: 12 }
     )
-    const [, ash, hidden, banished, loyal] = run.seats
+    const [, ash, banished, hidden, loyal] = run.seats
     const before = {
       ...run,
       day: 2,
@@ -177,6 +224,7 @@ describe('Betrayals cinematic scenes', () => {
       id: expect.stringMatching(/^hooded-/),
       name: 'Hooded guest',
       concealed: true,
+      conclaveSeat: 3,
     })
     expect(cinematicFor(night, 'conclave-arrival', loyal.id, '').cast).toEqual([])
     expect(cinematicFor(night, 'conclave-arrival', banished.id, '').cast).toEqual([])

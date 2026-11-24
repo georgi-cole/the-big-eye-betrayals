@@ -9,20 +9,26 @@ import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
 import { FINALE_CAST_SIZE } from './seasonPhases.ts'
+import { composeConclaveConversation } from './conclaveConversation.ts'
+import type { CinematicCastMember } from './CinematicScene'
 
-type ConclaveProposal = {
+export type ConclaveProposal = {
   speakerId: string
   speakerName: string
   portrait?: string
+  nomineeId: string
   nomineeName: string
   argument: string
 }
 
-export type ConclaveLine = Omit<ConclaveProposal, 'nomineeName'> & { nomineeName?: string }
+export type ConclaveLine = Omit<ConclaveProposal, 'nomineeId' | 'nomineeName'> & {
+  nomineeName?: string
+}
 
 export type ConclaveView = {
   targetIds: string[]
   proposals: ConclaveProposal[]
+  discussion: ConclaveLine[]
   shieldBriefing?: ConclaveLine[]
   runoff?: string
   ownArgument?: string
@@ -97,12 +103,13 @@ export function conclaveGuests(run: Run, actorId: string | null) {
   if (!actorId || !isActiveBetrayer(run, actorId)) return []
   const known = new Set([actorId, ...knownTeammateIds(run, actorId)])
   return run.seats
-    .filter(({ id, exit }) => !exit && run.private.betrayers.includes(id))
-    .map(({ id, name, portrait }, index) =>
-      known.has(id)
-        ? { id, name, portrait, human: id === run.humanId }
-        : { id: 'hooded-' + index, name: 'Hooded guest', concealed: true }
-    )
+    .filter(({ id }) => run.private.betrayers.includes(id))
+    .flatMap<CinematicCastMember>(({ id, name, portrait, exit }, conclaveSeat) => {
+      if (exit) return []
+      return known.has(id)
+        ? [{ id, name, portrait, human: id === run.humanId, conclaveSeat }]
+        : [{ id: 'hooded-' + conclaveSeat, name: 'Hooded guest', concealed: true, conclaveSeat }]
+    })
 }
 
 export function resolveNight(
@@ -227,23 +234,23 @@ function caseFor(run: Run, voterId: string, targetId: string) {
       (claim) => claim.speakerId === targetId && threats.has(claim.targetId)
     )
   ) {
-    return 'They were building a case against us at the table. By morning they could have more people behind it.'
+    return 'They started building a case at the table. Give them another day and it’ll stick.'
   }
   const castAgainst = run.lastTable?.revealedBallots?.find(
     ({ voterId }) => voterId === targetId
   )?.targetId
   if (castAgainst === voterId)
-    return 'They already voted for me. They could bring others next time.'
+    return 'They wrote my name tonight. Give them another day and they’ll bring someone with them.'
   if (castAgainst && knownTeammateIds(run, voterId).includes(castAgainst))
-    return 'They voted for one of us. That is a campaign we cannot let grow.'
+    return 'They came for one of us tonight. They’ll try again tomorrow.'
   if (rapport(ownConversations, voterId, targetId) > 0.12) {
-    return 'They trust me. Their absence could throw tomorrow’s alliances off balance.'
+    return 'They trust me. By breakfast people will be looking in a different direction.'
   }
   if ((run.lastTable?.tally[targetId] ?? 0) > 0) {
-    return 'Their name is already on slates. Take them out and the table has to start over.'
+    return 'People are already voting for them. Their seat goes empty and the whole table has to rethink.'
   }
   if (ownConversations.some(({ suspectId }) => suspectId === targetId)) {
-    return 'I’ve heard their name in private. By tomorrow, they could be setting the agenda.'
+    return 'Their name keeps coming up in private. Taking them out would throw that conversation off.'
   }
   const possibilities = [
     'Nobody wrote their name down. By daybreak the room will be guessing why we chose them.',
@@ -276,6 +283,7 @@ export function getConclaveView(
     return {
       targetIds,
       proposals: [],
+      discussion: [],
       runoff: ballotLine(run, vote.nominations),
       ownArgument:
         selectedId === unchanged(actorId)?.targetId ? 'You are keeping your vote.' : undefined,
@@ -297,6 +305,7 @@ export function getConclaveView(
         speakerId: speakerIdFor(voterId),
         speakerName: speaker?.name ?? 'Hooded voice',
         portrait: speaker?.portrait,
+        nomineeId: targetId,
         nomineeName: nominee.name,
         argument: caseFor(run, voterId, targetId),
       },
@@ -310,26 +319,28 @@ export function getConclaveView(
     const subject = seats.get(subjectId)?.name
     if (!subject) return []
     const argument = read.conflicting
-      ? `I've heard different things about ${subject}'s shield. I wouldn't bet the night on either story.`
+      ? `I heard two different stories about ${subject} and that shield. I'd keep a second name ready.`
       : read.protected >= read.exposed
         ? read.witnessedGift
-          ? `I had reason to think ${subject} was covered earlier. That could have changed.`
+          ? `I think ${subject} got a shield earlier. They might have passed it on.`
           : read.firsthand
-            ? `${subject} told me they had a shield. Could be a bluff, but I'd keep a second name in mind.`
-            : `I heard ${subject} might have a shield. It's secondhand, but I'd keep it in mind.`
+            ? `${subject} told me they had a shield. Could be a bluff. Do we want to risk it?`
+            : `I heard ${subject} might have a shield. It's secondhand. Who else have we got?`
         : read.firsthand
           ? `${subject} says they have no shield. They could be trying to draw us in.`
-          : `I heard ${subject} might be open tonight. I wouldn't take a rumor as proof.`
+          : `I heard ${subject} might be open tonight. I can't vouch for it.`
     return [
       {
         speakerId: speakerIdFor(speakerId),
         speakerName: speaker?.name ?? 'Hooded voice',
         portrait: speaker?.portrait,
+        aboutId: subjectId,
         argument,
       },
     ]
   })
-  return { targetIds, proposals, ownArgument, shieldBriefing }
+  const discussion = composeConclaveConversation(proposals, shieldBriefing)
+  return { targetIds, proposals, discussion, ownArgument, shieldBriefing }
 }
 
 export function getConclaveVerdict(run: Run, actorId: string | null) {
