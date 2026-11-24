@@ -23,64 +23,69 @@ import { useSeasonAiCapability } from '../../ai/competition/SeasonAiContext'
  */
 
 import { useCompetitionResultCheckpoint } from '../../minigames/competitionResultContext'
-import { useReducer, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { trapAuctionReducer } from './trapAuctionReducer';
-import type { TrapAuctionState, TrapAuctionPlayer, TrapAuctionPrizeType } from './trapAuctionTypes';
+import { useReducer, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { trapAuctionReducer } from './trapAuctionReducer'
+import type { TrapAuctionState, TrapAuctionPlayer, TrapAuctionPrizeType } from './trapAuctionTypes'
 import {
   TRAP_AUCTION_CONFIG,
   PERSONALITY_DESCRIPTIONS,
   PERSONALITY_LABELS,
   PERSONALITY_ICONS,
-} from './trapAuctionTypes';
+} from './trapAuctionTypes'
 import {
   createInitialPlayers,
   getAllowedBidRange,
   MOCK_PARTICIPANTS,
   shouldRevealPlayerBank,
-} from './trapAuctionHelpers';
-import type { MinigameParticipant } from '../MinigameHost/MinigameHost';
-import type { ReactMinigameCompletion } from '../MinigameHost/MinigameHost';
-import { resolveAvatarCandidates } from '../../utils/avatar';
-import { resolvePresentationAvatarCandidates } from '../../utils/presentationAvatar';
-import './TrapAuction.css';
+} from './trapAuctionHelpers'
+import type { MinigameParticipant } from '../MinigameHost/MinigameHost'
+import type { ReactMinigameCompletion } from '../MinigameHost/MinigameHost'
+import { resolveAvatarCandidates } from '../../utils/avatar'
+import { resolvePresentationAvatarCandidates } from '../../utils/presentationAvatar'
+import './TrapAuction.css'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface TrapAuctionProps {
-  participants?: MinigameParticipant[];
-  participantIds?: string[];
-  prizeType?: TrapAuctionPrizeType;
-  competitionTitle?: string;
-  seed?: number;
-  onComplete?: (completion: ReactMinigameCompletion) => void;
+  participants?: MinigameParticipant[]
+  participantIds?: string[]
+  prizeType?: TrapAuctionPrizeType
+  competitionTitle?: string
+  currency?: { singular: string; plural: string; symbol: string }
+  seed?: number
+  onComplete?: (completion: ReactMinigameCompletion) => void
   /** Standalone / challenge mode fallback */
-  onFinish?: (value: number) => void;
-  autoStart?: boolean;
+  onFinish?: (value: number) => void
+  autoStart?: boolean
 }
 
 // ─── Avatar helper ────────────────────────────────────────────────────────────
 
 function resolvePlayerAvatarSrc(player: TrapAuctionPlayer): string {
-  const candidates = resolveAvatarCandidates({ id: player.id, name: player.name, avatar: player.avatar }).flatMap(resolvePresentationAvatarCandidates);
-  return candidates[0] ?? '';
+  const candidates = resolveAvatarCandidates({
+    id: player.id,
+    name: player.name,
+    avatar: player.avatar,
+  }).flatMap(resolvePresentationAvatarCandidates)
+  return candidates[0] ?? ''
 }
 
 // ─── AvatarImg sub-component ─────────────────────────────────────────────────
 
 interface AvatarImgProps {
-  player: TrapAuctionPlayer;
-  className?: string;
+  player: TrapAuctionPlayer
+  className?: string
 }
 
 function AvatarImg({ player, className = '' }: AvatarImgProps) {
-  const [src, setSrc] = useState(() => resolvePlayerAvatarSrc(player));
-  const [failed, setFailed] = useState(false);
+  const [src, setSrc] = useState(() => resolvePlayerAvatarSrc(player))
+  const [failed, setFailed] = useState(false)
 
   function handleError() {
     if (!failed) {
-      setSrc(`https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(player.name)}`);
-      setFailed(true);
+      setSrc(`https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(player.name)}`)
+      setFailed(true)
     }
   }
 
@@ -89,7 +94,7 @@ function AvatarImg({ player, className = '' }: AvatarImgProps) {
       <div className={`ta-avatar-fallback ${className}`} aria-label={player.name}>
         {player.name.charAt(0).toUpperCase()}
       </div>
-    );
+    )
   }
 
   return (
@@ -99,7 +104,7 @@ function AvatarImg({ player, className = '' }: AvatarImgProps) {
       alt={player.name}
       onError={handleError}
     />
-  );
+  )
 }
 
 // ─── Initial state builder ────────────────────────────────────────────────────
@@ -107,9 +112,9 @@ function AvatarImg({ player, className = '' }: AvatarImgProps) {
 function buildInitialState(
   participants: MinigameParticipant[],
   seed: number,
-  prizeType: TrapAuctionPrizeType,
+  prizeType: TrapAuctionPrizeType
 ): TrapAuctionState {
-  const players = createInitialPlayers(participants, seed);
+  const players = createInitialPlayers(participants, seed)
   return {
     phase: 'intro',
     round: 1,
@@ -125,7 +130,7 @@ function buildInitialState(
     prizeType,
     seed,
     rematchCount: 0,
-  };
+  }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -134,171 +139,181 @@ export default function TrapAuction({
   participants,
   prizeType = 'LOH',
   competitionTitle,
+  currency = { singular: 'Eyeolens', plural: 'Eyeolens', symbol: '👁' },
   seed = 42,
   onComplete,
   onFinish,
   autoStart = false,
 }: TrapAuctionProps) {
   const aiCapability = useSeasonAiCapability()
-  const resolvedParticipants = participants && participants.length > 0
-    ? participants
-    : MOCK_PARTICIPANTS;
+  const currencyName = (amount: number) => (amount === 1 ? currency.singular : currency.plural)
+  const resolvedParticipants =
+    participants && participants.length > 0 ? participants : MOCK_PARTICIPANTS
 
   const [state, dispatch] = useReducer(
     trapAuctionReducer,
     { resolvedParticipants, seed, prizeType },
-    ({ resolvedParticipants, seed, prizeType }) =>
-      ({ ...buildInitialState(resolvedParticipants, seed, prizeType), aiCapability }),
-  );
-  const [bidValue, setBidValue] = useState<number>(0);
-  const [personalityMapOpen, setPersonalityMapOpen] = useState(false);
-  const [showSpectatePrompt, setShowSpectatePrompt] = useState(false);
-  const autoRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    ({ resolvedParticipants, seed, prizeType }) => ({
+      ...buildInitialState(resolvedParticipants, seed, prizeType),
+      aiCapability,
+    })
+  )
+  const [bidValue, setBidValue] = useState<number>(0)
+  const [personalityMapOpen, setPersonalityMapOpen] = useState(false)
+  const [showSpectatePrompt, setShowSpectatePrompt] = useState(false)
+  const autoRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Initialise bid slider to recommended value when bid phase begins
   useEffect(() => {
-    if (state.phase !== 'bid') return;
-    const human = state.players.find((p) => p.isHuman && p.isAlive);
-    if (!human) return;
-    const { recommended } = getAllowedBidRange(human, state.round);
-    setBidValue(recommended);
+    if (state.phase !== 'bid') return
+    const human = state.players.find((p) => p.isHuman && p.isAlive)
+    if (!human) return
+    const { recommended } = getAllowedBidRange(human, state.round)
+    setBidValue(recommended)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.round]);
+  }, [state.phase, state.round])
 
   // Auto-advance reveal cards — always timed; no manual flip controls
   useEffect(() => {
-    if (state.phase !== 'reveal') return;
-    const remaining = state.roundReveals.length - state.revealIndex;
-    if (remaining <= 0) return;
+    if (state.phase !== 'reveal') return
+    const remaining = state.roundReveals.length - state.revealIndex
+    if (remaining <= 0) return
 
     const delay = state.fastForward
       ? TRAP_AUCTION_CONFIG.fastRevealStepMs
-      : TRAP_AUCTION_CONFIG.revealStepMs;
+      : TRAP_AUCTION_CONFIG.revealStepMs
 
     autoRevealRef.current = setTimeout(() => {
-      dispatch({ type: 'ADVANCE_REVEAL' });
-    }, delay);
+      dispatch({ type: 'ADVANCE_REVEAL' })
+    }, delay)
 
     return () => {
       if (autoRevealRef.current !== null) {
-        clearTimeout(autoRevealRef.current);
-        autoRevealRef.current = null;
+        clearTimeout(autoRevealRef.current)
+        autoRevealRef.current = null
       }
-    };
-  }, [state.phase, state.revealIndex, state.fastForward, state.roundReveals.length]);
+    }
+  }, [state.phase, state.revealIndex, state.fastForward, state.roundReveals.length])
 
   // Auto-advance when all reveal cards are visible
   useEffect(() => {
-    if (state.phase !== 'reveal') return;
-    if (state.revealIndex < state.roundReveals.length) return;
+    if (state.phase !== 'reveal') return
+    if (state.revealIndex < state.roundReveals.length) return
 
-    const delay = state.fastForward ? 500 : 900;
+    const delay = state.fastForward ? 500 : 900
     const t = setTimeout(() => {
-      dispatch({ type: 'ADVANCE_TO_ELIMINATION' });
-    }, delay);
-    return () => clearTimeout(t);
-  }, [state.phase, state.revealIndex, state.roundReveals.length, state.fastForward]);
+      dispatch({ type: 'ADVANCE_TO_ELIMINATION' })
+    }, delay)
+    return () => clearTimeout(t)
+  }, [state.phase, state.revealIndex, state.roundReveals.length, state.fastForward])
 
   // Auto-advance the elimination cinematic unless the human needs a spectate choice
   useEffect(() => {
-    if (state.phase !== 'elimination') return;
-    const humanEliminatedThisRound = state.lastEliminatedIds.some((id) =>
-      state.players.find((p) => p.id === id)?.isHuman,
-    );
-    if (humanEliminatedThisRound && !state.spectating) return;
+    if (state.phase !== 'elimination') return
+    const humanEliminatedThisRound = state.lastEliminatedIds.some(
+      (id) => state.players.find((p) => p.id === id)?.isHuman
+    )
+    if (humanEliminatedThisRound && !state.spectating) return
 
-    const delay = state.fastForward ? 700 : TRAP_AUCTION_CONFIG.eliminationPauseMs;
+    const delay = state.fastForward ? 700 : TRAP_AUCTION_CONFIG.eliminationPauseMs
     const t = setTimeout(() => {
-      dispatch({ type: 'CONTINUE_AFTER_ELIMINATION' });
-    }, delay);
-    return () => clearTimeout(t);
-  }, [state.phase, state.fastForward, state.lastEliminatedIds, state.players, state.spectating]);
+      dispatch({ type: 'CONTINUE_AFTER_ELIMINATION' })
+    }, delay)
+    return () => clearTimeout(t)
+  }, [state.phase, state.fastForward, state.lastEliminatedIds, state.players, state.spectating])
 
   // Auto-advance spectator bid phase
   useEffect(() => {
-    if (!state.spectating || state.phase !== 'bid') return;
+    if (!state.spectating || state.phase !== 'bid') return
     // In spectator mode, auto-submit a dummy bid for the human slot so the
     // round can proceed (human is already eliminated, this triggers AI bids)
-    const t = setTimeout(() => {
-      dispatch({ type: 'SUBMIT_HUMAN_BID', bid: 0 });
-    }, state.fastForward ? 300 : 1200);
-    return () => clearTimeout(t);
-  }, [state.phase, state.spectating, state.round, state.fastForward]);
+    const t = setTimeout(
+      () => {
+        dispatch({ type: 'SUBMIT_HUMAN_BID', bid: 0 })
+      },
+      state.fastForward ? 300 : 1200
+    )
+    return () => clearTimeout(t)
+  }, [state.phase, state.spectating, state.round, state.fastForward])
 
   // When game completes, show spectate prompt if applicable, else fire onComplete
   useEffect(() => {
-    if (state.phase !== 'complete') return;
+    if (state.phase !== 'complete') return
     // nothing — handled by the complete screen render
-  }, [state.phase]);
+  }, [state.phase])
 
   // Show spectate prompt when human gets eliminated (phase = elimination, humanEliminated)
-  const lastEliminatedIds = state.lastEliminatedIds;
-  const players = state.players;
+  const lastEliminatedIds = state.lastEliminatedIds
+  const players = state.players
   useEffect(() => {
     if (
       state.phase === 'elimination' &&
       state.humanEliminated &&
       !state.spectating &&
-      lastEliminatedIds.some((id) =>
-        players.find((p) => p.id === id)?.isHuman,
-      )
+      lastEliminatedIds.some((id) => players.find((p) => p.id === id)?.isHuman)
     ) {
-      const t = setTimeout(() => setShowSpectatePrompt(true), 1200);
-      return () => clearTimeout(t);
+      const t = setTimeout(() => setShowSpectatePrompt(true), 1200)
+      return () => clearTimeout(t)
     } else {
-      setShowSpectatePrompt(false);
+      setShowSpectatePrompt(false)
     }
-  }, [state.phase, state.humanEliminated, state.spectating, lastEliminatedIds, players]);
+  }, [state.phase, state.humanEliminated, state.spectating, lastEliminatedIds, players])
 
   // autoStart: skip intro
   useEffect(() => {
     if (autoStart && state.phase === 'intro') {
-      dispatch({ type: 'START_BID' });
+      dispatch({ type: 'START_BID' })
     }
-  }, [autoStart, state.phase]);
+  }, [autoStart, state.phase])
 
   function handleGameComplete() {
-    if (!state.winner) return;
+    if (!state.winner) return
     if (onComplete) {
       const ordered = [...state.players].sort(
-        (a, b) => (a.placement ?? Number.MAX_SAFE_INTEGER) - (b.placement ?? Number.MAX_SAFE_INTEGER),
-      );
-      const lastPlaceId = ordered[ordered.length - 1]?.id ?? null;
-      const playerCount = ordered.length;
+        (a, b) =>
+          (a.placement ?? Number.MAX_SAFE_INTEGER) - (b.placement ?? Number.MAX_SAFE_INTEGER)
+      )
+      const lastPlaceId = ordered[ordered.length - 1]?.id ?? null
+      const playerCount = ordered.length
       onComplete({
         authoritativeWinnerId: state.winner.id,
         authoritativeLastPlaceId: lastPlaceId,
         rawResults: Object.fromEntries(
-          ordered.map((player) => [
-            player.id,
-            playerCount - (player.placement ?? playerCount) + 1,
-          ]),
+          ordered.map((player) => [player.id, playerCount - (player.placement ?? playerCount) + 1])
         ),
-      });
+      })
     } else if (onFinish) {
-      onFinish(1);
+      onFinish(1)
     }
   }
 
-  const alivePlayers = state.players.filter((p) => p.isAlive);
-  const humanPlayer = state.players.find((p) => p.isHuman);
+  const alivePlayers = state.players.filter((p) => p.isAlive)
+  const humanPlayer = state.players.find((p) => p.isHuman)
 
-  useCompetitionResultCheckpoint(state.phase === 'complete' && state.winner ? {
-    rawValue: 1,
-    partial: false,
-    completion: {
-      authoritativeWinnerId: state.winner.id,
-      authoritativeLastPlaceId: [...state.players]
-        .sort((a, b) => (a.placement ?? Number.MAX_SAFE_INTEGER) - (b.placement ?? Number.MAX_SAFE_INTEGER))
-        .at(-1)?.id,
-      rawResults: Object.fromEntries(
-        state.players.map((player) => [
-          player.id,
-          state.players.length - (player.placement ?? state.players.length) + 1,
-        ])
-      ),
-    },
-  } : null)
+  useCompetitionResultCheckpoint(
+    state.phase === 'complete' && state.winner
+      ? {
+          rawValue: 1,
+          partial: false,
+          completion: {
+            authoritativeWinnerId: state.winner.id,
+            authoritativeLastPlaceId: [...state.players]
+              .sort(
+                (a, b) =>
+                  (a.placement ?? Number.MAX_SAFE_INTEGER) -
+                  (b.placement ?? Number.MAX_SAFE_INTEGER)
+              )
+              .at(-1)?.id,
+            rawResults: Object.fromEntries(
+              state.players.map((player) => [
+                player.id,
+                state.players.length - (player.placement ?? state.players.length) + 1,
+              ])
+            ),
+          },
+        }
+      : null
+  )
 
   // ── Render by phase ─────────────────────────────────────────────────────────
 
@@ -352,11 +367,12 @@ export default function TrapAuction({
         <PersonalityMapModal
           players={state.players}
           round={state.round}
+          currencySymbol={currency.symbol}
           onClose={() => setPersonalityMapOpen(false)}
         />
       )}
     </div>
-  );
+  )
 
   // ─── Phase renderers ─────────────────────────────────────────────────────────
 
@@ -367,14 +383,23 @@ export default function TrapAuction({
         <h2 className="ta-intro__title">Trap Auction</h2>
         <p className="ta-intro__tagline">Bid to survive. The cheapest player pays the price.</p>
         <ul className="ta-intro__rules">
-          <li>Every player secretly bids <strong>Eyeolens</strong> each round.</li>
-          <li>The <span className="ta-text--danger">lowest bidder</span> is eliminated.</li>
-          <li>The <span className="ta-text--warning">highest bidder</span> is exposed.</li>
+          <li>
+            Every player secretly bids <strong>{currency.plural}</strong> each round.
+          </li>
+          <li>
+            The <span className="ta-text--danger">lowest bidder</span> is eliminated.
+          </li>
+          <li>
+            The <span className="ta-text--warning">highest bidder</span> is exposed.
+          </li>
           <li>All players pay what they bid from their bank.</li>
           <li>Last one standing wins.</li>
         </ul>
         <div className="ta-intro__bank-note">
-          Everyone starts with <strong>{TRAP_AUCTION_CONFIG.startingBank} 👁 Eyeolens</strong>
+          Everyone starts with{' '}
+          <strong>
+            {TRAP_AUCTION_CONFIG.startingBank} {currency.symbol} {currency.plural}
+          </strong>
         </div>
         <button
           className="ta-btn ta-btn--primary ta-btn--lg"
@@ -384,7 +409,7 @@ export default function TrapAuction({
           Let's Auction
         </button>
       </div>
-    );
+    )
   }
 
   function renderBid(): ReactNode {
@@ -395,16 +420,16 @@ export default function TrapAuction({
           <p className="ta-spectator-waiting__text">Waiting for bids…</p>
           {renderPlayerGrid(state.players, false)}
         </div>
-      );
+      )
     }
 
-    const human = humanPlayer;
+    const human = humanPlayer
     if (!human || !human.isAlive) {
       // Human is eliminated but not yet spectating — handled by spectate prompt
-      return null;
+      return null
     }
 
-    const range = getAllowedBidRange(human, state.round);
+    const range = getAllowedBidRange(human, state.round)
 
     return (
       <div className="ta-bid-phase">
@@ -422,7 +447,7 @@ export default function TrapAuction({
           <div className="ta-bid-control__bank">
             <span className="ta-bid-control__bank-label">Your Bank</span>
             <span className="ta-bid-control__bank-amount">
-              {human.bank} <span className="ta-eyeolens">👁</span>
+              {human.bank} <span className="ta-eyeolens">{currency.symbol}</span>
             </span>
           </div>
 
@@ -437,7 +462,7 @@ export default function TrapAuction({
             max={range.max}
             value={bidValue}
             onChange={(e) => setBidValue(Number(e.target.value))}
-            aria-label={`Bid amount: ${bidValue} Eyeolens`}
+            aria-label={`Bid amount: ${bidValue} ${currencyName(bidValue)}`}
           />
 
           <div className="ta-bid-control__range">
@@ -451,26 +476,34 @@ export default function TrapAuction({
               onClick={() => setBidValue((v) => Math.max(range.min, v - 5))}
               type="button"
               aria-label="Decrease bid by 5"
-            >−5</button>
+            >
+              −5
+            </button>
             <button
               className="ta-btn ta-btn--ghost ta-btn--sm"
               onClick={() => setBidValue((v) => Math.max(range.min, v - 1))}
               type="button"
               aria-label="Decrease bid by 1"
-            >−1</button>
+            >
+              −1
+            </button>
             <span className="ta-bid-stepper__val">{bidValue}</span>
             <button
               className="ta-btn ta-btn--ghost ta-btn--sm"
               onClick={() => setBidValue((v) => Math.min(range.max, v + 1))}
               type="button"
               aria-label="Increase bid by 1"
-            >+1</button>
+            >
+              +1
+            </button>
             <button
               className="ta-btn ta-btn--ghost ta-btn--sm"
               onClick={() => setBidValue((v) => Math.min(range.max, v + 5))}
               type="button"
               aria-label="Increase bid by 5"
-            >+5</button>
+            >
+              +5
+            </button>
           </div>
 
           <button
@@ -485,11 +518,11 @@ export default function TrapAuction({
         {/* Player grid (compact) */}
         {renderPlayerGrid(state.players, true)}
       </div>
-    );
+    )
   }
 
   function renderReveal(): ReactNode {
-    const allRevealed = state.revealIndex >= state.roundReveals.length;
+    const allRevealed = state.revealIndex >= state.roundReveals.length
 
     return (
       <div className="ta-reveal-phase">
@@ -497,17 +530,21 @@ export default function TrapAuction({
 
         <div className="ta-reveal-cards">
           {state.roundReveals.map((reveal, idx) => {
-            const player = state.players.find((p) => p.id === reveal.playerId);
-            if (!player) return null;
-            const isFlipped = reveal.revealed;
+            const player = state.players.find((p) => p.id === reveal.playerId)
+            if (!player) return null
+            const isFlipped = reveal.revealed
 
-            let cardClass = 'ta-reveal-card';
-            if (isFlipped && reveal.isLowest) cardClass += ' ta-reveal-card--lowest';
-            if (isFlipped && reveal.isHighest) cardClass += ' ta-reveal-card--highest';
-            if (!isFlipped) cardClass += ' ta-reveal-card--hidden';
+            let cardClass = 'ta-reveal-card'
+            if (isFlipped && reveal.isLowest) cardClass += ' ta-reveal-card--lowest'
+            if (isFlipped && reveal.isHighest) cardClass += ' ta-reveal-card--highest'
+            if (!isFlipped) cardClass += ' ta-reveal-card--hidden'
 
             return (
-              <div key={reveal.playerId} className={cardClass} aria-label={isFlipped ? `${player.name}: ${reveal.bid}` : 'Hidden bid'}>
+              <div
+                key={reveal.playerId}
+                className={cardClass}
+                aria-label={isFlipped ? `${player.name}: ${reveal.bid}` : 'Hidden bid'}
+              >
                 <div className="ta-reveal-card__inner">
                   {/* Card back */}
                   <div className="ta-reveal-card__back">
@@ -533,7 +570,7 @@ export default function TrapAuction({
                 {/* Reveal order indicator */}
                 <span className="ta-reveal-card__order">{idx + 1}</span>
               </div>
-            );
+            )
           })}
         </div>
 
@@ -545,16 +582,14 @@ export default function TrapAuction({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   function renderElimination(): ReactNode {
-    const eliminatedPlayers = state.players.filter((p) =>
-      state.lastEliminatedIds.includes(p.id),
-    );
-    const humanEliminatedThisRound = state.lastEliminatedIds.some((id) =>
-      state.players.find((p) => p.id === id)?.isHuman,
-    );
+    const eliminatedPlayers = state.players.filter((p) => state.lastEliminatedIds.includes(p.id))
+    const humanEliminatedThisRound = state.lastEliminatedIds.some(
+      (id) => state.players.find((p) => p.id === id)?.isHuman
+    )
 
     return (
       <div className="ta-elimination-phase">
@@ -577,14 +612,16 @@ export default function TrapAuction({
         {/* Spectate prompt for eliminated human */}
         {showSpectatePrompt && !state.spectating && (
           <div className="ta-spectate-prompt">
-            <p className="ta-spectate-prompt__msg">You've been eliminated! What would you like to do?</p>
+            <p className="ta-spectate-prompt__msg">
+              You've been eliminated! What would you like to do?
+            </p>
             <div className="ta-spectate-prompt__actions">
               <button
                 className="ta-btn ta-btn--ghost"
                 onClick={() => {
-                  setShowSpectatePrompt(false);
-                  dispatch({ type: 'SPECTATE' });
-                  dispatch({ type: 'CONTINUE_AFTER_ELIMINATION' });
+                  setShowSpectatePrompt(false)
+                  dispatch({ type: 'SPECTATE' })
+                  dispatch({ type: 'CONTINUE_AFTER_ELIMINATION' })
                 }}
                 type="button"
               >
@@ -593,8 +630,8 @@ export default function TrapAuction({
               <button
                 className="ta-btn ta-btn--danger"
                 onClick={() => {
-                  setShowSpectatePrompt(false);
-                  dispatch({ type: 'SKIP_TO_RESULTS' });
+                  setShowSpectatePrompt(false)
+                  dispatch({ type: 'SKIP_TO_RESULTS' })
                 }}
                 type="button"
               >
@@ -612,14 +649,14 @@ export default function TrapAuction({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   function renderComplete(): ReactNode {
-    const { winner } = state;
+    const { winner } = state
     const sortedPlayers = [...state.players].sort(
-      (a, b) => (a.placement ?? 999) - (b.placement ?? 999),
-    );
+      (a, b) => (a.placement ?? 999) - (b.placement ?? 999)
+    )
 
     return (
       <div className="ta-complete-phase">
@@ -635,7 +672,7 @@ export default function TrapAuction({
                 : `wins the ${competitionTitle ?? (state.prizeType === 'LOH' ? '👑 Leader of the House' : '🛡️ Power of Safety')}`}
             </p>
             <p className="ta-complete-winner__bank">
-              Ended with {winner.bank} 👁 Eyeolens
+              Ended with {winner.bank} {currency.symbol} {currencyName(winner.bank)}
             </p>
             {/* TODO_SOUND: play winner fanfare sound */}
           </div>
@@ -650,11 +687,13 @@ export default function TrapAuction({
                 className={`ta-complete-placement ${p.id === winner?.id ? 'ta-complete-placement--winner' : ''}`}
               >
                 <span className="ta-complete-placement__rank">
-                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${(p.placement ?? i + 1)}`}
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${p.placement ?? i + 1}`}
                 </span>
                 <AvatarImg player={p} className="ta-complete-placement__avatar" />
                 <span className="ta-complete-placement__name">{p.name}</span>
-                <span className="ta-complete-placement__bank">{p.bank} 👁</span>
+                <span className="ta-complete-placement__bank">
+                  {p.bank} {currency.symbol}
+                </span>
                 {p.eliminatedRound && (
                   <span className="ta-complete-placement__elim">Round {p.eliminatedRound}</span>
                 )}
@@ -673,51 +712,59 @@ export default function TrapAuction({
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   // ─── Player grid (compact overview during bid + spectating) ────────────────
 
   function renderPlayerGrid(players: TrapAuctionPlayer[], compact: boolean): ReactNode {
     return (
-        <div className={`ta-player-grid ${compact ? 'ta-player-grid--compact' : ''}`} role="list" aria-label="Players">
-          {players.map((p) => (
-            <div
+      <div
+        className={`ta-player-grid ${compact ? 'ta-player-grid--compact' : ''}`}
+        role="list"
+        aria-label="Players"
+      >
+        {players.map((p) => (
+          <div
             key={p.id}
             className={`ta-player-card ${!p.isAlive ? 'ta-player-card--eliminated' : ''} ${p.isHuman ? 'ta-player-card--human' : ''}`}
             role="listitem"
             aria-label={`${p.name}${!p.isAlive ? ' (eliminated)' : ''}`}
-            >
-              <AvatarImg player={p} className="ta-player-card__avatar" />
-              <span className="ta-player-card__name">{p.name}</span>
-              {shouldRevealPlayerBank(p, state.round) ? (
-                <span className="ta-player-card__bank">{p.bank} 👁</span>
-              ) : (
-                <span className="ta-player-card__bank ta-player-card__bank--hidden">Hidden</span>
-              )}
-              {!p.isAlive && (
-                <span className="ta-player-card__eliminated-badge">OUT</span>
-              )}
-            {p.isHuman && p.isAlive && (
-              <span className="ta-player-card__you">YOU</span>
+          >
+            <AvatarImg player={p} className="ta-player-card__avatar" />
+            <span className="ta-player-card__name">{p.name}</span>
+            {shouldRevealPlayerBank(p, state.round) ? (
+              <span className="ta-player-card__bank">
+                {p.bank} {currency.symbol}
+              </span>
+            ) : (
+              <span className="ta-player-card__bank ta-player-card__bank--hidden">Hidden</span>
             )}
+            {!p.isAlive && <span className="ta-player-card__eliminated-badge">OUT</span>}
+            {p.isHuman && p.isAlive && <span className="ta-player-card__you">YOU</span>}
           </div>
         ))}
       </div>
-    );
+    )
   }
 }
 
 // ─── PersonalityMapModal ──────────────────────────────────────────────────────
 
 interface PersonalityMapModalProps {
-  players: TrapAuctionPlayer[];
-  round: number;
-  onClose: () => void;
+  players: TrapAuctionPlayer[]
+  round: number
+  currencySymbol: string
+  onClose: () => void
 }
 
-function PersonalityMapModal({ players, round, onClose }: PersonalityMapModalProps) {
-  const others = players.filter((p) => !p.isHuman);
+function PersonalityMapModal({
+  players,
+  round,
+  currencySymbol,
+  onClose,
+}: PersonalityMapModalProps) {
+  const others = players.filter((p) => !p.isHuman)
 
   return (
     <div className="ta-pm-backdrop" role="dialog" aria-label="Player Profiles" aria-modal="true">
@@ -743,10 +790,14 @@ function PersonalityMapModal({ players, round, onClose }: PersonalityMapModalPro
                 <div className="ta-pm-card__identity">
                   <strong className="ta-pm-card__name">{p.name}</strong>
                   {!p.isAlive && (
-                    <span className="ta-pm-card__status ta-pm-card__status--out">Eliminated R{p.eliminatedRound}</span>
+                    <span className="ta-pm-card__status ta-pm-card__status--out">
+                      Eliminated R{p.eliminatedRound}
+                    </span>
                   )}
                   {p.isAlive && p.isExposed && (
-                    <span className="ta-pm-card__status ta-pm-card__status--exposed">⚠️ Exposed</span>
+                    <span className="ta-pm-card__status ta-pm-card__status--exposed">
+                      ⚠️ Exposed
+                    </span>
                   )}
                 </div>
               </div>
@@ -760,13 +811,12 @@ function PersonalityMapModal({ players, round, onClose }: PersonalityMapModalPro
                 </span>
               </div>
 
-              <p className="ta-pm-card__desc">
-                {PERSONALITY_DESCRIPTIONS[p.personality]}
-              </p>
+              <p className="ta-pm-card__desc">{PERSONALITY_DESCRIPTIONS[p.personality]}</p>
 
               <div className="ta-pm-card__stats">
                 <span className="ta-pm-card__stats-item">
-                  💰 Bank: {shouldRevealPlayerBank(p, round) ? `${p.bank} 👁` : 'Hidden'}
+                  💰 Bank:{' '}
+                  {shouldRevealPlayerBank(p, round) ? `${p.bank} ${currencySymbol}` : 'Hidden'}
                 </span>
               </div>
             </div>
@@ -778,6 +828,5 @@ function PersonalityMapModal({ players, round, onClose }: PersonalityMapModalPro
         </p>
       </div>
     </div>
-  );
+  )
 }
-

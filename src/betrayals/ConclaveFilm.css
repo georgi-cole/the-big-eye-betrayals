@@ -1,67 +1,51 @@
 .conclave-film {
   position: absolute;
   inset: 0;
-  isolation: isolate;
   overflow: hidden;
-  background: #111721;
-}
-
-.conclave-film::after {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse at 50% 46%, transparent 34%, #08090e81 100%),
-    linear-gradient(0deg, #0a0a0f 0%, #0b0c1062 20%, transparent 36%);
+  isolation: isolate;
+  background: #15100f;
   pointer-events: none;
-  content: '';
 }
 
-.conclave-film__canvas,
-.conclave-film__fallback,
-.conclave-film__backdrop {
+.conclave-film__poster,
+.conclave-film__set,
+.conclave-film__grade {
   position: absolute;
   inset: 0;
-  display: block;
   width: 100%;
   height: 100%;
 }
 
-.conclave-film__canvas {
-  visibility: hidden;
-  pointer-events: none;
+.conclave-film__poster {
+  object-fit: cover;
+  object-position: center;
 }
 
-.conclave-film[data-painted] .conclave-film__canvas {
+.conclave-film__set {
+  visibility: hidden;
+}
+
+.conclave-film[data-painted] .conclave-film__set {
   visibility: visible;
 }
 
-.conclave-film__canvas[data-interactive] {
+.conclave-film__set[data-interactive] {
   pointer-events: auto;
   touch-action: none;
   cursor: grab;
 }
 
-.conclave-film__canvas[data-interactive]:active {
+.conclave-film__set[data-interactive]:active {
   cursor: grabbing;
 }
-.conclave-film__canvas:focus-visible {
+
+.conclave-film__set:focus-visible {
   outline: 2px solid #cb9a63;
   outline-offset: -3px;
 }
 
-.conclave-film__backdrop {
-  object-fit: cover;
-  object-position: center 55%;
-}
-
-.conclave-film__fallback-figure {
-  position: absolute;
-  top: calc(61% + mod(var(--figure-index), 2) * 5%);
-  left: calc(25% + 50% * (var(--figure-index) + 0.5) / var(--figure-total));
-  width: min(19%, 9rem);
-  height: 30%;
-  object-fit: contain;
-  object-position: center bottom;
-  transform: translate(-50%, -100%);
-  filter: drop-shadow(0 0.28rem 0.48rem #000c);
+.conclave-film__grade {
+  background:
+    radial-gradient(ellipse at 50% 43%, transparent 38%, #08060867 100%),
+    linear-gradient(0deg, #080709e0, transparent 29%, transparent 84%, #08070976);
 }

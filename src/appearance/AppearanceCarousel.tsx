@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { joinPublicAssetPath } from '../utils/avatar'
-import { getAppearanceAsset, SELECTABLE_LOOKS } from './catalog'
+import {
+  getAppearanceAsset,
+  SELECTABLE_LOOKS,
+  type AppearanceLook,
+  type AppearanceRole,
+} from './catalog'
 import { warmAppearanceRole } from './preloadAppearance'
 import arrowLeft from './assets/arrow-left.svg'
 import arrowRight from './assets/arrow-right.svg'
@@ -16,16 +21,20 @@ interface AppearanceCarouselProps {
   accessText?: string
   accessContent?: ReactNode
   figureRef?: Ref<HTMLImageElement>
+  looks?: readonly AppearanceLook[]
+  backdrop?: string
+  figureRole?: 'casual' | 'formal'
 }
 
-function lookAt(index: number) {
-  return SELECTABLE_LOOKS[(index + SELECTABLE_LOOKS.length) % SELECTABLE_LOOKS.length]
+function lookAt(looks: readonly AppearanceLook[], index: number) {
+  return looks[(index + looks.length) % looks.length]
 }
 
-function figureUrl(lookId: string) {
-  const look = SELECTABLE_LOOKS.find((candidate) => candidate.id === lookId)
-  const asset =
-    look && getAppearanceAsset({ kind: 'catalog', lookId, revision: look.revision }, 'casual')
+function figureUrl(look: AppearanceLook, role: AppearanceRole) {
+  const asset = getAppearanceAsset(
+    { kind: 'catalog', lookId: look.id, revision: look.revision },
+    role
+  )
   return asset ? joinPublicAssetPath(asset) : ''
 }
 
@@ -37,16 +46,19 @@ export default function AppearanceCarousel({
   accessText,
   accessContent,
   figureRef,
+  looks = SELECTABLE_LOOKS,
+  backdrop = 'assets/dressing-room/dressing-room-mobile.webp',
+  figureRole = 'casual',
 }: AppearanceCarouselProps) {
   const reducedMotion = useReducedMotion()
   const touchStartX = useRef<number | null>(null)
   const currentIndex = Math.max(
     0,
-    SELECTABLE_LOOKS.findIndex((look) => look.id === selectedId)
+    looks.findIndex((look) => look.id === selectedId)
   )
-  const current = lookAt(currentIndex)
-  const previous = lookAt(currentIndex - 1)
-  const next = lookAt(currentIndex + 1)
+  const current = lookAt(looks, currentIndex)
+  const previous = lookAt(looks, currentIndex - 1)
+  const next = lookAt(looks, currentIndex + 1)
 
   useEffect(() => {
     if (!current) return
@@ -54,15 +66,15 @@ export default function AppearanceCarousel({
       if (look)
         void warmAppearanceRole(
           { kind: 'catalog', lookId: look.id, revision: look.revision },
-          'casual'
+          figureRole
         )
     }
-  }, [current, next, previous])
+  }, [current, next, previous, figureRole])
 
   if (!current) return <p className="appearance-carousel__empty">No looks are available yet.</p>
 
   function move(offset: number) {
-    const target = lookAt(currentIndex + offset)
+    const target = lookAt(looks, currentIndex + offset)
     if (target) onSelect(target.id)
   }
 
@@ -92,14 +104,14 @@ export default function AppearanceCarousel({
       <div
         className="appearance-carousel__stage"
         style={{
-          backgroundImage: `url("${joinPublicAssetPath('assets/dressing-room/dressing-room-mobile.webp')}")`,
+          backgroundImage: `url("${joinPublicAssetPath(backdrop)}")`,
         }}
       >
         <motion.img
           ref={figureRef}
           key={current.id}
           className="appearance-carousel__figure"
-          src={figureUrl(current.id)}
+          src={figureUrl(current, figureRole)}
           alt={current.label}
           style={
             {

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit'
-import { lazy, useRef, useState } from 'react'
+import { lazy, useContext, useRef, useState } from 'react'
 import { Provider } from 'react-redux'
 import { rankTiltLabyrinthResults } from '../components/TiltLabyrinthComp/tiltLabyrinthCollision'
 import cwgo from '../features/cwgo/cwgoCompetitionSlice'
@@ -13,12 +13,15 @@ import tiltLabyrinth from '../features/tiltLabyrinth/tiltLabyrinthSlice'
 import type { CompetitionResult, ReactMinigameCompletion } from '../minigames/competitionResult'
 import { CompetitionResultContext, HostResultsContext } from '../minigames/competitionResultContext'
 import reactComponents from '../minigames/reactComponents'
-import { type ChallengeGame, challengePlayers, challengeSeed } from './challengeRotation'
-import { challengeRelationships } from './challengeRelationships'
 import { isSocialChallengeGameKey } from '../minigames/socialChallenges/shared'
+import { challengeRelationships } from './challengeRelationships'
+import { BetrayalsChallengeAccessContext } from './challengeAccessContext'
+import { betrayalsChallengeExperience } from './challengeExperience'
+import { type ChallengeGame, challengePlayers, challengeSeed } from './challengeRotation'
 import type { Run } from './run'
 
-const QuickTap = lazy(() => import('../minigames/quickTapRace/QuickTapRaceCanvasGame'))
+const QuickTap = lazy(() => import('../components/QuickTapRace/QuickTapRace'))
+const QuickTapClassic = lazy(() => import('../minigames/quickTapRace/QuickTapRaceCanvasGame'))
 const ColorMatch = lazy(() => import('../components/ColorMatchComp/ColorMatchComp'))
 const MajorityRules = lazy(() => import('../components/MajorityRulesComp/MajorityRulesComp'))
 const DeckOfLight = lazy(() => import('../components/HouseOfCardsComp/HouseOfCardsComp'))
@@ -40,6 +43,7 @@ const DeckOfDarkness = lazy(() => import('../components/HouseOfDarknessComp/Hous
 type Props = {
   run: Run
   game: ChallengeGame
+  premiumGames?: boolean
   onFinish: (
     score?: number,
     tieBreak?: number,
@@ -47,7 +51,16 @@ type Props = {
   ) => Promise<boolean>
 }
 
-export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
+export default function BetrayalsChallengeGame({
+  run,
+  game,
+  premiumGames = false,
+  onFinish,
+}: Props) {
+  const committedAccess = useContext(BetrayalsChallengeAccessContext)
+  const [experience] = useState(() =>
+    betrayalsChallengeExperience(game, committedAccess ?? premiumGames)
+  )
   const [participants] = useState(() => challengePlayers(run, game))
   const [savingResults, setSavingResults] = useState(false)
   const pendingResult = useRef<Promise<boolean> | null>(null)
@@ -77,10 +90,26 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
       },
     })
   })
-  const seed = challengeSeed(run)
+  const [seed] = useState(() => challengeSeed(run))
   const field = { participantIds, participants, seed }
   const usesSocialChoices = isSocialChallengeGameKey(game.key) || game.key === 'riskWheelAbyss'
   const prizeType: 'LOH' | 'POS' = run.phase === 'safety' ? 'POS' : 'LOH'
+  const competitionTitle =
+    run.phase === 'safety'
+      ? 'Night Shield'
+      : run.phase === 'immunity'
+        ? 'Immunity'
+        : 'Final Challenge'
+
+  function finishScore(score?: number, tieBreak?: number, completion?: ReactMinigameCompletion) {
+    return onFinish(
+      score,
+      tieBreak,
+      score !== undefined && experience.quickTapVariant
+        ? { ...completion, betrayalsQuickTapVariant: experience.quickTapVariant }
+        : completion
+    )
+  }
 
   function finishField(completion?: ReactMinigameCompletion, score?: number) {
     if (game.reactComponentKey === 'GlassBridge') {
@@ -99,7 +128,7 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
         authoritativeRankedIds: [...aliveIds, ...[...eliminationOrder].reverse()],
       }
     }
-    return onFinish(
+    return finishScore(
       completion?.rawResults?.[run.humanId] ?? completion?.rawValue ?? score ?? 0,
       completion?.tiebreakerMs,
       completion
@@ -126,7 +155,11 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
   let minigame
   switch (game.reactComponentKey) {
     case 'QuickTapRace':
-      minigame = <QuickTap autoStart onFinish={onFinish} />
+      minigame = experience.quickTapVariant ? (
+        <QuickTap {...field} autoStart vipQuickTap onFinish={finishScore} />
+      ) : (
+        <QuickTapClassic {...field} autoStart onFinish={finishScore} />
+      )
       break
     case 'ColorMatch':
       minigame = <ColorMatch seed={seed} onFinish={onFinish} />
@@ -136,6 +169,7 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
         <MajorityRules
           {...field}
           prizeType={prizeType}
+          premiumPresentation={experience.premiumPresentation}
           simultaneousFinish
           onComplete={hosted.onComplete}
         />
@@ -146,19 +180,20 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
         <DeckOfLight
           {...field}
           prizeType={prizeType}
+          premiumPresentation={experience.premiumPresentation}
           parallelBoards
           onComplete={hosted.onComplete}
         />
       )
       break
     case 'RiskWheel':
-      minigame = <RiskWheel {...hosted} />
+      minigame = <RiskWheel {...hosted} premiumPresentation={experience.premiumPresentation} />
       break
     case 'HoldTheWall':
       minigame = (
         <HoldTheWall
           {...hosted}
-          competitionTitle={run.phase === 'immunity' ? 'Full Immunity' : undefined}
+          competitionTitle={run.phase === 'immunity' ? 'Full Immunity' : competitionTitle}
         />
       )
       break
@@ -193,23 +228,56 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
       )
       break
     case 'ClosestWithoutGoingOver':
-      minigame = <DontGoOver {...hosted} />
+      minigame = <DontGoOver {...hosted} competitionTitle={competitionTitle} />
       break
     case 'GlassBridge':
-      minigame = <CrystalPath {...hosted} />
+      minigame = <CrystalPath {...hosted} premium={experience.premiumPresentation} />
       break
     case 'CrystalPathShattered':
-      minigame = <CrystalPathInfinity {...hosted} />
+      minigame = (
+        <CrystalPathInfinity
+          {...hosted}
+          premium={experience.premiumPresentation}
+          competitionTitle={competitionTitle}
+        />
+      )
       break
     case 'TrapAuction':
-      minigame = <TrapAuction {...hosted} autoStart />
+      minigame = (
+        <TrapAuction
+          {...hosted}
+          autoStart
+          competitionTitle={competitionTitle}
+          currency={{ singular: 'token', plural: 'tokens', symbol: '◆' }}
+        />
+      )
       break
     case 'ChainOfGreed':
-      minigame = <ChainOfGreed {...field} soloRushOnly onFinish={onFinish} />
+      minigame = (
+        <ChainOfGreed
+          {...field}
+          premiumPresentation={experience.premiumPresentation}
+          soloRushOnly
+          onFinish={onFinish}
+        />
+      )
       break
     case 'HouseOfDarkness':
-      minigame = <DeckOfDarkness {...field} reportLifespan onFinish={onFinish} />
+      minigame = (
+        <DeckOfDarkness
+          {...field}
+          premiumPresentation={experience.premiumPresentation}
+          aiDifficulty="competitive"
+          reportLifespan
+          onFinish={onFinish}
+        />
+      )
       break
+    case 'Capitalization': {
+      const Capitalization = reactComponents.Capitalization
+      minigame = <Capitalization {...field} context="challenge" onFinish={onFinish} />
+      break
+    }
     default: {
       if (!game.reactComponentKey || !reactComponents[game.reactComponentKey]) {
         throw new Error(`Missing Betrayals minigame: ${game.key}`)
@@ -219,13 +287,14 @@ export default function BetrayalsChallengeGame({ run, game, onFinish }: Props) {
         <Minigame
           {...field}
           autoStart
-          vipQuickTap={false}
+          premiumPresentation={experience.premiumPresentation}
+          vipQuickTap={Boolean(experience.quickTapVariant)}
           voteEffectsEnabled={false}
           relationships={
             usesSocialChoices ? challengeRelationships(run, participantIds) : undefined
           }
           challengeArtwork={usesSocialChoices ? 'betrayals' : undefined}
-          onFinish={onFinish}
+          onFinish={finishScore}
         />
       )
       break

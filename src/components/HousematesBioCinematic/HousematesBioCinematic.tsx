@@ -8,7 +8,9 @@ import {
   type CinematicAudioController,
 } from '../../services/sound/cinematicAudio'
 import { HOUSEMATES_BIO_CARDS, type HousematesBioCard } from './housematesBioData'
+import GameBackButton from '../ui/GameBackButton/GameBackButton'
 import './HousematesBioCinematic.css'
+import './HousematesBioCinematic.betrayals.css'
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
 const INTRO_DURATION_MS = 3_200
@@ -38,8 +40,11 @@ const INITIAL_HOUSEMATE_BACKDROPS = Array.from(
 const REMAINING_HOUSEMATE_BACKDROPS = HOUSEMATE_BACKDROP_PRELOADS.filter(
   (source) => !INITIAL_HOUSEMATE_BACKDROPS.includes(source)
 )
+const CASTLE_BACKDROPS = ['observatory.jpg', 'portrait-wall.webp', 'council.jpg'].map((file) =>
+  asset('/assets/betrayals/' + file)
+)
 
-function Intro({ onExplore }: { onExplore: () => void }) {
+function Intro({ castle, onExplore }: { castle: boolean; onExplore: () => void }) {
   return (
     <motion.section
       className="hbc-intro"
@@ -56,7 +61,7 @@ function Intro({ onExplore }: { onExplore: () => void }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
         >
-          The Big Eye presents
+          {castle ? 'The Big Eye: Betrayals' : 'The Big Eye presents'}
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 24 }}
@@ -73,7 +78,9 @@ function Intro({ onExplore }: { onExplore: () => void }) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
         >
-          22 lives. One hub. Follow the stories you want to know.
+          {castle
+            ? 'Open the portrait gallery to meet the castle guests.'
+            : '22 lives. One hub. Follow the stories you want to know.'}
         </motion.p>
         <motion.button
           className="hbc-primary-action"
@@ -83,14 +90,20 @@ function Intro({ onExplore }: { onExplore: () => void }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.02 }}
         >
-          Enter the hub <span aria-hidden="true">→</span>
+          {castle ? 'Enter the gallery' : 'Enter the hub'} <span aria-hidden="true">→</span>
         </motion.button>
       </div>
     </motion.section>
   )
 }
 
-function HousemateCarousel({ onSelect }: { onSelect: (index: number) => void }) {
+function HousemateCarousel({
+  castle,
+  onSelect,
+}: {
+  castle: boolean
+  onSelect: (index: number) => void
+}) {
   const [activeIndex, setActiveIndex] = useState(0)
   const activeCard = HOUSEMATES_BIO_CARDS[activeIndex]
 
@@ -110,8 +123,8 @@ function HousemateCarousel({ onSelect }: { onSelect: (index: number) => void }) 
     >
       <div className="hbc-carousel__aurora" aria-hidden="true" />
       <header className="hbc-carousel__heading">
-        <p className="hbc-kicker">Meet the players</p>
-        <h1>One story at a time.</h1>
+        {!castle && <p className="hbc-kicker">Meet the players</p>}
+        <h1>{castle ? 'The Portrait Gallery' : 'One story at a time.'}</h1>
         <p>Browse the cast, then tap a card to open their full story.</p>
       </header>
 
@@ -141,7 +154,7 @@ function HousemateCarousel({ onSelect }: { onSelect: (index: number) => void }) 
                 aria-label={isActive ? `Open ${card.name}'s full story` : `Show ${card.name}`}
                 style={
                   {
-                    '--hbc-accent': card.accent,
+                    '--hbc-accent': `var(--hbc-theme-accent, ${card.accent})`,
                     '--hbc-carousel-backdrop': `url("${backdropSrc(card)}")`,
                   } as CSSProperties
                 }
@@ -186,12 +199,14 @@ function HousemateCarousel({ onSelect }: { onSelect: (index: number) => void }) 
 function HousemateProfile({
   card,
   index,
+  castle,
   onBack,
   onPrevious,
   onNext,
 }: {
   card: HousematesBioCard
   index: number
+  castle: boolean
   onBack: () => void
   onPrevious: () => void
   onNext: () => void
@@ -204,7 +219,7 @@ function HousemateProfile({
       className="hbc-profile"
       style={
         {
-          '--hbc-accent': card.accent,
+          '--hbc-accent': `var(--hbc-theme-accent, ${card.accent})`,
           '--hbc-profile-backdrop': `url("${backdropSrc(card)}")`,
         } as CSSProperties
       }
@@ -214,9 +229,17 @@ function HousemateProfile({
     >
       <div className="hbc-profile__backdrop" aria-hidden="true" />
       <div className="hbc-profile__grade" aria-hidden="true" />
-      <button className="hbc-back-button" type="button" onClick={onBack}>
-        <span aria-hidden="true">←</span> All players
-      </button>
+      {castle ? (
+        <GameBackButton
+          className="hbc-back-button"
+          label="Back to the portrait gallery"
+          onClick={onBack}
+        />
+      ) : (
+        <button className="hbc-back-button" type="button" onClick={onBack}>
+          <span aria-hidden="true">←</span> All players
+        </button>
+      )}
 
       <div className="hbc-profile__layout">
         <motion.div
@@ -241,7 +264,7 @@ function HousemateProfile({
           transition={{ duration: 0.56, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
         >
           <p className="hbc-profile__counter">
-            Hubmate {String(index + 1).padStart(2, '0')} <span>/</span>{' '}
+            {castle ? 'Guest' : 'Hubmate'} {String(index + 1).padStart(2, '0')} <span>/</span>{' '}
             {HOUSEMATES_BIO_CARDS.length}
           </p>
           <h1>{card.name}</h1>
@@ -249,7 +272,7 @@ function HousemateProfile({
             {card.age} · {card.location} · {card.profession}
           </p>
           <div className="hbc-profile__story">
-            <span>In the Hub</span>
+            <span>{castle ? 'Their story' : 'In the Hub'}</span>
             <p>{card.introduction}</p>
           </div>
           <div className="hbc-profile__why">
@@ -273,9 +296,14 @@ function HousemateProfile({
 
 export interface HousematesBioCinematicProps {
   onComplete: () => void
+  variant?: 'betrayals'
 }
 
-export default function HousematesBioCinematic({ onComplete }: HousematesBioCinematicProps) {
+export default function HousematesBioCinematic({
+  onComplete,
+  variant,
+}: HousematesBioCinematicProps) {
+  const castle = variant === 'betrayals'
   const reducedMotion = useReducedMotion() ?? false
   const [view, setView] = useState<HousematesView>('intro')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -287,13 +315,17 @@ export default function HousematesBioCinematic({ onComplete }: HousematesBioCine
 
   useEffect(() => {
     const warmHousemateBackdrops = () => {
+      if (castle) {
+        preloadImages(CASTLE_BACKDROPS)
+        return
+      }
       preloadImages(INITIAL_HOUSEMATE_BACKDROPS)
       preloadImages(REMAINING_HOUSEMATE_BACKDROPS, 'low')
     }
     warmHousemateBackdrops()
     document.addEventListener('visibilitychange', warmHousemateBackdrops)
     return () => document.removeEventListener('visibilitychange', warmHousemateBackdrops)
-  }, [])
+  }, [castle])
 
   useEffect(() => {
     onCompleteRef.current = onComplete
@@ -351,26 +383,41 @@ export default function HousematesBioCinematic({ onComplete }: HousematesBioCine
   return (
     <div
       className={`hbc${reducedMotion ? ' hbc--reduced-motion' : ''}`}
+      data-edition={variant}
       role="dialog"
       aria-modal="true"
-      aria-label="Meet the Hubmates"
+      aria-label={castle ? 'Players' : 'Meet the Hubmates'}
     >
-      <button className="hbc__exit" type="button" onClick={finish} aria-label="Exit Hubmates">
-        Exit <span aria-hidden="true">×</span>
+      <button
+        className="hbc__exit"
+        type="button"
+        onClick={finish}
+        aria-label={castle ? 'Close Players' : 'Exit Hubmates'}
+      >
+        {!castle && 'Exit '}
+        <span aria-hidden="true">×</span>
       </button>
-      <div className="hbc__sound" aria-label="Hubmates music is playing">
+      <div
+        className="hbc__sound"
+        aria-label={castle ? 'Players soundtrack' : 'Hubmates music is playing'}
+      >
         ♫
       </div>
 
       <main className="hbc__stage" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
-          {view === 'intro' && <Intro key="intro" onExplore={() => setView('map')} />}
-          {view === 'map' && <HousemateCarousel key="carousel" onSelect={openProfile} />}
+          {view === 'intro' && (
+            <Intro key="intro" castle={castle} onExplore={() => setView('map')} />
+          )}
+          {view === 'map' && (
+            <HousemateCarousel key="carousel" castle={castle} onSelect={openProfile} />
+          )}
           {view === 'profile' && selectedCard && (
             <HousemateProfile
               key={selectedCard.id}
               card={selectedCard}
               index={selectedIndex}
+              castle={castle}
               onBack={() => setView('map')}
               onPrevious={() => changeProfile(-1)}
               onNext={() => changeProfile(1)}

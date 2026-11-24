@@ -1,0 +1,155 @@
+.betrayals-observatory-mask {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.betrayals-observatory-window {
+  position: absolute;
+  top: 26.017%;
+  left: 36.663%;
+  width: 26.568%;
+  height: 25.239%;
+  overflow: hidden;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.betrayals-observatory-window__sky,
+.betrayals-observatory-window__lightning {
+  position: absolute;
+  inset: 0;
+}
+
+.betrayals-observatory-window__sky {
+  --plate-x: 2.65%;
+  --plate-y: 0%;
+  --glass: #16303b24;
+  background-image:
+    linear-gradient(145deg, var(--glass), transparent 66%, #0c25363d),
+    url('/assets/betrayals/observatory-exterior.webp');
+  background-size:
+    100% 100%,
+    338% 200%;
+  background-position:
+    center,
+    var(--plate-x) var(--plate-y);
+  background-repeat: no-repeat;
+  background-color: #243844;
+  filter: saturate(0.82) brightness(0.91);
+}
+
+.betrayals-observatory-window__sky:is([data-period='morning'], [data-period='evening']) {
+  --plate-x: 50%;
+}
+
+.betrayals-observatory-window__sky:is([data-period='noon'], [data-period='night']) {
+  --plate-x: 97.35%;
+}
+
+.betrayals-observatory-window__sky:is(
+  [data-period='afternoon'],
+  [data-period='evening'],
+  [data-period='night']
+) {
+  --plate-y: 100%;
+}
+
+.betrayals-observatory-window__sky[data-sky='clouds'] {
+  --glass: #27435449;
+  filter: saturate(0.62) brightness(0.8);
+}
+
+.betrayals-observatory-window__sky[data-sky='mist'] {
+  --glass: #a1c6d15c;
+  filter: saturate(0.58) contrast(0.79) brightness(0.87);
+}
+
+.betrayals-observatory-window__sky[data-sky='rain'] {
+  --glass: #25445166;
+  filter: saturate(0.57) brightness(0.68);
+}
+
+.betrayals-observatory-window__sky[data-sky='snow'] {
+  --glass: #b0cbdd54;
+  filter: saturate(0.48) contrast(0.88) brightness(0.89);
+}
+
+.betrayals-observatory-window__sky[data-sky='storm'] {
+  --glass: #263a5b80;
+  filter: saturate(0.48) brightness(0.5);
+}
+
+.betrayals-observatory-window__sky[data-sky-transition] {
+  animation: betrayals-observatory-transition 1.35s ease-out both;
+}
+
+@keyframes betrayals-observatory-transition {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.betrayals-observatory-window__lightning {
+  background: radial-gradient(ellipse at 73% 26%, #f0f1ff, #bdceff8f 44%, transparent 88%);
+  opacity: 0;
+  animation: betrayals-observatory-storm 15s linear infinite;
+}
+
+@keyframes betrayals-observatory-storm {
+  0%,
+  26%,
+  100% {
+    opacity: 0;
+  }
+  26.7% {
+    opacity: 0.72;
+  }
+  29% {
+    opacity: 0.31;
+  }
+  34% {
+    opacity: 0;
+  }
+}
+
+.betrayals-observatory-sunlight {
+  --ray-color: #f7d4a83b;
+  position: absolute;
+  inset: 34.6% 20% 33% 21%;
+  mix-blend-mode: screen;
+  background:
+    conic-gradient(
+      from 193deg at 58% 0%,
+      transparent 1deg,
+      var(--ray-color) 7deg,
+      transparent 15deg,
+      var(--ray-color) 21deg,
+      transparent 34deg
+    ),
+    radial-gradient(ellipse at 58% 0%, #ffd89a45, transparent 51%);
+  mask-image: linear-gradient(#000, #000a 52%, transparent 100%);
+  opacity: 0.82;
+  animation: betrayals-observatory-rays 10s ease-in-out infinite alternate;
+}
+
+.betrayals-observatory-sunlight:is([data-window-time='sunrise'], [data-window-time='evening']) {
+  --ray-color: #ffb66b4a;
+}
+
+@keyframes betrayals-observatory-rays {
+  from {
+    opacity: 0.53;
+  }
+  to {
+    opacity: 0.84;
+  }
+}
+
+.betrayals-home[data-betrayals-motion='reduced']
+  :is(.betrayals-observatory-sunlight, .betrayals-observatory-window__sky) {
+  animation: none;
+}

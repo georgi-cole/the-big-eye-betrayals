@@ -97,4 +97,21 @@ describe('Housemates archive', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Exit Hubmates' }))
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
+
+  it('uses the castle gallery and keeps the original player biographies', async () => {
+    const onComplete = vi.fn()
+    render(<HousematesBioCinematic variant="betrayals" onComplete={onComplete} />)
+    expect(screen.getByRole('dialog', { name: 'Players' })).toHaveAttribute(
+      'data-edition',
+      'betrayals'
+    )
+    expect(await screen.findByRole('heading', { name: 'The Portrait Gallery' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: "Open Aria's full story" }))
+    expect(screen.getByRole('heading', { name: 'Aria' })).toBeVisible()
+    expect(screen.getByText(/i.m aria from/i)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Back to the portrait gallery' }))
+    expect(screen.getByRole('heading', { name: 'The Portrait Gallery' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Players' }))
+    expect(onComplete).toHaveBeenCalledOnce()
+  })
 })

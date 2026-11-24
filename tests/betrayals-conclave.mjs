@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { composeConclaveConversation } from '../src/betrayals/conclaveConversation.ts'
 import {
   describeConclaveVerdict,
   getConclaveVerdict,
@@ -51,8 +52,10 @@ test('a repeated 2-1-1 runoff chooses the sole leader and eliminates them at daw
   const first = resolveConclave(run, commandToken(run), leader)
   const tally = 'Contestant 22 2 · Contestant 19 1 · Contestant 10 1'
   assert.equal(first.phase, 'night')
-  assert.equal(getConclaveView(first, run.humanId).runoff, tally)
-  assert.equal(getConclaveView(first, run.humanId).targetIds.length, 3)
+  const runoff = getConclaveView(first, run.humanId)
+  assert.equal(runoff.runoff, tally)
+  assert.equal(runoff.targetIds.length, 3)
+  assert.deepEqual(runoff.discussion, [])
 
   const final = resolveConclave(first, commandToken(first), leader)
   assert.equal(final.phase, 'night-resolved')
@@ -106,6 +109,18 @@ test('hidden and spectator projections preserve role confidentiality', () => {
       ({ speakerName, portrait }) => speakerName !== hidden.name && portrait !== hidden.portrait
     )
   )
+  assert.ok(
+    view.discussion.some(
+      ({ speakerId, speakerName, portrait }) =>
+        speakerId === 'hooded-1' && speakerName === 'Hooded voice' && !portrait
+    )
+  )
+  assert.ok(
+    view.discussion.every(
+      ({ speakerId, speakerName, portrait }) =>
+        speakerId !== hidden.id && speakerName !== hidden.name && portrait !== hidden.portrait
+    )
+  )
   assert.ok(view.targetIds.includes(hidden.id))
   assert.ok(!view.targetIds.includes(run.immunityId))
   assert.ok(!view.targetIds.includes(run.seats[2].id))
@@ -123,6 +138,33 @@ test('hidden and spectator projections preserve role confidentiality', () => {
   assert.equal(result.phase, 'night-resolved')
   assert.ok(!run.private.betrayers.includes(result.private.pendingNight.targetId))
   assert.deepEqual(first, resolveConclave(run, token, hidden.id))
+})
+
+test('the Conclave puts a reply beside the nomination and avoids repeating the same case', () => {
+  const finn = { speakerId: 'finn', speakerName: 'Finn' }
+  const ash = { speakerId: 'ash', speakerName: 'Ash' }
+  const hooded = { speakerId: 'hooded-1', speakerName: 'Hooded voice' }
+  const opening = {
+    ...ash,
+    nomineeId: 'ivy',
+    nomineeName: 'Ivy',
+    argument: 'She already voted for one of us.',
+  }
+  const other = {
+    ...finn,
+    nomineeId: 'aria',
+    nomineeName: 'Aria',
+    argument: 'She is building a case against us.',
+  }
+  const reply = { ...hooded, aboutId: 'ivy', argument: 'I heard she might have a shield.' }
+  const lines = composeConclaveConversation([other, opening, { ...opening, ...finn }], [reply])
+  assert.deepEqual(
+    lines.map(({ speakerId }) => speakerId),
+    [ash.speakerId, hooded.speakerId, finn.speakerId]
+  )
+  assert.match(lines[0].argument, /^Ivy\./)
+  assert.equal(lines[1].argument, reply.argument)
+  assert.match(lines[2].argument, /Aria/)
 })
 
 test('a 2–2 first ballot pauses for a saved runoff and the verdict states what decided it', () => {

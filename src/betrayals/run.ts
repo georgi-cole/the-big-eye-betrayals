@@ -1,6 +1,8 @@
 import { mulberry32, seededPickN } from '../store/rng.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import type { SocialWallet } from './socialResources.ts'
+import { hasPaidNightShield } from './economy.ts'
+import { MAX_BETRAYERS, MIN_BETRAYERS, NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 
 export const CAST_SIZE = 25
 export const MAX_TABLE_ROUNDS = 3
@@ -45,6 +47,7 @@ export const NIGHT_SHIELD_MOVES = [
   'shield-tip',
 ] as const
 export type NightShieldClaim = 'has' | 'none'
+export type NightShieldPlan = 'keep' | 'open-to-gift' | 'private'
 
 export type SocialReaction =
   | 'wary'
@@ -89,9 +92,12 @@ export type SocialEntry = {
     | 'found-alliance'
     | 'consult-alliance'
     | 'alliance-update'
+    | 'shield-request'
+    | 'shield-plans'
     | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
   shieldReply?: NightShieldClaim | 'private'
+  shieldPlan?: NightShieldPlan
   accepted?: boolean
   alliance?: CastleAlliance
   allianceChange?: 'invite' | 'leave' | 'rename' | 'remove' | 'dissolve'
@@ -135,6 +141,7 @@ export type TableSway = {
   targetId: string
   tone: 'careful' | 'forceful'
   evidence?: import('./intel.ts').TableEvidence
+  investigation?: import('./investigationEvidence.ts').InvestigationCase
   stance?: 'question' | 'defend'
 }
 
@@ -180,8 +187,12 @@ export type Run = {
   publicSeed: number
   pot: number
   challengeHistory?: string[]
+  seasonRewards?: import('./seasonRewards.ts').SeasonRewards
+  economy?: import('./economy.ts').BetrayalsEconomy
+  pendingAdBreak?: import('./adBreakPolicy.ts').BetrayalsAdBreakEvent
   social: SocialEntry[]
   activity?: import('./gameLog.ts').GameLogEntry[]
+  investigation?: import('./investigationRecords.ts').Investigation
   witnessLead?: import('./intel.ts').WitnessLead
   socialWallets?: Record<string, SocialWallet>
   incomingResponses?: Record<string, IncomingAnswer>
@@ -252,13 +263,13 @@ export function startRun(
     }
   }
   if (eligible.size < CAST_SIZE - 1) {
-    throw new Error('Betrayals requires 24 distinct AI contestants.')
+    throw new Error(`Betrayals requires ${CAST_SIZE - 1} distinct AI contestants.`)
   }
 
   const castRandom = mulberry32(entropy.publicSeed)
   const roster = seededPickN(castRandom, [...eligible.values()], CAST_SIZE - 1)
   const privateRandom = mulberry32(entropy.roleSeed)
-  const betrayerCount = privateRandom() < 0.5 ? 3 : 4
+  const betrayerCount = privateRandom() < 0.5 ? MIN_BETRAYERS : MAX_BETRAYERS
   const seats = [human, ...roster].map(({ id, name, portrait }) => ({ id, name, portrait }))
 
   return {
@@ -315,7 +326,7 @@ export function knownTeammateIds(run: Run, actorId: string | null): string[] {
 export function nightShieldWinners(run: Run): readonly string[] {
   const standings = run.private.safetyStandings
   return standings?.day === run.day
-    ? standings.rows.slice(0, 2).map(({ contestantId }) => contestantId)
+    ? standings.rows.slice(0, NIGHT_SHIELD_COUNT).map(({ contestantId }) => contestantId)
     : (run.private.nightShieldAwardIds ?? run.private.nightShieldIds)
 }
 
@@ -336,6 +347,7 @@ export function viewFor(run: Run, actorId: string | null) {
   const nightShieldCount = activeActor
     ? run.private.nightShieldIds.filter((id) => id === actor.id).length
     : 0
+  const purchasedNightShieldActive = Boolean(activeActor && hasPaidNightShield(run, actor.id))
   // Teammates see who won at Safety, but don't get updates about private handoffs.
   const shieldCycle =
     run.phase === 'round-table' ||
@@ -349,7 +361,8 @@ export function viewFor(run: Run, actorId: string | null) {
       if (teammateIds.includes(id)) knownNightShieldIds.add(id)
     }
   }
-  if (activeActor && nightShieldCount) knownNightShieldIds.add(actor.id)
+  if (activeActor && (nightShieldCount || purchasedNightShieldActive))
+    knownNightShieldIds.add(actor.id)
 
   return {
     phase: run.phase,
@@ -358,18 +371,20 @@ export function viewFor(run: Run, actorId: string | null) {
     teammateIds,
     knownNightShieldIds: [...knownNightShieldIds],
     publicNightShieldWinnerIds,
-    hasNightShield: nightShieldCount > 0,
+    hasNightShield: nightShieldCount > 0 || purchasedNightShieldActive,
     nightShieldCount,
+    purchasedNightShieldActive,
     seats: run.seats.map(({ id, name, portrait, exit }) => ({
       id,
       name,
       portrait,
       exit: exit ? { ...exit } : undefined,
-      finaleRole: run.result
-        ? run.private.betrayers.includes(id)
-          ? 'betrayer'
-          : 'loyal'
-        : undefined,
+      finaleRole:
+        run.result && run.seasonRewards?.finaleRevealed
+          ? run.private.betrayers.includes(id)
+            ? 'betrayer'
+            : 'loyal'
+          : undefined,
       fullImmunity: !exit && id === run.immunityId,
       publicShield:
         !exit &&

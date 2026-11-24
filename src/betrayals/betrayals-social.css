@@ -1,19 +1,21 @@
-.betrayals-social-dialog {
+.sp2-backdrop.betrayals-social-dialog {
   --color-accent: #d5aa7e;
   --social-metal: #685646;
   --social-surface: linear-gradient(150deg, #29221d, #171718 72%);
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   max-width: none;
   max-height: none;
   margin: 0;
   padding: 0;
   overflow: hidden;
   border: 0;
+  background: #111215;
+  backdrop-filter: none;
   color: inherit;
 }
 
-.betrayals-social-dialog:not([open]) {
+.sp2-backdrop.betrayals-social-dialog:not([open]) {
   display: none;
 }
 
@@ -21,7 +23,14 @@
   background: transparent;
 }
 
-.betrayals-social-dialog .sp2-modal {
+.sp2-backdrop.betrayals-social-dialog > .sp2-modal {
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   background:
     radial-gradient(ellipse at 12% 0%, #58413073, transparent 47%),
     linear-gradient(155deg, #201b18, #111215 62%, #0e1013);
@@ -30,6 +39,32 @@
 .betrayals-social-dialog :is(.sp2-header, .sp2-footer) {
   background: linear-gradient(105deg, #2c231d, #151618);
   border-color: #58483a;
+}
+
+.betrayals-social-dialog .sp2-header {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.48rem;
+  padding-top: max(0.48rem, var(--app-safe-area-top, 0px));
+  padding-inline: max(0.74rem, env(safe-area-inset-left)) max(0.74rem, env(safe-area-inset-right));
+}
+
+.betrayals-social-dialog .sp2-header__resources {
+  flex: 0 0 auto;
+  gap: 0.2rem;
+  margin-inline-start: auto;
+}
+
+.betrayals-social-dialog .sp2-header__resources:empty {
+  display: none;
+}
+
+.betrayals-social-dialog .sp2-header__close {
+  margin-inline-start: auto;
+}
+
+.betrayals-social-dialog .sp2-header__resources:not(:empty) + .sp2-header__close {
+  margin-inline-start: 0;
 }
 
 .betrayals-social-dialog
@@ -48,7 +83,47 @@
 }
 
 .betrayals-social-dialog .sp2-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: min(100%, 68rem);
+  min-height: 0;
+  margin-inline: auto;
+  padding-inline: max(0.56rem, env(safe-area-inset-left)) max(0.56rem, env(safe-area-inset-right));
+  overflow: hidden auto;
+  overscroll-behavior: contain;
   background: linear-gradient(180deg, #14141866, #0e1013b3);
+}
+
+.betrayals-social-dialog .sp2-body > :is(.sp2-hubmates, .sp2-focus, .sp2-moves) {
+  flex: 0 0 auto;
+}
+
+.betrayals-social-dialog .sp2-body > .sp2-focus {
+  align-self: stretch;
+  max-height: none;
+  overflow: clip;
+}
+
+.betrayals-social-dialog .sp2-body--focused-target > .sp2-focus--active {
+  position: relative;
+  top: auto;
+}
+
+.betrayals-social-dialog .sp2-focus--active .sp2-focus__portrait .pa--lg {
+  inline-size: 3.6rem;
+  block-size: 3.6rem;
+}
+
+.betrayals-social-dialog .sp2-body > .sp2-moves,
+.betrayals-social-dialog .sp2-body .sp2-action-grid {
+  flex: 0 0 auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.betrayals-social-dialog .sp2-hubmates {
+  padding-bottom: 0.46rem;
 }
 
 .betrayals-social-dialog .sp2-body .sp2-moves__top {
@@ -131,4 +206,50 @@
 .betrayals-social-dialog .game-back-button {
   border-color: #8b6c50 !important;
   background: linear-gradient(145deg, #594536, #29221c) !important;
+}
+
+.betrayals-social-dialog .house-pulse__summary.betrayals-social-pulse {
+  border-color: #b783596e;
+  background:
+    radial-gradient(circle at 0 50%, #84344570, transparent 52%),
+    linear-gradient(115deg, #302027, #171416 82%);
+  box-shadow:
+    inset 0 1px #fff3df16,
+    0 8px 24px #0005;
+}
+
+.betrayals-social-pulse .house-pulse__mark {
+  box-sizing: border-box;
+  border: 1px solid #e0b66a99;
+  color: #f1cf85;
+  background: radial-gradient(circle, #8d4a4a, #38202a 74%);
+  box-shadow: 0 0 18px #bc73422e;
+}
+
+.betrayals-social-pulse .house-pulse__mark svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.betrayals-social-pulse em {
+  color: #d7c1ba;
+}
+
+.betrayals-social-pulse b {
+  color: #f2cd83;
+}
+
+.betrayals-social-dialog .ra-header__actions {
+  margin-inline-end: 0;
+}
+
+.betrayals-social-dialog .sp2-footer--unified .ra-history-btn {
+  height: 1.6rem;
+  min-height: 1.6rem;
+  padding-inline: 0.42rem;
+  border-radius: 999px;
 }

@@ -176,6 +176,10 @@ export interface StoredProfile {
    * an old purchase callback cannot become payable again after enough transactions.
    */
   processedEyeoleanTransactionIds?: string[]
+  /** Betrayals reward/debit keys are never trimmed, including after a season rewind. */
+  betrayalsWalletTransactionIds?: string[]
+  /** Native cash receipts are permanent and separate from the bounded display ledger. */
+  betrayalsPurchaseReceipts?: Record<string, { productId: string; amount: number }>
   /** Season settlement IDs already paid; prevents finale reload/replay duplication. */
   settledEyeoleanSeasonIds?: string[]
   /** Permanent achievement identifiers unlocked by this profile. */
@@ -482,6 +486,34 @@ export function coerceStoredProfile(raw: unknown): StoredProfile | null {
         ? Math.max(0, Math.floor(r.lifetimeXp))
         : 0,
     eyeoleans: migratedForecastBalance,
+    betrayalsWalletTransactionIds: Array.isArray(r.betrayalsWalletTransactionIds)
+      ? [
+          ...new Set(
+            r.betrayalsWalletTransactionIds.filter(
+              (id): id is string => typeof id === 'string' && id.startsWith('betrayals:')
+            )
+          ),
+        ]
+      : [],
+    betrayalsPurchaseReceipts:
+      r.betrayalsPurchaseReceipts &&
+      typeof r.betrayalsPurchaseReceipts === 'object' &&
+      !Array.isArray(r.betrayalsPurchaseReceipts)
+        ? (Object.fromEntries(
+            Object.entries(r.betrayalsPurchaseReceipts).filter(([key, raw]) => {
+              if (!/^betrayals-store:(ios|android):.+/.test(key) || !raw || typeof raw !== 'object')
+                return false
+              const receipt = raw as { productId?: unknown; amount?: unknown }
+              return (
+                typeof receipt.productId === 'string' &&
+                receipt.productId.length > 0 &&
+                typeof receipt.amount === 'number' &&
+                Number.isSafeInteger(receipt.amount) &&
+                receipt.amount > 0
+              )
+            })
+          ) as Record<string, { productId: string; amount: number }>)
+        : {},
     eyeoleanInventory: coerceEyeoleanInventory(r.eyeoleanInventory),
     eyeoleanPowerReservations: coerceEyeoleanPowerReservations(r.eyeoleanPowerReservations),
     eyeoleanPowerSeasonProgress: coerceEyeoleanPowerSeasonProgress(r.eyeoleanPowerSeasonProgress),
@@ -547,10 +579,17 @@ export function loadProfilesState(): ProfilesState {
 
 /** Persist profiles state to localStorage. Silently ignores errors. */
 export function saveProfilesState(state: ProfilesState): void {
+  saveProfilesStateChecked(state)
+}
+
+/** Paid currency must be confirmed on disk before its native transaction is consumed. */
+export function saveProfilesStateChecked(state: ProfilesState): boolean {
   try {
-    localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(state))
+    const serialized = JSON.stringify(state)
+    localStorage.setItem(PROFILES_STORAGE_KEY, serialized)
+    return localStorage.getItem(PROFILES_STORAGE_KEY) === serialized
   } catch {
-    // Ignore quota / private-browsing errors.
+    return false
   }
 }
 
@@ -959,6 +998,112 @@ const profilesSlice = createSlice({
       }
     },
 
+    /** Native billing supplies a verified transaction and pins its original profile. */
+    creditBetrayalsPurchase(
+      state,
+      action: PayloadAction<{
+        profileId: string
+        transactionId: string
+        productId: string
+        amount: number
+        label: string
+      }>
+    ) {
+      const { profileId, transactionId, productId, amount, label } = action.payload
+      const profile = state.profiles.find((entry) => entry.id === profileId)
+      if (
+        !profile ||
+        !/^betrayals-store:(ios|android):.+/.test(transactionId) ||
+        !productId.trim() ||
+        !label.trim() ||
+        !Number.isSafeInteger(amount) ||
+        amount <= 0
+      )
+        return
+      if (Object.hasOwn(profile.betrayalsPurchaseReceipts ?? {}, transactionId)) return
+      const balance = Math.max(0, Math.floor(profile.eyeoleans ?? 0))
+      if (!Number.isSafeInteger(balance + amount)) return
+      const credited = creditEyeoleans(profile, {
+        id: transactionId,
+        amount,
+        source: 'purchase_credit',
+        label,
+        createdAt: new Date().toISOString(),
+      })
+      if (credited !== amount) return
+      profile.betrayalsPurchaseReceipts = {
+        ...(profile.betrayalsPurchaseReceipts ?? {}),
+        [transactionId]: { productId, amount },
+      }
+    },
+
+    recordBetrayalsRewards(
+      state,
+      action: PayloadAction<{
+        profileId: string
+        events: Array<{ id: string; amount: number; label: string }>
+      }>
+    ) {
+      const profile = state.profiles.find((entry) => entry.id === action.payload.profileId)
+      if (!profile) return
+      const processed = new Set(profile.betrayalsWalletTransactionIds ?? [])
+      for (const event of action.payload.events) {
+        if (
+          !event.id.startsWith('betrayals:') ||
+          processed.has(event.id) ||
+          !Number.isSafeInteger(event.amount) ||
+          event.amount <= 0 ||
+          !event.label.trim()
+        )
+          continue
+        if (!Number.isSafeInteger((profile.eyeoleans ?? 0) + event.amount)) continue
+        const credited = creditEyeoleans(profile, {
+          ...event,
+          source: 'season_reward',
+          createdAt: new Date().toISOString(),
+        })
+        if (credited === event.amount) processed.add(event.id)
+      }
+      profile.betrayalsWalletTransactionIds = [...processed]
+    },
+
+    spendBetrayalsEyeros(
+      state,
+      action: PayloadAction<{
+        profileId: string
+        transactionId: string
+        amount: number
+        label: string
+      }>
+    ) {
+      const { profileId, transactionId, amount, label } = action.payload
+      const profile = state.profiles.find((entry) => entry.id === profileId)
+      if (
+        !profile ||
+        !transactionId.startsWith('betrayals:') ||
+        !label.trim() ||
+        !Number.isSafeInteger(amount) ||
+        amount <= 0
+      )
+        return
+      const processed = profile.betrayalsWalletTransactionIds ?? []
+      if (processed.includes(transactionId)) return
+      const balance = Math.max(0, Math.floor(profile.eyeoleans ?? 0))
+      if (balance < amount) return
+      if (
+        !appendEyeoleanTransaction(profile, {
+          id: transactionId,
+          amount: -amount,
+          source: 'store_purchase',
+          label,
+          createdAt: new Date().toISOString(),
+        })
+      )
+        return
+      profile.eyeoleans = balance - amount
+      profile.betrayalsWalletTransactionIds = [...processed, transactionId]
+    },
+
     /** Debug-panel grant for QA wallet testing; never shown in player-facing UI. */
     debugGrantEyeoleans(state, action: PayloadAction<{ grantId: string; amount: number }>) {
       const profile = state.profiles.find((p) => p.id === state.activeProfileId)
@@ -1223,6 +1368,9 @@ export const {
   settleSeasonEyeoleans,
   spendEyeoleans,
   purchaseAppearanceLook,
+  creditBetrayalsPurchase,
+  recordBetrayalsRewards,
+  spendBetrayalsEyeros,
   debugGrantEyeoleans,
   purchaseEyeoleanStoreProduct,
   armEyeoleanStorePower,

@@ -55,6 +55,15 @@ const BetrayalsReview =
   import.meta.env.DEV || isBetrayalsEdition
     ? lazy(() => import('./betrayals/BetrayalsScreen'))
     : null
+const Betrayals = isBetrayalsEdition ? lazy(() => import('./betrayals/BetrayalsRoute')) : null
+const BetrayalsShop = lazy(() => import('./betrayals/BetrayalsShopRoute'))
+const BetrayalsProfileShell = isBetrayalsEdition
+  ? lazy<object>(() =>
+      import('./betrayals/BetrayalsRoute').then(({ BetrayalsProfileShell }) => ({
+        default: BetrayalsProfileShell,
+      }))
+    )
+  : null
 const ReleaseFixesPreview = import.meta.env.DEV
   ? lazy(() => import('./screens/ReleaseFixesPreview/ReleaseFixesPreview'))
   : null
@@ -152,8 +161,25 @@ const MinigameTurnDemos = import.meta.env.DEV
   : null
 
 export const router = createHashRouter(
-  isBetrayalsEdition && BetrayalsReview
-    ? [{ path: '*', element: load(<BetrayalsReview />), errorElement: <RouteErrorBoundary /> }]
+  Betrayals && BetrayalsProfileShell
+    ? [
+        {
+          element: load(<BetrayalsProfileShell />),
+          errorElement: <RouteErrorBoundary />,
+          children: [
+            { path: '/store', element: load(<BetrayalsShop />) },
+            { path: '/store/:section', element: load(<BetrayalsShop />) },
+            { path: '/wallet', element: load(<BetrayalsShop />) },
+            { path: '/profile', element: load(<Profile />) },
+            { path: '/profile/account', element: load(<PlayerAccount />) },
+            { path: '/profile/dressing-room', element: load(<DressingRoom />) },
+            { path: '/profile-edit', element: load(<EditProfile />) },
+            { path: '/profile-picker', element: load(<ProfilePicker />) },
+            { path: '/player-privacy', element: load(<AdvertisingPrivacy betrayals />) },
+          ],
+        },
+        { path: '*', element: load(<Betrayals />), errorElement: <RouteErrorBoundary /> },
+      ]
     : [
         {
           path: '/cinematic',

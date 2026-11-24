@@ -13,6 +13,10 @@ for (const feature of [
   'src/economy/storeCatalog.ts',
   'src/store/gameSlice.ts',
   'src/vip/vipPurchaseService.ts',
+  'src/betrayals/commerce/catalog.ts',
+  'src/betrayals/economy.ts',
+  'src/betrayals/useBetrayalsAdBreak.ts',
+  'src/betrayals/BetrayalsWallet.tsx',
   'public/assets/skins/new-theme.webp',
 ]) {
   test(`requires a marketplace review for ${feature}`, () => {

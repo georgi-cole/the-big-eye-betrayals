@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { ageBandForAge, declarePlayerAge } from '../../safety/playerSafety'
 import { usePlayerSafety } from '../../safety/usePlayerSafety'
 import { usesContextualAdTreatment } from './adAudience'
@@ -11,7 +12,7 @@ import {
 import { getAdAvailabilityMessage, subscribeAdAvailability } from './adAvailability'
 import '../../safety/PlayerSafetyScreen.css'
 
-export default function AdvertisingPrivacy() {
+export default function AdvertisingPrivacy({ betrayals = false }: { betrayals?: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const openedFromSettings =
@@ -31,10 +32,18 @@ export default function AdvertisingPrivacy() {
     setAge('')
   }
   return (
-    <main className="player-safety">
+    <main className={betrayals ? 'player-safety player-safety--betrayals' : 'player-safety'}>
       <section className="player-safety__card" aria-labelledby="advertising-privacy-title">
-        <p className="player-safety__eyebrow">THE BIG EYE</p>
+        <p className="player-safety__eyebrow">
+          {betrayals ? 'THE BIG EYE: BETRAYALS' : 'THE BIG EYE'}
+        </p>
         <h1 id="advertising-privacy-title">Advertising privacy</h1>
+        {betrayals && (
+          <p>
+            Standard play includes an automatic break after banishment and the night result, and
+            after each Final Five vote. No Ads and VIP remove these breaks.
+          </p>
+        )}
         {!record ? (
           <form onSubmit={submitAge}>
             <p>
@@ -58,10 +67,16 @@ export default function AdvertisingPrivacy() {
           </form>
         ) : !usesContextualAdTreatment() ? (
           <>
-            <p>
-              Standard play includes automatic ad breaks. No Ads and VIP remove those breaks.
-              Rewarded ads are optional: choose Watch Ad when you want a reward.
-            </p>
+            {betrayals ? (
+              <p>
+                Rewarded ads are optional. You can choose to watch one when a reward is offered.
+              </p>
+            ) : (
+              <p>
+                Standard play includes automatic ad breaks. No Ads and VIP remove those breaks.
+                Rewarded ads are optional: choose Watch Ad when you want a reward.
+              </p>
+            )}
             <p>
               Google may receive device information, your IP address, and ad interactions. Manage
               Google's privacy choices below. Ads are subject to availability and privacy
@@ -106,7 +121,11 @@ export default function AdvertisingPrivacy() {
             )}
           </>
         ) : (
-          <p>Rewarded ads and Survival run purchases are available to adults only.</p>
+          <p>
+            {betrayals
+              ? 'Rewarded ads and Eyeros pack purchases are available to adults only.'
+              : 'Rewarded ads and Survival run purchases are available to adults only.'}
+          </p>
         )}
         {usesContextualAdTreatment() && (
           <p>
@@ -129,17 +148,21 @@ export default function AdvertisingPrivacy() {
           <a href="mailto:kolequant@gmail.com?subject=The%20Big%20Eye%20ad%20report">
             Report an ad
           </a>
-          <button
-            type="button"
-            className="player-safety__secondary"
+          <GameBackButton
+            label={
+              returnToCompetition
+                ? 'Back to competition'
+                : betrayals
+                  ? 'Back to Betrayals'
+                  : 'Back to settings'
+            }
+            showLabel
             onClick={() => {
               if (returnToCompetition) navigate('/game', { replace: true })
               else if (openedFromSettings) navigate(-1)
-              else navigate('/settings', { replace: true })
+              else navigate(betrayals ? '/' : '/settings', { replace: true })
             }}
-          >
-            {returnToCompetition ? 'Back to competition' : 'Back to settings'}
-          </button>
+          />
         </div>
       </section>
     </main>

@@ -21,6 +21,7 @@ import { clearSeasonArchives } from '../../store/archivePersistence'
 import { withRunAutosaveSuspended } from '../../store/runAutosaveGate'
 import { persistCurrentRunSnapshot } from '../../store/store'
 import ConfirmExitModal from '../../components/ConfirmExitModal/ConfirmExitModal'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileOptionalDetails from '../../components/ProfileOptionalDetails/ProfileOptionalDetails'
 import ProfileEmailFields from '../../components/ProfileEmailFields/ProfileEmailFields'
 import {
@@ -30,8 +31,11 @@ import {
 import { normalizeProfileBio } from '../../components/ProfileOptionalDetails/profileBio'
 import ProfilePhotoPreview from '../../components/ProfilePhotoPreview/ProfilePhotoPreview'
 import { coerceAppearanceSelection, type AppearanceSelection } from '../../appearance/catalog'
+import { IS_BETRAYALS_EDITION, isBetrayalsLook } from '../../betrayals/betrayalsAppearance'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
 import { warmSelectedAppearance } from '../../appearance/preloadAppearance'
 import './EditProfile.css'
 
@@ -61,7 +65,9 @@ export default function EditProfile() {
   const routeLocation = useLocation()
   const dispatch = useAppDispatch()
   const profile = useAppSelector(selectCurrentProfile)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const profileCount = useAppSelector((state) => state.profiles.profiles.length)
   const currentRunPhotoId = useAppSelector(
     (state) =>
@@ -73,6 +79,7 @@ export default function EditProfile() {
   const creatingProfile =
     routeState?.createProfile === true &&
     creationSelection.kind === 'catalog' &&
+    (!IS_BETRAYALS_EDITION || isBetrayalsLook(creationSelection.lookId)) &&
     hasAppearanceLookAccess(creationSelection.lookId, null, isVip)
   const requestedReturnTo = routeState?.from
   const returnTo =
@@ -80,9 +87,31 @@ export default function EditProfile() {
     requestedReturnTo === '/profile' ||
     requestedReturnTo === '/profile-picker'
       ? requestedReturnTo
-      : '/game'
+      : IS_BETRAYALS_EDITION
+        ? betrayalsProfileReturnPath(requestedReturnTo)
+        : '/game'
   const editReturnPath = returnTo === '/profile-picker' ? '/profile-picker' : '/profile'
   const editReturnFrom = returnTo === '/profile-picker' ? '/profile' : returnTo
+
+  function handleCancel() {
+    if (creatingProfile) {
+      navigate('/profile/dressing-room', {
+        replace: true,
+        state: {
+          from: '/',
+          createProfile: true,
+          initialLookId: creationSelection.lookId,
+          adoptGuestRun: routeState?.adoptGuestRun === true,
+          ...(routeState?.fromPlayerAccount && { fromPlayerAccount: true }),
+          ...(routeState?.playerAccountId && {
+            playerAccountId: routeState.playerAccountId,
+          }),
+        },
+      })
+    } else {
+      navigate(editReturnPath, { replace: true, state: { from: editReturnFrom } })
+    }
+  }
 
   // Redirect if no profile is active
   useEffect(() => {
@@ -236,7 +265,9 @@ export default function EditProfile() {
         )
           return
         if (!canCommit()) return
-        if (routeState?.adoptGuestRun) {
+        if (IS_BETRAYALS_EDITION) {
+          withRunAutosaveSuspended(() => dispatch(createProfile(accountProfileDetails)))
+        } else if (routeState?.adoptGuestRun) {
           withRunAutosaveSuspended(() => dispatch(createProfile(accountProfileDetails)))
           persistCurrentRunSnapshot()
           await flushSavePersistence()
@@ -252,7 +283,7 @@ export default function EditProfile() {
         else
           navigate('/profile', {
             replace: true,
-            state: { from: '/', fromLookReveal: true },
+            state: { from: IS_BETRAYALS_EDITION ? returnTo : '/', fromLookReveal: true },
           })
       } finally {
         if (mounted.current) setSaving(false)
@@ -489,32 +520,24 @@ export default function EditProfile() {
 
       {/* Save / Cancel */}
       <div className="edit-profile__actions">
-        <button
-          type="button"
-          className="edit-profile__btn edit-profile__btn--cancel"
-          disabled={saving}
-          onClick={() => {
-            if (creatingProfile) {
-              navigate('/profile/dressing-room', {
-                replace: true,
-                state: {
-                  from: '/',
-                  createProfile: true,
-                  initialLookId: creationSelection.lookId,
-                  adoptGuestRun: routeState?.adoptGuestRun === true,
-                  ...(routeState?.fromPlayerAccount && { fromPlayerAccount: true }),
-                  ...(routeState?.playerAccountId && {
-                    playerAccountId: routeState.playerAccountId,
-                  }),
-                },
-              })
-            } else {
-              navigate(editReturnPath, { replace: true, state: { from: editReturnFrom } })
-            }
-          }}
-        >
-          {creatingProfile ? 'Back to looks' : 'Cancel'}
-        </button>
+        {creatingProfile ? (
+          <GameBackButton
+            className="edit-profile__back"
+            label="Back to looks"
+            showLabel
+            disabled={saving}
+            onClick={handleCancel}
+          />
+        ) : (
+          <button
+            type="button"
+            className="edit-profile__btn edit-profile__btn--cancel"
+            disabled={saving}
+            onClick={handleCancel}
+          >
+            Cancel
+          </button>
+        )}
         <button
           type="button"
           className="edit-profile__btn edit-profile__btn--save"

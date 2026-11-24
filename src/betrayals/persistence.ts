@@ -9,6 +9,22 @@ import {
 } from './run.ts'
 import type { Run, Seat } from './run.ts'
 import { initializeSocialWallets } from './socialResources.ts'
+import { validSeasonCheckpoint, type SeasonRewards } from './seasonRewards.ts'
+import { validBetrayalsEconomy } from './economy.ts'
+import {
+  CASTLE_ROOMS,
+  DEMEANORS,
+  GUEST_READS,
+  IMPRESSIONS,
+  PERSONAL_NOTE_LIMIT,
+  PROFILE_TRAITS,
+  REPORT_ACCESSES,
+  REPORT_METHODS,
+  SHARING_MODES,
+  SOCIAL_BEHAVIORS,
+  TRAIT_READS,
+  WATCH_STATUSES,
+} from './investigationRecords.ts'
 
 const SAVE_PREFIX = 'big-eye:betrayals:season:'
 
@@ -204,7 +220,9 @@ function validShieldConversations(entries: unknown[], ids: Set<string>, day: num
         (entry.declinedIds === undefined || validIds(entry.declinedIds, ids, 0, 5))
       )
     }
-    if (!entry || !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
+    if (!entry) return true
+    const isFollowUp = entry.kind === 'shield-request' || entry.kind === 'shield-plans'
+    if (!isFollowUp && !NIGHT_SHIELD_MOVES.some((kind) => kind === entry.kind)) return true
     if (
       typeof entry.day !== 'number' ||
       !Number.isSafeInteger(entry.day) ||
@@ -213,6 +231,18 @@ function validShieldConversations(entries: unknown[], ids: Set<string>, day: num
       !validIds([entry.actorId, entry.recipientId], ids, 2, 2)
     )
       return false
+    if (isFollowUp) {
+      return (
+        entry.shieldReply === undefined &&
+        entry.suspectId === undefined &&
+        (entry.kind === 'shield-request'
+          ? typeof entry.accepted === 'boolean' && entry.shieldPlan === undefined
+          : entry.accepted === undefined &&
+            (entry.shieldPlan === 'keep' ||
+              entry.shieldPlan === 'open-to-gift' ||
+              entry.shieldPlan === 'private'))
+      )
+    }
     if (entry.kind === 'shield-tip') {
       return (
         validIds([entry.actorId, entry.recipientId, entry.suspectId], ids, 3, 3) &&
@@ -270,7 +300,196 @@ function validWitnessLead(value: unknown, ids: Set<string>, day: number): boolea
   )
 }
 
-function validTableArguments(value: unknown, ids: Set<string>): boolean {
+function onOrBefore(value: unknown, day: number): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value <= day
+}
+
+function validInvestigation(value: unknown, ids: Set<string>, humanId: string, day: number) {
+  if (value === undefined) return true
+  const state = asObject(value)
+  if (!state) return false
+  const { incidents, reports, watches, witnesses, shares, saved, votes } = state
+  const notes = asObject(state.notes)
+  if (
+    !notes ||
+    !Array.isArray(incidents) ||
+    !Array.isArray(reports) ||
+    !Array.isArray(watches) ||
+    !Array.isArray(witnesses) ||
+    !Array.isArray(shares) ||
+    !Array.isArray(saved) ||
+    !Array.isArray(votes)
+  )
+    return false
+
+  const guest = (id: unknown): id is string =>
+    typeof id === 'string' && id !== humanId && ids.has(id)
+  const validOptional = (list: readonly string[], value: unknown) =>
+    value === undefined || list.includes(value as string)
+  function validClaim(claim: Record<string, unknown>, reportedDay: number) {
+    return (
+      onOrBefore(claim.day, reportedDay) &&
+      validOptional(SOCIAL_BEHAVIORS, claim.behavior) &&
+      validOptional(CASTLE_ROOMS, claim.room) &&
+      validOptional(DEMEANORS, claim.mood) &&
+      (claim.contactId === undefined || guest(claim.contactId)) &&
+      (claim.topicId === undefined || guest(claim.topicId)) &&
+      (claim.denies === undefined || claim.denies === true)
+    )
+  }
+  const incidentIds = new Set<string>()
+  if (
+    !incidents.every((value: unknown) => {
+      const incident = asObject(value)
+      const fact = asObject(incident?.fact)
+      if (
+        !incident ||
+        typeof incident.id !== 'string' ||
+        !guest(incident.guestId) ||
+        !fact ||
+        !validClaim(fact, day) ||
+        incident.id !== `${fact.day}:castle:${incident.guestId}` ||
+        incidentIds.has(incident.id) ||
+        !fact.behavior ||
+        !fact.room ||
+        !fact.mood ||
+        fact.denies ||
+        (incident.witnessId !== undefined && !guest(incident.witnessId)) ||
+        !validIds(incident.relayIds, ids, 0, 2) ||
+        (incident.relayIds as string[]).some((id) => !guest(id)) ||
+        (fact.behavior === 'alone' ? fact.contactId !== undefined : !guest(fact.contactId)) ||
+        (fact.behavior === 'lobbied' || fact.behavior === 'defended') !== Boolean(fact.topicId)
+      )
+        return false
+      const present = [
+        incident.guestId,
+        fact.contactId,
+        incident.witnessId,
+        ...(incident.relayIds as string[]),
+      ].filter(Boolean)
+      if (
+        new Set(present).size !== present.length ||
+        (fact.topicId && (fact.topicId === incident.guestId || fact.topicId === fact.contactId))
+      )
+        return false
+      incidentIds.add(incident.id)
+      return true
+    })
+  )
+    return false
+
+  const reportIds = new Set<string>()
+  if (
+    !reports.every((value: unknown, index) => {
+      const report = asObject(value)
+      if (
+        !report ||
+        report.id !== `intel:${index + 1}` ||
+        !onOrBefore(report.day, day) ||
+        !guest(report.guestId) ||
+        !REPORT_METHODS.includes(report.method as (typeof REPORT_METHODS)[number]) ||
+        !REPORT_ACCESSES.includes(report.access as (typeof REPORT_ACCESSES)[number]) ||
+        !validOptional(IMPRESSIONS, report.impression) ||
+        (report.method === 'observe' || report.method === 'eavesdrop'
+          ? report.speakerId !== undefined
+          : !guest(report.speakerId)) ||
+        [report.sourceId, report.nearbyId].some((id) => id !== undefined && !guest(id)) ||
+        (report.incidentId !== undefined && !incidentIds.has(report.incidentId as string)) ||
+        (report.referenceId !== undefined && !reportIds.has(report.referenceId as string))
+      )
+        return false
+      const claim = asObject(report.claim)
+      if (report.claim !== undefined && (!claim || !validClaim(claim, report.day))) return false
+      reportIds.add(report.id)
+      return true
+    })
+  )
+    return false
+
+  const validReference = (value: unknown) => {
+    const record = asObject(value)
+    return record &&
+      onOrBefore(record.day, day) &&
+      typeof record.reportId === 'string' &&
+      reportIds.has(record.reportId)
+      ? record
+      : undefined
+  }
+  return (
+    saved.every((id: unknown) => typeof id === 'string' && reportIds.has(id)) &&
+    new Set(saved).size === saved.length &&
+    Object.entries(notes).every(([id, value]) => {
+      const note = asObject(value)
+      const traits = asObject(note?.traits)
+      return (
+        guest(id) &&
+        note &&
+        GUEST_READS.includes(note.leaning as (typeof GUEST_READS)[number]) &&
+        typeof note.text === 'string' &&
+        note.text.length <= PERSONAL_NOTE_LIMIT &&
+        (note.traits === undefined ||
+          (traits &&
+            Object.entries(traits).every(
+              ([trait, value]) =>
+                Object.hasOwn(PROFILE_TRAITS, trait) &&
+                TRAIT_READS.includes(value as (typeof TRAIT_READS)[number])
+            )))
+      )
+    }) &&
+    watches.every((value: unknown) => {
+      const watch = asObject(value)
+      return (
+        watch &&
+        onOrBefore(watch.day, day) &&
+        guest(watch.guestId) &&
+        guest(watch.watcherId) &&
+        watch.guestId !== watch.watcherId &&
+        WATCH_STATUSES.includes(watch.status as (typeof WATCH_STATUSES)[number])
+      )
+    }) &&
+    witnesses.every((value: unknown) => typeof validReference(value)?.accepted === 'boolean') &&
+    shares.every((value: unknown) => {
+      const share = validReference(value)
+      return (
+        share &&
+        guest(share.listenerId) &&
+        SHARING_MODES.includes(share.mode as (typeof SHARING_MODES)[number])
+      )
+    }) &&
+    votes.every((value: unknown) => {
+      const vote = asObject(value)
+      return (
+        vote &&
+        onOrBefore(vote.day, day) &&
+        Array.isArray(vote.ballots) &&
+        vote.ballots.length > 0 &&
+        validTableCount({ round: 1, ballots: vote.ballots, tiedIds: [] }, ids)
+      )
+    })
+  )
+}
+
+function validInvestigationChoice(value: unknown, targetId: string, reports: unknown) {
+  if (value === undefined) return true
+  const choice = asObject(value)
+  return Boolean(
+    choice &&
+    typeof choice.reportId === 'string' &&
+    (choice.witness === undefined || choice.witness === true) &&
+    Array.isArray(reports) &&
+    reports.some((value: unknown) => {
+      const report = asObject(value)
+      return (
+        report &&
+        report.id === choice.reportId &&
+        report.guestId === targetId &&
+        (choice.witness === undefined || report.access === 'firsthand')
+      )
+    })
+  )
+}
+
+function validTableArguments(value: unknown, ids: Set<string>, reports?: unknown): boolean {
   if (value === undefined) return true
   if (!Array.isArray(value) || value.length > 5) return false
   const speakers = new Set<string>()
@@ -279,6 +498,7 @@ function validTableArguments(value: unknown, ids: Set<string>): boolean {
     if (
       !argument ||
       typeof argument.speakerId !== 'string' ||
+      typeof argument.targetId !== 'string' ||
       speakers.has(argument.speakerId) ||
       !validIds([argument.speakerId, argument.targetId], ids, 2, 2) ||
       (argument.tone !== 'careful' && argument.tone !== 'forceful') ||
@@ -290,7 +510,10 @@ function validTableArguments(value: unknown, ids: Set<string>): boolean {
         argument.basis !== 'record') ||
       (argument.evidence !== undefined &&
         argument.evidence !== 'call-witness' &&
-        argument.evidence !== 'name-source')
+        argument.evidence !== 'name-source') ||
+      (argument.investigation !== undefined &&
+        (argument.stance !== undefined || argument.evidence !== undefined)) ||
+      !validInvestigationChoice(argument.investigation, argument.targetId, reports)
     )
       return false
     speakers.add(argument.speakerId)
@@ -352,10 +575,23 @@ function isRun(value: unknown): value is Run {
   const lastShieldSave = asObject(hidden?.lastShieldSave)
   const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
+  const reports = asObject(item.investigation)?.reports
+  const adBreak = asObject(item.pendingAdBreak)
   return Boolean(
     ids.size === CAST_SIZE &&
     typeof item.humanId === 'string' &&
     ids.has(item.humanId) &&
+    validBetrayalsEconomy(item.economy, item.id) &&
+    (item.pendingAdBreak === undefined ||
+      (adBreak &&
+        typeof adBreak.id === 'string' &&
+        adBreak.id.length > 0 &&
+        adBreak.runId === item.id &&
+        typeof adBreak.day === 'number' &&
+        Number.isSafeInteger(adBreak.day) &&
+        adBreak.day >= 1 &&
+        adBreak.day <= item.day &&
+        ['banishment', 'murder', 'final-vote'].includes(adBreak.kind as string))) &&
     options &&
     typeof options.publicMode === 'boolean' &&
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
@@ -381,8 +617,9 @@ function isRun(value: unknown): value is Run {
     (lastTable?.revealedBallots === undefined ||
       (Array.isArray(lastTable.revealedBallots) &&
         validTableCount({ round: 1, ballots: lastTable.revealedBallots, tiedIds: [] }, ids))) &&
-    validTableArguments(item.tableArguments, ids) &&
-    validTableArguments(lastTable?.campaigns, ids) &&
+    validInvestigation(item.investigation, ids, item.humanId, item.day) &&
+    validTableArguments(item.tableArguments, ids, reports) &&
+    validTableArguments(lastTable?.campaigns, ids, reports) &&
     validCaseReviews(item.caseReviews, ids, item.day) &&
     validWitnessLead(item.witnessLead, ids, item.day) &&
     (item.tableSway == null ||
@@ -390,6 +627,9 @@ function isRun(value: unknown): value is Run {
         typeof sway.targetId === 'string' &&
         ids.has(sway.targetId) &&
         (sway.tone === 'careful' || sway.tone === 'forceful') &&
+        (sway.investigation === undefined ||
+          (sway.stance === undefined && sway.evidence === undefined)) &&
+        validInvestigationChoice(sway.investigation, sway.targetId, reports) &&
         (sway.stance === undefined || sway.stance === 'question' || sway.stance === 'defend') &&
         (sway.evidence === undefined ||
           ((sway.evidence === 'call-witness' || sway.evidence === 'name-source') &&
@@ -455,6 +695,28 @@ export function saveRun(storage: StorageAdapter, profileId: string, run: Run): v
   storage.setItem(SAVE_PREFIX + profileId, JSON.stringify(run))
 }
 
+function restoreSeasonRewards(run: Run): SeasonRewards | undefined {
+  const saved = asObject(run.seasonRewards)
+  if (!saved) return
+  function restoreCheckpoint(type: 'day' | 'table') {
+    const candidate = saved?.[type]
+    if (
+      isRun(candidate) &&
+      candidate.seasonRewards === undefined &&
+      candidate.presentation === undefined &&
+      candidate.pendingAdBreak === undefined &&
+      validSeasonCheckpoint(candidate, run, type)
+    ) {
+      return candidate
+    }
+  }
+  return {
+    day: restoreCheckpoint('day'),
+    table: restoreCheckpoint('table'),
+    finaleRevealed: run.phase === 'settled' && saved.finaleRevealed === true,
+  }
+}
+
 export function restoreRun(storage: StorageAdapter, profileId: string): Restore {
   let value: string | null
   try {
@@ -466,16 +728,15 @@ export function restoreRun(storage: StorageAdapter, profileId: string): Restore 
   try {
     const candidate: unknown = JSON.parse(value)
     if (!isRun(candidate)) return { status: 'incompatible' }
-    if (candidate.socialWallets) return { status: 'ready', run: candidate }
+    const seasonRewards = restoreSeasonRewards(candidate)
     return {
       status: 'ready',
       run: {
         ...candidate,
-        socialWallets: initializeSocialWallets(
-          candidate.seats,
-          candidate.day,
-          candidate.options.realityMode
-        ),
+        ...(candidate.seasonRewards !== undefined ? { seasonRewards } : {}),
+        socialWallets:
+          candidate.socialWallets ??
+          initializeSocialWallets(candidate.seats, candidate.day, candidate.options.realityMode),
       },
     }
   } catch {

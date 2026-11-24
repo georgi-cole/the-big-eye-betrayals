@@ -1,9 +1,16 @@
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import profilesReducer, { createProfile, type ProfilesState } from '../../store/profilesSlice'
 import Profile from './Profile'
 
 const mockNavigate = vi.fn()
+const mockEdition = vi.hoisted(() => ({ betrayals: false }))
+vi.mock('../../betrayals/betrayalsAppearance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../betrayals/betrayalsAppearance')>()),
+  get IS_BETRAYALS_EDITION() {
+    return mockEdition.betrayals
+  },
+}))
 vi.mock('../../services/backend/config', () => ({ isPlayerSignInConfigured: () => true }))
 let mockProfiles: ProfilesState
 let mockLocation: { pathname: string; state: { from: string; fromLookReveal?: boolean } }
@@ -20,12 +27,17 @@ vi.mock('../../store/hooks', () => ({
     }),
 }))
 vi.mock('../../components/ui/GameBackButton/GameBackButton', () => ({
-  default: () => <button type="button">Back</button>,
+  default: ({ onClick }: { onClick: () => void }) => (
+    <button type="button" onClick={onClick}>
+      Back
+    </button>
+  ),
 }))
 
 describe('Profile return entrance', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
+    mockEdition.betrayals = false
     mockLocation = { pathname: '/profile', state: { from: '/' } }
     mockProfiles = profilesReducer(
       undefined,
@@ -56,6 +68,25 @@ describe('Profile return entrance', () => {
     const { container } = render(<Profile />)
     expect(mockNavigate).not.toHaveBeenCalled()
     expect(container.firstChild).not.toHaveClass('profile-screen--look-return')
+  })
+
+  it.each(['/wallet', '/store', '/store/vip', '/store/features', '/store/items'])(
+    'returns a Betrayals profile visit to its %s entry',
+    (from) => {
+      mockEdition.betrayals = true
+      mockLocation.state.from = from
+      render(<Profile />)
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+      expect(mockNavigate).toHaveBeenCalledWith(from, { replace: true })
+    }
+  )
+
+  it('returns unknown Betrayals profile origins to Home', () => {
+    mockEdition.betrayals = true
+    mockLocation.state.from = '/store/not-a-section'
+    render(<Profile />)
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true })
   })
 
   it('skips the empty profile screen and returns through the account entry', () => {

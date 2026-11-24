@@ -1,0 +1,410 @@
+.betrayals-pulse,
+.guest-profile,
+.round-table-accounts {
+  --journal-ink: #f5ead9;
+  --journal-muted: #c0b0a0;
+  --journal-accent: #edcf8e;
+  --journal-line: rgb(222 180 117 / 23%);
+  --journal-inset: #19131e;
+  color: var(--journal-ink);
+}
+
+.betrayals-pulse.house-pulse__sheet {
+  position: fixed;
+  inset: auto 0 0;
+  max-width: none;
+  padding: 0;
+}
+
+.betrayals-pulse:not([open]) {
+  display: none;
+}
+
+.betrayals-pulse::backdrop {
+  background: rgb(5 4 12 / 72%);
+  backdrop-filter: blur(8px);
+}
+
+.betrayals-pulse .house-pulse__content {
+  min-height: 0;
+  align-content: start;
+  overscroll-behavior: contain;
+}
+
+.pulse-new > header,
+.pulse-comparison > header,
+.guest-profile__section > header,
+.investigation-account > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.investigation-account > header span:first-child {
+  color: var(--journal-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+}
+
+.pulse-new > header button,
+.pulse-comparison > header button,
+.betrayals-pulse .investigation-account__actions button,
+.guest-profile button:not(.hubmate-choice-chip),
+.round-table-accounts button {
+  padding: 6px 10px;
+  min-height: 38px;
+  color: var(--journal-ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  background: #282132;
+  border: 1px solid var(--journal-line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.betrayals-pulse button:disabled,
+.guest-profile button:disabled,
+.round-table-accounts button:disabled {
+  opacity: 0.52;
+  cursor: default;
+}
+
+.betrayals-pulse button:focus-visible,
+.guest-profile :is(button, summary):focus-visible,
+.round-table-accounts :is(button, summary):focus-visible {
+  outline: 2px solid var(--journal-accent);
+  outline-offset: 2px;
+}
+
+.betrayals-pulse
+  :is(.house-pulse__link, .investigation-account__actions button)[aria-pressed='true'],
+.guest-profile .investigation-account__actions button[aria-pressed='true'],
+.investigation-choices .hubmate-choice-chip[aria-pressed='true'] {
+  color: var(--journal-accent);
+  border-color: #987547;
+  background: #342635;
+}
+
+.pulse-timeline,
+.pulse-new,
+.pulse-accounts,
+.guest-profile__body,
+.guest-profile__accounts,
+.round-table-accounts {
+  display: grid;
+  gap: 9px;
+}
+
+.pulse-timeline details,
+.pulse-ballots,
+.pulse-comparison,
+.pulse-commitments li,
+.investigation-account:not(.house-pulse__card),
+.guest-profile__section {
+  background: var(--journal-inset);
+  border: 1px solid var(--journal-line);
+  border-radius: 10px;
+  padding: 10px;
+  min-width: 0;
+}
+
+.pulse-timeline summary,
+.pulse-ballots summary,
+.guest-profile__metric-account summary,
+.guest-profile__share > summary,
+.round-table-accounts summary {
+  color: var(--journal-accent);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pulse-timeline summary > span {
+  float: right;
+  color: var(--journal-muted);
+  font-weight: 500;
+}
+
+.pulse-timeline ol,
+.pulse-ballots ul,
+.pulse-commitments {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pulse-timeline ol {
+  margin: 7px 0 0 3px;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--journal-line);
+}
+
+.pulse-timeline li,
+.pulse-ballots li {
+  padding: 6px 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.pulse-timeline li[data-kind='departure'] {
+  color: #efcab5;
+}
+
+.pulse-commitments li {
+  margin-bottom: 8px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.84rem;
+}
+
+.pulse-commitments li > span,
+.investigation-account small,
+.investigation-account > header span:last-child,
+.guest-profile__section small,
+.guest-profile__section > header > span,
+.pulse-empty {
+  color: var(--journal-muted);
+  font-size: 0.75rem;
+}
+
+.investigation-account:not(.house-pulse__card) {
+  border-left: 2px solid #947451;
+}
+
+.investigation-account[data-access='hearsay'],
+.investigation-account[data-access='impression'] {
+  border-left-color: #82708c;
+}
+
+.investigation-account[data-access='withheld'],
+.investigation-account[data-access='unavailable'] {
+  border-left-color: #695a63;
+}
+
+.investigation-account:not(.house-pulse__card) p,
+.pulse-comparison p {
+  margin: 6px 0 0;
+  font-size: 0.87rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.investigation-account small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  margin-top: 5px;
+}
+
+.investigation-account__actions,
+.guest-profile__actions {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.investigation-account__actions,
+.guest-profile__actions,
+.guest-profile__accounts {
+  margin-top: 7px;
+}
+
+.pulse-tools,
+.guest-profile__choices {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.pulse-tools__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulse-tools__top span,
+.guest-profile__choices > span {
+  color: var(--journal-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.investigation-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.investigation-choices--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  padding: 3px 3px 6px;
+}
+
+.pulse-comparison > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pulse-comparison > p {
+  color: var(--journal-accent);
+}
+
+.sp2-focus > .guest-profile {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+}
+
+.sp2-focus > .guest-profile > summary {
+  min-height: 1.65rem;
+  align-content: center;
+  color: #e0bd99;
+  font-size: 0.7rem;
+}
+
+.guest-profile__observe {
+  background: linear-gradient(120deg, #352637, var(--journal-inset));
+}
+
+.guest-profile__section > header {
+  margin-bottom: 6px;
+}
+
+.guest-profile__section h3,
+.pulse-new h3,
+.pulse-comparison h3,
+.pulse-ballots h3 {
+  margin: 0;
+  font-size: 0.91rem;
+}
+
+.guest-profile__metrics {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.32rem 0.58rem;
+  border: 1px solid var(--journal-line);
+  border-radius: 0.55rem;
+  background: #171412b3;
+}
+
+.guest-profile__metric {
+  min-width: 0;
+}
+
+.guest-profile__metric-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) min(38%, 11rem) minmax(0, 1fr);
+  align-items: center;
+  min-height: 1.23rem;
+  gap: 0.45rem;
+}
+
+.guest-profile__metric-row > span:first-child {
+  color: #e6ceb1;
+  font-size: 0.73rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.guest-profile__metrics > small,
+.guest-profile__metric-row small,
+.guest-profile__metric > small,
+.guest-profile__metric-account small {
+  color: #b9adca;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.guest-profile__metric-row small {
+  text-align: end;
+}
+
+.guest-profile__metric-row .reality-ledger__relationship-meter {
+  width: 100%;
+  height: 6px;
+}
+
+.guest-profile__metric-row .guest-profile__locked-meter {
+  box-sizing: border-box;
+  border: 1px dashed #d9b57d70;
+  background: #a67d5012;
+}
+
+.guest-profile__lock-icon {
+  display: grid;
+  width: 0.95rem;
+  height: 0.95rem;
+  place-items: center;
+  justify-self: end;
+  color: #e7c27e;
+}
+
+.guest-profile__lock-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.guest-profile .guest-profile__locked-note {
+  padding-top: 0.2rem;
+  border-top: 1px solid var(--journal-line);
+  text-align: end;
+}
+
+.guest-profile .guest-profile__locked-note button {
+  min-height: 1.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--journal-accent);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.guest-profile__metric > small,
+.guest-profile__metric-account {
+  margin-top: 4px;
+}
+
+.guest-profile__metric-account summary {
+  color: #dbbc9c;
+  font-size: 0.72rem;
+}
+
+.guest-profile__observe .investigation-account,
+.guest-profile__share {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guest-profile__metrics .reality-ledger__relationship-meter-fill {
+    transition: none;
+  }
+}
+
+.round-table-accounts {
+  margin: 8px 0;
+}
+
+.round-table-accounts > div {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+}

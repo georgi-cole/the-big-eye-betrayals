@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
-import { getEyeArtwork, LOGO_TO_EYE_MS, playLogoToEye } from './logoToEye'
+import {
+  getEyeArtwork,
+  LOGO_TO_EYE_MS,
+  LOGO_TO_LANTERNS_MS,
+  playLogoToEye,
+  playLogoToLanterns,
+} from './logoToEye'
 import './KolequantSplash.css'
 
 interface Props {
@@ -12,6 +18,7 @@ interface Props {
   messages?: readonly string[]
   /** The displayed background and its frame, used to align the opening eye. */
   introHub?: { frame: RefObject<HTMLDivElement | null>; url: string | null }
+  lanternTargets?: readonly [RefObject<HTMLElement | null>, RefObject<HTMLElement | null>]
   onFinish?: () => void
 }
 
@@ -40,6 +47,7 @@ export default function KolequantSplash({
   status,
   messages = DEFAULT_MESSAGES,
   introHub,
+  lanternTargets,
   onFinish,
 }: Props) {
   const [messageIndex, setMessageIndex] = useState(0)
@@ -52,6 +60,8 @@ export default function KolequantSplash({
   const onFinishRef = useRef(onFinish)
   const hubFrame = introHub?.frame
   const hubUrl = introHub?.url
+  const westLantern = lanternTargets?.[0]
+  const eastLantern = lanternTargets?.[1]
   const clampedProgress = clampProgress(progress)
   const activeMessages = useMemo(
     () => (messages.length > 0 ? messages : DEFAULT_MESSAGES),
@@ -104,11 +114,19 @@ export default function KolequantSplash({
     if (!ready || !artworkReady || !scene || finished.current) return
 
     const artwork = getEyeArtwork(hubUrl)
-    const canMorph =
-      artwork &&
-      hubFrame?.current &&
-      duration >= LOGO_TO_EYE_MS + 900 &&
-      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const canAnimate = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const canMorphToLanterns =
+      canAnimate &&
+      westLantern?.current &&
+      eastLantern?.current &&
+      duration >= LOGO_TO_LANTERNS_MS + 900
+    const canMorphToEye =
+      canAnimate && artwork && hubFrame?.current && duration >= LOGO_TO_EYE_MS + 900
+    const morphDuration = canMorphToLanterns
+      ? LOGO_TO_LANTERNS_MS
+      : canMorphToEye
+        ? LOGO_TO_EYE_MS
+        : 0
     const remaining = () => Math.max(0, duration - (performance.now() - artworkReadyAt.current))
     let stopMorph: (() => void) | null = null
     let exitTimer: number | undefined
@@ -125,7 +143,17 @@ export default function KolequantSplash({
         const frame = hubFrame?.current
         const canvas = canvasRef.current
         const logo = logoRef.current
-        if (canMorph && frame && canvas && logo) {
+        const west = westLantern?.current
+        const east = eastLantern?.current
+        if (canMorphToLanterns && west && east && canvas && logo) {
+          stopMorph = playLogoToLanterns({
+            canvas,
+            scene,
+            logo,
+            lanterns: [west, east],
+            onFinish: finish,
+          })
+        } else if (canMorphToEye && frame && canvas && logo) {
           stopMorph = playLogoToEye({
             canvas,
             scene,
@@ -134,15 +162,15 @@ export default function KolequantSplash({
             artwork,
             onFinish: finish,
           })
-          if (stopMorph) return
         }
+        if (stopMorph) return
 
         exitTimer = window.setTimeout(() => {
           scene.classList.add('kq-splash__scene--exiting')
           finishTimer = window.setTimeout(finish, EXIT_MS)
         }, remaining())
       },
-      Math.max(0, remaining() - (canMorph ? LOGO_TO_EYE_MS : 0))
+      Math.max(0, remaining() - morphDuration)
     )
 
     return () => {
@@ -152,7 +180,7 @@ export default function KolequantSplash({
       window.clearTimeout(finishTimer)
       scene.classList.remove('kq-splash__scene--exiting')
     }
-  }, [artworkReady, duration, hubFrame, hubUrl, ready])
+  }, [artworkReady, duration, eastLantern, hubFrame, hubUrl, ready, westLantern])
 
   const splashStyle = {
     '--kq-splash-min-duration': `${duration}ms`,
@@ -163,6 +191,7 @@ export default function KolequantSplash({
   return (
     <div
       className={className}
+      data-splash-variant={lanternTargets ? 'lanterns' : undefined}
       style={splashStyle}
       role="status"
       aria-live="polite"
@@ -194,7 +223,9 @@ export default function KolequantSplash({
                 onError={() => markArtworkSettled(2)}
               />
             </div>
-            <p className="kq-splash__title">The Big Eye</p>
+            <p className="kq-splash__title">
+              {lanternTargets ? 'The Big Eye: Betrayals' : 'The Big Eye'}
+            </p>
           </div>
           <div className="kq-splash__preload" aria-hidden="true">
             <div className="kq-splash__preload-row">
@@ -206,7 +237,9 @@ export default function KolequantSplash({
             </div>
           </div>
           <div className="kq-splash__footer">
-            <p className="kq-splash__tagline">Life doesn't have to be short</p>
+            <p className="kq-splash__tagline">
+              {lanternTargets ? 'The castle keeps its secrets.' : "Life doesn't have to be short"}
+            </p>
           </div>
         </div>
       </div>

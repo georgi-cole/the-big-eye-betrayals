@@ -59,8 +59,8 @@ export interface GenericMinigameProps {
   quickTapAiTuning?: import('../ai/competition/quickTapAiTuning').QuickTapAiTuningVersion
   /** Development-only phase preview for the portrait finale stages. */
   previewStage?: 'final' | 'round6' | 'final2'
-  /** Capitalization only: selects standard LOH or Back 2 the Game rules. */
-  context?: 'loh' | 'battleBack'
+  /** Capitalization only: selects the prize or return-to-game presentation. */
+  context?: 'loh' | 'battleBack' | 'challenge'
   /** Battery Low only: enable one-shot vote effects in compatible weekly formats. */
   voteEffectsEnabled?: boolean
   /** Authoritative participant ids forwarded from MinigameHost for hosted competitions. */

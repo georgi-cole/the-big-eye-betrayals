@@ -3,6 +3,7 @@ import type { CastleAlliance, CommandToken, Run, SocialEntry } from './run.ts'
 import { mulberry32, seededPick } from '../store/rng.ts'
 import { ALLIANCE_LIMITS } from '../social/reality/allianceIdentity.ts'
 import { castleAlliances } from './allianceRecords.ts'
+import { addIntelReport, isVoteClaim } from './investigationRecords.ts'
 import { hasPersonalAlliance, rapport } from './perception.ts'
 import {
   missingSocialResource,
@@ -240,6 +241,7 @@ export function applyGeneralSocialMove(
   const cost = socialMoveCost(kind, run.options.realityMode, guestIds.length)
   if (missingSocialResource(socialWalletFor(run, actorId), cost)) return run
   const { energy } = cost
+  let investigation = run.investigation
   let entries: SocialEntry[] = (kind === 'group-chat' ? guestIds : [actorId]).map(
     (recipientId) => ({
       day: run.day,
@@ -285,6 +287,8 @@ export function applyGeneralSocialMove(
       .sort(([a, first], [b, second]) => second - first || a.localeCompare(b))[0]?.[0]
   }
   if (kind === 'eavesdrop') {
+    const conversations =
+      investigation?.incidents.filter(({ fact }) => fact.day === run.day && isVoteClaim(fact)) ?? []
     const candidates = run.social.filter(
       ({ kind, day, actorId: speaker, recipientId, suspectId, accepted }) =>
         day === run.day &&
@@ -297,12 +301,30 @@ export function applyGeneralSocialMove(
         (kind === 'question' || (kind === 'vote-plan' && accepted) || kind === 'share-suspicion')
     )
     const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 829) ^ hashId(actorId))
-    entries[0].suspectId =
-      candidates.length && random() < 0.8 ? seededPick(random, candidates).suspectId : undefined
+    if (random() < 0.8) {
+      const overheard = conversations.length ? seededPick(random, conversations) : undefined
+      if (overheard && investigation) {
+        const {
+          guestId,
+          id,
+          fact: { day, behavior, room, topicId },
+        } = overheard
+        investigation = addIntelReport(investigation, {
+          day,
+          guestId,
+          method: 'eavesdrop',
+          access: 'observed',
+          incidentId: id,
+          claim: { day, behavior, room, topicId },
+        })
+        entries[0].suspectId = topicId
+      } else if (candidates.length) entries[0].suspectId = seededPick(random, candidates).suspectId
+    }
     entries[0].reaction = entries[0].suspectId ? 'landed' : 'held-back'
   }
   return {
     ...run,
+    investigation,
     revision: run.revision + 1,
     social: [...run.social, ...entries],
     socialWallets: recordSocialWallet(

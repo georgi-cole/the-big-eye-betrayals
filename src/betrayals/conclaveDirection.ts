@@ -1,39 +1,72 @@
 import type { CinematicCastMember } from './CinematicScene'
 
+export type ConclaveFrame =
+  | 'corridor'
+  | 'latch'
+  | 'entry'
+  | 'table'
+  | 'hood'
+  | 'portrait'
+  | 'sealed'
+
 type OpeningBeat = {
+  frame: ConclaveFrame
   title: string
   hold?: number
   cue?: string
-  entering?: boolean
-  unmaskingId?: string
   focusId?: string
-  visibleCount: number
+  visibleCount?: number
 }
 
 export function conclaveOpeningBeats(
   cast: readonly CinematicCastMember[],
   first: boolean
 ): OpeningBeat[] {
-  const known = cast.filter(({ concealed }) => !concealed)
-  const end = { title: 'The Conclave', visibleCount: known.length }
-  if (!first)
-    return [
-      { title: 'Behind closed doors', hold: 1800, cue: 'door', visibleCount: known.length },
-      end,
-    ]
+  const end = { frame: 'table', title: 'The Conclave' } as const
+  if (!first) return [{ frame: 'table', title: '', hold: 700 }, end]
+
+  const guests = cast.filter(({ concealed, human }) => !concealed && !human)
+  const entrance: OpeningBeat[] = [
+    { frame: 'corridor', title: '', hold: 1700, cue: 'conclave_steps', visibleCount: 0 },
+    { frame: 'latch', title: '', hold: 1020, cue: 'door', visibleCount: 0 },
+    { frame: 'entry', title: '', hold: 2600, cue: 'conclave_steps', visibleCount: 0 },
+    { frame: 'table', title: '', hold: 1850, cue: 'conclave_chair', visibleCount: 0 },
+  ]
+  if (!guests.length) return [...entrance, end]
+
   return [
-    { title: 'After dark', hold: 3450, cue: 'door', entering: true, visibleCount: 0 },
-    { title: 'The guests take their places', hold: 970, cue: 'suspense', visibleCount: 0 },
-    ...known.flatMap(({ id, name }, index) => [
-      {
-        title: 'The hoods come down',
-        hold: 1980,
-        unmaskingId: id,
+    ...entrance,
+    {
+      frame: 'hood',
+      title: '',
+      hold: 2150,
+      cue: 'conclave_cloth',
+      focusId: guests[0].id,
+      visibleCount: 0,
+    },
+    ...guests.map(
+      ({ id, name }, index): OpeningBeat => ({
+        frame: 'portrait',
+        title: name,
         focusId: id,
-        visibleCount: index,
-      },
-      { title: name, hold: 1120, cue: 'reveal', focusId: id, visibleCount: index + 1 },
-    ]),
+        hold: index === 0 ? 2550 : 2600,
+        visibleCount: index + 1,
+      })
+    ),
     end,
   ]
+}
+
+export function conclaveRevealed(
+  cast: readonly CinematicCastMember[],
+  visibleCount?: number
+): ReadonlySet<string> {
+  const guests = cast.filter(({ concealed }) => !concealed)
+  const player = guests.filter(({ human }) => human)
+  const others = guests.filter(({ human }) => !human).slice(0, visibleCount)
+  return new Set([...player, ...others].map(({ id }) => id))
+}
+
+export function conclaveCueVolume(cue?: string) {
+  return cue === 'door' ? 0.29 : 0.43
 }

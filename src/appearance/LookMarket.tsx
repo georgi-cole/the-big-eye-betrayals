@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import StoreProductIcon from '../components/StoreProductModal/StoreProductIcon'
 import type { AppearanceLook } from './catalog'
 import { APPEARANCE_LOOK_PRICE_EYEROS } from './lookAccess'
@@ -162,9 +163,12 @@ export function LookMarket({
             </span>
             <h3>{result === 'purchased' ? 'This look is yours.' : 'Already unlocked.'}</h3>
             <p>No repeat payments. Keep it for future seasons.</p>
-            <button type="button" className="look-market__primary" onClick={onClose}>
-              Back to changing room
-            </button>
+            <GameBackButton
+              className="look-market__return"
+              label="Back to changing room"
+              showLabel
+              onClick={onClose}
+            />
           </div>
         ) : (
           <>

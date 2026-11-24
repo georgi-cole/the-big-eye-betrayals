@@ -11,10 +11,21 @@ import ProfilePicker from './ProfilePicker'
 import Profile from '../Profile/Profile'
 
 const mockNavigate = vi.fn()
+const mockEdition = vi.hoisted(() => ({ betrayals: false }))
 const mockDispatch = vi.fn()
 const mockLoadSavedRunProfile = vi.fn()
 let mockLocationState: { from?: string; manageOnly?: boolean; autoSelectSingle?: boolean } | null =
   null
+
+vi.mock('../../betrayals/betrayalsAppearance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../betrayals/betrayalsAppearance')>()),
+  get IS_BETRAYALS_EDITION() {
+    return mockEdition.betrayals
+  },
+}))
+vi.mock('../../betrayals/commerce/useBetrayalsCommerce', () => ({
+  useBetrayalsCommerce: () => ({ paidLooks: false }),
+}))
 
 const mockState: {
   profiles: {
@@ -129,6 +140,7 @@ function openLegacyCreation() {
 describe('ProfilePicker', () => {
   beforeEach(() => {
     mockNavigate.mockReset()
+    mockEdition.betrayals = false
     mockDispatch.mockReset()
     mockLoadSavedRunProfile.mockReset()
     mockLoadSavedRunProfile.mockImplementation((id: string) => emptySavedProfile(id))
@@ -228,6 +240,34 @@ describe('ProfilePicker', () => {
       payload: 'only-profile',
     })
     expect(mockNavigate).toHaveBeenCalledWith('/profile', { replace: true, state: { from: '/' } })
+  })
+
+  it.each(['/wallet', '/store/items'])(
+    'preserves a Betrayals %s origin after selecting an existing profile',
+    (from) => {
+      mockEdition.betrayals = true
+      mockState.profiles.profiles = [
+        { id: 'only-profile', name: 'Deni', avatar: 'D', createdAt: '2026-11-23T12:00:00Z' },
+      ]
+      mockLocationState = { from, autoSelectSingle: true }
+      render(<ProfilePicker />)
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'profiles/selectActiveProfile',
+        payload: 'only-profile',
+      })
+      expect(mockNavigate).toHaveBeenCalledWith('/profile', { replace: true, state: { from } })
+    }
+  )
+
+  it('keeps Wallet as the origin when a Betrayals player starts profile creation', () => {
+    mockEdition.betrayals = true
+    mockLocationState = { from: '/wallet' }
+    render(<ProfilePicker />)
+    expect(screen.getByRole('button', { name: 'Back to wallet' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /create new profile/i }))
+    expect(mockNavigate).toHaveBeenCalledWith('/profile/dressing-room', {
+      state: { from: '/wallet', createProfile: true, adoptGuestRun: false },
+    })
   })
 
   it('keeps optional email inside the fallback creation form with no separate account entry', async () => {

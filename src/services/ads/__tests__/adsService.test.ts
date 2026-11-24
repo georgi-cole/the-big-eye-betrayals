@@ -279,6 +279,34 @@ describe('adsService bridge guards', () => {
 })
 
 describe('canShowAd guard logic', () => {
+  it.each([
+    'betrayals_banishment_break',
+    'betrayals_murder_break',
+    'betrayals_final_vote_break',
+  ] as const)('does not inherit original-game No Ads ownership for %s', (placement) => {
+    installSafetyFixture(28)
+    const standalone = makeState()
+    standalone.vip.entitlements.noAds = true
+    const interstitial = vi.fn()
+    window.GameAds = { showInterstitial: interstitial, showRewarded: vi.fn() }
+    try {
+      for (const state of [
+        makeState({ hasNoAdsPack: true }),
+        makeState(undefined, { isActive: true }),
+        standalone,
+      ]) {
+        expect(canShowAd('live_vote_auto', state)).toBe(false)
+        expect(showInterstitial('live_vote_auto', state, vi.fn())).toBe(false)
+        expect(canShowAd(placement, state)).toBe(true)
+        expect(showInterstitial(placement, state, vi.fn())).toBe(true)
+      }
+      expect(interstitial).toHaveBeenCalledTimes(3)
+      expect(interstitial).toHaveBeenCalledWith(placement)
+    } finally {
+      delete window.GameAds
+    }
+  })
+
   it('exempts VIP and both No Ads ownership paths from Survival elimination ads', () => {
     installSafetyFixture(28, ['ads'])
     expect(canShowAd('survival_elimination_auto', makeState())).toBe(true)

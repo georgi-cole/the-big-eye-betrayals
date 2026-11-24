@@ -34,6 +34,7 @@ describe('Round Table broadcast', () => {
     render(
       <RoundTableDiscussion
         run={run}
+        hasRealityMode
         open
         art="/council.jpg"
         onBack={vi.fn()}
@@ -49,7 +50,15 @@ describe('Round Table broadcast', () => {
     const candidate = run.seats[1]
     fireEvent.click(screen.getByRole('button', { name: 'Take the floor' }))
     expect(screen.queryByRole('button', { name: 'Ask for a reason' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: candidate.name }))
+    const painting = screen.getByRole('button', { name: candidate.name })
+    expect(painting.querySelector('.betrayals-painting__frame')).toHaveAttribute(
+      'src',
+      expect.stringContaining('dressing-room/antique-gold-frame.webp')
+    )
+    fireEvent.click(painting)
+    expect(
+      document.querySelector('.betrayals-gallery__subject .betrayals-painting__frame')
+    ).toHaveAttribute('src', expect.stringContaining('dressing-room/antique-gold-frame.webp'))
     const change = screen.getByRole('button', { name: 'Choose another guest' })
     expect(change).toHaveFocus()
     fireEvent.click(change)

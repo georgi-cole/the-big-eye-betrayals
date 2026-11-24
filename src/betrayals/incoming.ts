@@ -9,6 +9,8 @@ import {
 } from './nightShields.ts'
 import { INCOMING_ANSWERS, isCurrentCommand, publicNightShieldWinners } from './run.ts'
 import type { CommandToken, Contestant, IncomingAnswer, Run, SocialEntry } from './run.ts'
+import { respondToShieldFollowUp, shieldFollowUpFor } from './shieldSocial.ts'
+import type { ShieldFollowUpAction } from './shieldSocial.ts'
 import { getSocialView, hasAlliance, rapport } from './social.ts'
 import { recordSocialWallet } from './socialResources.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
@@ -16,6 +18,7 @@ import { tableDiscussionOpen } from './table.ts'
 
 type OrdinaryEncounter = 'confidence' | 'alliance' | 'vote-plan'
 type EncounterKind = OrdinaryEncounter | 'shield-question' | 'shield-message' | 'shield-gift'
+export type IncomingAction = IncomingAnswer | ShieldFollowUpAction
 
 export type IncomingInteraction = {
   id: string
@@ -24,6 +27,7 @@ export type IncomingInteraction = {
   target?: Contestant
   text: string
   response?: IncomingAnswer
+  shieldFollowUp?: ReturnType<typeof shieldFollowUpFor>
 }
 
 function family(
@@ -187,6 +191,7 @@ function shieldInteractions(run: Run): IncomingInteraction[] {
       speaker: { id: seat.id, name: seat.name, portrait: seat.portrait },
       text,
       response: run.incomingResponses?.[id],
+      ...(entry.kind === 'shield-claim' && { shieldFollowUp: shieldFollowUpFor(run, seat.id) }),
     })
   }
 
@@ -321,11 +326,21 @@ export function respondToIncomingInteraction(
   run: Run,
   token: CommandToken,
   interactionId: string,
-  answer: IncomingAnswer
+  answer: IncomingAction
 ): Run {
-  if (!isCurrentCommand(run, token) || !INCOMING_ANSWERS.includes(answer)) return run
+  if (!isCurrentCommand(run, token)) return run
   const encounter = getIncomingInteractions(run).find(({ id }) => id === interactionId)
-  if (!encounter || encounter.response) return run
+  if (!encounter) return run
+  if (answer === 'request-shield' || answer === 'ask-shield-plans') {
+    if (!encounter.shieldFollowUp || encounter.response === 'dismiss') return run
+    const next = respondToShieldFollowUp(run, encounter.speaker.id, answer)
+    if (next === run || encounter.response) return next
+    return {
+      ...next,
+      incomingResponses: { ...next.incomingResponses, [interactionId]: 'engage' },
+    }
+  }
+  if (!INCOMING_ANSWERS.includes(answer) || encounter.response) return run
   const entry = responseEntry(run, encounter, answer)
   const socialWallets =
     entry?.kind === 'alliance'

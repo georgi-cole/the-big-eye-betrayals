@@ -4,6 +4,12 @@ Premium Challenges and VIP both unlock every premium minigame version. VIP also
 includes every released standalone product. This covers enhanced
 presentations, alternate premium rules, and replacement remasters.
 
+Those shared catalog rules describe the original Big Eye. Betrayals has its own
+product and entitlement catalog in `src/betrayals/commerce/catalog.ts`; see
+`docs/betrayals-monetization.md` for its separate products, Eyeros economy,
+Night Shield restrictions, premium adapters and ad schedule. The original game's
+generated `MARKETPLACE_CATALOG.md` is not the Betrayals store's price authority.
+
 ## What stays synchronized
 
 - The Premium Challenges list, count, tagline, and badge derive from the game
@@ -43,6 +49,33 @@ reference when updating their descriptions; repository checks do not publish
 store listings or change configured prices.
 
 ## Review log
+
+- 2026-11-23: Reviewed the Betrayals Store navigation and dedicated Wallet.
+  The compact Store overview leads to separate VIP, Feature unlocks, Season
+  items and Wallet views, with a direct Changing room shortcut. The Wallet
+  shows the selected profile's existing Eyeros balance and recent activity;
+  packs are offered in its separate Top up Eyeros view. Locked features enter
+  the matching Store section, and back controls return through the appropriate
+  overview. Native localized checkout, ownership, restore, product identifiers,
+  prices, wallet delivery and Night Shield eligibility retain their current
+  behavior. This reorganization adds no product, reward or entitlement.
+
+- 2026-11-23: Reviewed the new Betrayals store: permanent VIP, My Pulse, Reality
+  Mode and No Ads; native Eyeros consumables; catalog-based standalone upgrade
+  credit; owned changing-room looks; earned Eyeros; and the restricted one-night
+  purchased Night Shield. Betrayals VIP uses its own entitlements and the actual
+  supported premium minigame presentations/rules, with a frozen competition
+  variant and duration-adjusted Quick Tap pot targets. Automatic ads occur after
+  ordinary banishment/night results and each completed Final Five vote, after
+  presentation closure; VIP/No Ads suppress them. Product IDs, setup price
+  targets, recovery limits and external store/AdMob activation are documented in
+  `docs/betrayals-monetization.md`. Original Big Eye products and offers are
+  unchanged; its generated reference remains governed by its existing catalog.
+
+- 2026-11-22: Betrayals adds optional rewarded ads for a season rewind and the
+  finale role reveal. Its Home and Profile presentation, ceremony assets, and
+  Deck of Darkness difficulty have been reviewed. Prices, paid entitlements,
+  and marketplace offers are unchanged.
 
 - 2026-11-22: Betrayals includes The Last Light, Rock, Paper, Scissors, and
   Risk Wheel: Abyss with edition-owned presentation and artwork. Reviewed
@@ -699,6 +732,7 @@ store listings or change configured prices.
   champion coronation. The presentation update preserves existing marketplace
   products, pricing, benefits and entitlement rules.
 
-- 2026-11-22: Reviewed the Betrayals banishment presentation. The shared
-  departure renderer adds a Betrayals theme for the existing exit and Skip
-  flow. Marketplace products, pricing, benefits and entitlements stay the same.
+- 2026-11-23: Reviewed the Betrayals presentation update. Round Table portraits
+  reuse the Changing Room frame, Advertising Privacy uses the Betrayals theme,
+  and hotel letter scenes use character-specific artwork for the full cast.
+  Existing age checks, ad availability, prices, rewards, and entitlements apply.

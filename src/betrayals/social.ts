@@ -35,7 +35,7 @@ export { getSocialView, hasAlliance, rapport } from './perception.ts'
 
 export type SocialMove = Omit<
   SocialEntry,
-  'day' | 'accepted' | 'reaction' | 'pledgeResult' | 'shieldReply'
+  'day' | 'accepted' | 'reaction' | 'pledgeResult' | 'shieldReply' | 'shieldPlan'
 >
 
 const checkIn = ['rapport'] as const

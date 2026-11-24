@@ -9,7 +9,7 @@ import {
 } from './nightShields.ts'
 import { hasAlliance, rapport } from './perception.ts'
 import { commandToken, knownTeammateIds, nightShieldWinners } from './run.ts'
-import type { Run } from './run.ts'
+import type { NightShieldPlan, Run, SocialEntry } from './run.ts'
 import { applySocialMove } from './social.ts'
 import type { SocialMove } from './social.ts'
 
@@ -23,7 +23,13 @@ function send(
   return applySocialMove(run, commandToken(run), { actorId, recipientId, kind, suspectId })
 }
 
-function giftTarget(run: Run, actorId: string, candidateIds: readonly string[], salt: number) {
+function giftTarget(
+  run: Run,
+  actorId: string,
+  candidateIds: readonly string[],
+  salt: number,
+  requested = false
+) {
   const teammates = knownTeammateIds(run, actorId)
   const reports = nightShieldReads(run, actorId)
   const loyalty = getSocialPersonality(actorId).loyalty
@@ -41,17 +47,97 @@ function giftTarget(run: Run, actorId: string, candidateIds: readonly string[], 
         (reports.get(id)?.protected ?? 0) < 0.5
     )
     .map((id) => ({ id, trust: rapport(run.social, actorId, id) }))
-    .filter(({ trust }) => trust >= 0.24)
+    .filter(({ trust }) => trust >= (requested ? 0.16 : 0.24))
     .map(({ id, trust }) => ({
       id,
       value:
         trust * 0.5 +
         loyalty * 0.3 +
         (nightExposure(run, id) - personalRisk) * 0.55 +
-        (spare ? 0.22 : 0),
+        (spare ? 0.22 : 0) +
+        (requested ? 0.2 : 0),
     }))
     .sort((a, b) => b.value - a.value)[0]
   if (best && best.value > 0.32 && shieldRoll(run, actorId, salt) < best.value) return best.id
+}
+
+export type ShieldFollowUpAction = 'request-shield' | 'ask-shield-plans'
+
+export function shieldFollowUpFor(run: Run, speakerId: string) {
+  const replies = run.social.filter(
+    ({ day, actorId, recipientId }) =>
+      day === run.day && actorId === run.humanId && recipientId === speakerId
+  )
+  const requestAccepted = replies.find(({ kind }) => kind === 'shield-request')?.accepted
+  const plan = replies.find(({ kind }) => kind === 'shield-plans')?.shieldPlan
+  // Everyone can follow up on a claim, even if it was a bluff.
+  const open =
+    run.phase === 'round-table' &&
+    !run.result &&
+    !run.tableCount &&
+    !run.runoffIds &&
+    run.seats.some(({ id, exit }) => id === speakerId && !exit) &&
+    run.seats.some(({ id, exit }) => id === run.humanId && !exit)
+
+  return {
+    canRequest: open && requestAccepted === undefined,
+    canAskPlans: open && plan === undefined,
+    requestAccepted,
+    plan,
+  }
+}
+
+function shieldPlanFor(run: Run, speakerId: string): NightShieldPlan {
+  const trust = rapport(run.social, speakerId, run.humanId)
+  if (
+    !run.private.nightShieldIds.includes(speakerId) ||
+    trust < 0.16 ||
+    shieldRoll(run, speakerId, 6456) > 0.52 + trust * 0.4
+  ) {
+    return 'private'
+  }
+
+  const guests = run.seats.filter(({ exit }) => !exit).map(({ id }) => id)
+  return giftTarget(run, speakerId, guests, 6460) ||
+    giftTarget(run, speakerId, [run.humanId], 6460, true)
+    ? 'open-to-gift'
+    : 'keep'
+}
+
+export function respondToShieldFollowUp(
+  run: Run,
+  speakerId: string,
+  action: ShieldFollowUpAction
+): Run {
+  const claimed = run.social.some(
+    ({ day, actorId, recipientId, kind }) =>
+      day === run.day &&
+      actorId === speakerId &&
+      recipientId === run.humanId &&
+      kind === 'shield-claim'
+  )
+  if (!claimed || speakerId === run.humanId) return run
+
+  const followUp = shieldFollowUpFor(run, speakerId)
+  const participants = { day: run.day, actorId: run.humanId, recipientId: speakerId }
+  let next = run
+  let entry: SocialEntry
+  if (action === 'request-shield') {
+    if (!followUp.canRequest) return run
+    if (
+      run.private.nightShieldIds.includes(speakerId) &&
+      !run.private.nightShieldIds.includes(run.humanId) &&
+      giftTarget(run, speakerId, [run.humanId], 6460, true)
+    ) {
+      next = send(run, speakerId, run.humanId, 'shield-gift')
+    }
+    entry = { ...participants, kind: 'shield-request', accepted: next !== run }
+  } else {
+    if (!followUp.canAskPlans) return run
+    entry = { ...participants, kind: 'shield-plans', shieldPlan: shieldPlanFor(run, speakerId) }
+  }
+
+  return { ...next, revision: run.revision + 1, social: [...next.social, entry] }
 }
 
 /** Initial choices happen once, when Safety awards the two shields. */

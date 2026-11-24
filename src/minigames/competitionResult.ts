@@ -15,6 +15,8 @@ export interface ReactMinigameCompletion {
   rawResults?: Record<string, number>
   /** Optional time-based tie-breaker in ms (lower is better). */
   tiebreakerMs?: number
+  /** Betrayals host: frozen rules variant, used only to normalize the season pot target. */
+  betrayalsQuickTapVariant?: 'race' | 'seasons'
   /** Battery Low only: one-shot vote modifiers earned by contestants. */
   batteryLowVoteEffects?: Record<string, 'doubleVote' | 'skipVote'>
   /** Mystic Chamber only: relationship changes recorded with the outcome. */

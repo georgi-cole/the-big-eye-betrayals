@@ -11,6 +11,7 @@ import {
 } from '../../gameManager/gameManager'
 import './GameManager.css'
 import ManagerPublishBar from '../../components/ManagerPublishBar/ManagerPublishBar'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { selectRemoteConfig } from '../../remoteConfig/remoteConfigSlice'
 
 const CATEGORIES: GameCategory[] = ['arcade', 'logic', 'trivia', 'endurance']
@@ -78,13 +79,12 @@ export default function GameManager() {
             evaluated by priority; system twists always keep their safety and format precedence.
           </p>
         </div>
-        <button
-          type="button"
+        <GameBackButton
           className="game-manager__back"
+          label="Back to game"
+          showLabel
           onClick={() => navigate('/game?debug=1')}
-        >
-          Back to game
-        </button>
+        />
       </header>
       <ManagerPublishBar
         managerName="Game Manager"

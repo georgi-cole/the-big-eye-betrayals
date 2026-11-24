@@ -21,6 +21,7 @@ import type {
 import { isDebugAccessGranted } from '../../utils/debugMode'
 import { normalizeGameCopy } from '../../utils/tvLogTemplates'
 import ManagerPublishBar from '../../components/ManagerPublishBar/ManagerPublishBar'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import {
   ALL_BROADCAST_PHASES,
   BROADCAST_CAMPAIGNS,
@@ -563,13 +564,12 @@ export default function BroadcastManager() {
             collapsed automatically.
           </p>
         </div>
-        <button
-          type="button"
+        <GameBackButton
           className="broadcast-manager__back"
+          label="Back to game"
+          showLabel
           onClick={() => navigate('/game?debug=1')}
-        >
-          Back to game
-        </button>
+        />
       </header>
 
       <ManagerPublishBar

@@ -1,20 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getAppearanceAsset } from '../appearance/catalog'
+import { isBetrayalsLook, type BetrayalsLookId } from './betrayalsAppearance'
 import { SFX_SOUND_CATEGORIES } from '../services/sound/audioSettingsSync'
 import type { MusicTrack } from '../services/sound/musicTracks'
 import { SoundManager } from '../services/sound/SoundManager'
-import type { Phase } from './run'
+import type { Phase, RealityPreset, RunOptions } from './run'
 
 const STORAGE_KEY = 'betrayals.preferences.v1'
 
-export const BETRAYALS_PORTRAITS = [
-  { id: 'pc-005', name: 'The Envoy' },
-  { id: 'pc-015', name: 'The Heiress' },
-  { id: 'pc-025', name: 'The Insider' },
-] as const
-
-type PortraitId = (typeof BETRAYALS_PORTRAITS)[number]['id']
-type UtilityPanel = 'settings' | 'store'
+export { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance'
+type UtilityPanel = 'settings' | 'store' | 'achievements' | 'rules'
 
 type Preferences = {
   musicOn: boolean
@@ -22,7 +16,9 @@ type Preferences = {
   soundOn: boolean
   soundVolume: number
   reducedMotion: boolean
-  lookId: PortraitId | null
+  lookId: BetrayalsLookId | null
+  seasonPublicMode?: boolean
+  seasonRealityMode?: RealityPreset
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -56,6 +52,10 @@ function validVolume(value: unknown, fallback: number): number {
     : fallback
 }
 
+export function isSeasonRealityMode(value: unknown): value is 'off' | 'casual' | 'tv' {
+  return value === 'off' || value === 'casual' || value === 'tv'
+}
+
 function readPreferences(): Preferences {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
@@ -67,23 +67,29 @@ function readPreferences(): Preferences {
       soundOn: saved.soundOn !== false,
       soundVolume: validVolume(saved.soundVolume, DEFAULT_PREFERENCES.soundVolume),
       reducedMotion: saved.reducedMotion === true,
-      lookId: BETRAYALS_PORTRAITS.find(({ id }) => id === saved.lookId)?.id ?? null,
+      lookId: saved.lookId && isBetrayalsLook(saved.lookId) ? saved.lookId : null,
+      seasonPublicMode:
+        typeof saved.seasonPublicMode === 'boolean' ? saved.seasonPublicMode : undefined,
+      seasonRealityMode: isSeasonRealityMode(saved.seasonRealityMode)
+        ? saved.seasonRealityMode
+        : undefined,
     }
   } catch {
     return DEFAULT_PREFERENCES
   }
 }
 
-export function getBetrayalsPortrait(lookId: PortraitId | null): string | undefined {
-  const asset = lookId && getAppearanceAsset({ kind: 'catalog', lookId, revision: 1 }, 'main')
-  return asset ? import.meta.env.BASE_URL + asset : undefined
-}
-
-export function useBetrayalsUtilities(phase?: Phase, suspended = false) {
+export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeason?: RunOptions) {
   const [preferences, setPreferences] = useState(readPreferences)
   const [panel, setPanel] = useState<UtilityPanel | null>(null)
   const track = phase ? PHASE_MUSIC[phase] : 'nominations'
   const { musicOn, musicVolume, soundOn, soundVolume } = preferences
+  const seasonOptions: RunOptions = {
+    publicMode: preferences.seasonPublicMode ?? lastSeason?.publicMode ?? false,
+    realityMode:
+      preferences.seasonRealityMode ??
+      (isSeasonRealityMode(lastSeason?.realityMode) ? lastSeason.realityMode : 'off'),
+  }
 
   useEffect(() => {
     void SoundManager.init()
@@ -148,6 +154,7 @@ export function useBetrayalsUtilities(phase?: Phase, suspended = false) {
 
   return {
     preferences,
+    seasonOptions,
     panel,
     openPanel: setPanel,
     closePanel: () => setPanel(null),

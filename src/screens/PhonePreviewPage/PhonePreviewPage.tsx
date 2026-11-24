@@ -1,5 +1,6 @@
 import { useMemo, type CSSProperties } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import './PhonePreviewPage.css'
 
 type PreviewTarget =
@@ -71,6 +72,7 @@ function buildPhonePreviewUrl(target: PreviewTarget, device: PreviewDevice) {
 }
 
 export default function PhonePreviewPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTarget = searchParams.get('target')
   const target = isPreviewTarget(requestedTarget) ? requestedTarget : 'fullApp'
@@ -108,9 +110,12 @@ export default function PhonePreviewPage() {
               ))}
             </select>
           </label>
-          <a className="phone-preview-page__back" href="#/twists-test">
-            Back to twist tests
-          </a>
+          <GameBackButton
+            className="phone-preview-page__back"
+            label="Back to twist tests"
+            showLabel
+            onClick={() => navigate('/twists-test')}
+          />
         </div>
       </header>
 

@@ -1,3 +1,9 @@
+import { joinPublicAssetPath } from '../utils/avatar'
+
+export const ANTIQUE_PORTRAIT_FRAME_URL = joinPublicAssetPath(
+  'assets/dressing-room/antique-gold-frame.webp'
+)
+
 /** Normalized face center X/Y and height, measured and visually reviewed in each existing image. */
 type FaceAnchor = readonly [centerX: number, centerY: number, height: number]
 

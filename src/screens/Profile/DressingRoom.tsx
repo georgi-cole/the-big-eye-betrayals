@@ -12,9 +12,20 @@ import { MAX_PROFILES, selectCurrentProfile, updateProfile } from '../../store/p
 import { selectIsVipActive } from '../../store/vipSlice'
 import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { joinPublicAssetPath } from '../../utils/avatar'
-import LookLockInReveal, { LOCK_IN_FRAME_URL, type LockInLook } from './LookLockInReveal'
+import { ANTIQUE_PORTRAIT_FRAME_URL } from '../../appearance/portraitFraming'
+import LookLockInReveal, { type LockInLook } from './LookLockInReveal'
 import { preloadImage } from '../../utils/preload'
+import {
+  BETRAYALS_LOOKS,
+  betrayalsWardrobe,
+  IS_BETRAYALS_EDITION,
+} from '../../betrayals/betrayalsAppearance'
 import './DressingRoom.css'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
+
+const looks = IS_BETRAYALS_EDITION ? BETRAYALS_LOOKS : SELECTABLE_LOOKS
+const figureRole = IS_BETRAYALS_EDITION ? 'formal' : 'casual'
 
 export default function DressingRoom() {
   const navigate = useNavigate()
@@ -30,25 +41,50 @@ export default function DressingRoom() {
   const creatingProfile = routeState?.createProfile === true
   const dispatch = useAppDispatch()
   const profile = useAppSelector(selectCurrentProfile)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const atProfileLimit = useAppSelector((state) => state.profiles.profiles.length >= MAX_PROFILES)
-  const canFillCurrentLook = useAppSelector((state) =>
-    Boolean(state.game && canFillInitialSeasonAppearance(state.game))
+  const canFillCurrentLook = useAppSelector(
+    (state) =>
+      !IS_BETRAYALS_EDITION && Boolean(state.game && canFillInitialSeasonAppearance(state.game))
   )
   const profileIdAtOpen = useRef(creatingProfile ? undefined : profile?.id)
   const figureRef = useRef<HTMLImageElement>(null)
   const [lockIn, setLockIn] = useState<LockInLook | null>(null)
   const [marketOption, setMarketOption] = useState<LookMarketOption | null>(null)
+  const savedLookId =
+    !creatingProfile && profile?.appearanceSelection?.kind === 'catalog'
+      ? profile.appearanceSelection.lookId
+      : undefined
   const [selectedId, setSelectedId] = useState(
-    SELECTABLE_LOOKS.some((look) => look.id === routeState?.initialLookId)
+    looks.some((look) => look.id === routeState?.initialLookId)
       ? routeState!.initialLookId!
-      : !creatingProfile && profile?.appearanceSelection?.kind === 'catalog'
-        ? profile.appearanceSelection.lookId
-        : (SELECTABLE_LOOKS[0]?.id ?? '')
+      : (looks.find(({ id }) => id === savedLookId)?.id ?? looks[0]?.id ?? '')
   )
-  const returnTo = routeState?.from === '/' ? '/' : '/game'
-  const creationBack = routeState?.fromPlayerAccount ? '/profile/account' : '/'
-  const currentLook = SELECTABLE_LOOKS.find((look) => look.id === selectedId)
+  const returnTo = IS_BETRAYALS_EDITION
+    ? betrayalsProfileReturnPath(routeState?.from)
+    : routeState?.from === '/'
+      ? '/'
+      : '/game'
+  const returningToShop = IS_BETRAYALS_EDITION && returnTo !== '/'
+  const creationBack = routeState?.fromPlayerAccount
+    ? '/profile/account'
+    : returningToShop
+      ? returnTo
+      : '/'
+  const backPath = creatingProfile ? creationBack : returningToShop ? returnTo : '/profile'
+  const backLabel =
+    creatingProfile && routeState?.fromPlayerAccount
+      ? 'Back to account'
+      : returningToShop
+        ? returnTo === '/wallet'
+          ? 'Back to wallet'
+          : 'Back to store'
+        : creatingProfile
+          ? 'Back to home'
+          : 'Back to profile'
+  const currentLook = looks.find((look) => look.id === selectedId)
   const isAvailable = hasAppearanceLookAccess(selectedId, creatingProfile ? null : profile, isVip)
   const balance = creatingProfile ? 0 : (profile?.eyeoleans ?? 0)
 
@@ -63,7 +99,7 @@ export default function DressingRoom() {
   }, [creatingProfile, atProfileLimit, navigate, routeState?.fromPlayerAccount, returnTo])
 
   useEffect(() => {
-    void preloadImage(LOCK_IN_FRAME_URL)
+    void preloadImage(ANTIQUE_PORTRAIT_FRAME_URL)
   }, [])
 
   useEffect(() => {
@@ -73,7 +109,7 @@ export default function DressingRoom() {
   }, [creatingProfile, navigate, profile, returnTo])
 
   useEffect(() => {
-    const look = SELECTABLE_LOOKS.find((candidate) => candidate.id === selectedId)
+    const look = looks.find((candidate) => candidate.id === selectedId)
     if (look) {
       void warmAppearanceRole({ kind: 'catalog', lookId: look.id, revision: look.revision }, 'main')
     }
@@ -83,9 +119,9 @@ export default function DressingRoom() {
 
   function confirmSelection() {
     if ((!creatingProfile && (!profile || profile.id !== profileIdAtOpen.current)) || lockIn) return
-    const look = SELECTABLE_LOOKS.find((candidate) => candidate.id === selectedId)
+    const look = looks.find((candidate) => candidate.id === selectedId)
     if (!look) return
-    if (!hasAppearanceLookAccess(look.id, creatingProfile ? null : profile, isVip)) {
+    if (!isAvailable) {
       setMarketOption('eyeros')
       return
     }
@@ -94,7 +130,7 @@ export default function DressingRoom() {
     const appliesToCurrentSeason =
       canFillCurrentLook &&
       (firstAppearance?.kind !== 'catalog' || firstAppearance.lookId === selection.lookId)
-    const casualAsset = getAppearanceAsset(selection, 'casual')
+    const casualAsset = getAppearanceAsset(selection, figureRole)
     const portraitAsset = getAppearanceAsset(selection, 'main')
     const figure = figureRef.current
     const bounds = figure?.getBoundingClientRect()
@@ -144,7 +180,14 @@ export default function DressingRoom() {
       replace: true,
       state: { ...routeState, initialLookId: selectedId },
     })
-    navigate('/store', { state: { shelf: 'all-access' } })
+    if (IS_BETRAYALS_EDITION) {
+      navigate('/store/vip', {
+        state: {
+          returnTo: '/profile/dressing-room',
+          returnState: { ...routeState, initialLookId: selectedId },
+        },
+      })
+    } else navigate('/store', { state: { shelf: 'all-access' } })
   }
 
   function finishLockIn() {
@@ -152,7 +195,7 @@ export default function DressingRoom() {
       navigate('/profile-edit', {
         replace: true,
         state: {
-          from: '/',
+          from: IS_BETRAYALS_EDITION ? returnTo : '/',
           createProfile: true,
           appearanceSelection: { kind: 'catalog', lookId: selectedId, revision: 1 },
           adoptGuestRun: routeState?.adoptGuestRun === true,
@@ -171,30 +214,44 @@ export default function DressingRoom() {
   return (
     <>
       <main
-        className="dressing-room placeholder-screen"
+        className={
+          IS_BETRAYALS_EDITION
+            ? 'dressing-room dressing-room--betrayals placeholder-screen'
+            : 'dressing-room placeholder-screen'
+        }
         aria-hidden={lockIn ? true : undefined}
         inert={Boolean(lockIn)}
       >
         <div className="dressing-room__topbar">
           <GameBackButton
+            className="dressing-room__back"
             onClick={() =>
-              navigate(creatingProfile ? creationBack : '/profile', {
+              navigate(backPath, {
                 state: creatingProfile ? undefined : { from: returnTo },
               })
             }
-            label={
-              creatingProfile
-                ? routeState?.fromPlayerAccount
-                  ? 'Back to account'
-                  : 'Back to home'
-                : 'Back to profile'
-            }
+            label={backLabel}
           />
-          <span>Changing room</span>
+          <span>
+            {IS_BETRAYALS_EDITION && (
+              <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+                <path d="M23.5 10a4.5 4.5 0 1 1 4.5 4.5V17L41 25.5H7L20 17v-2.5" />
+                <path d="m11 27 2.5 14h21L37 27" />
+              </svg>
+            )}
+            Changing room
+          </span>
         </div>
         <h1>Choose your look</h1>
-        <p className="dressing-room__subtitle">Your name. Your story. Your style.</p>
+        <p className="dressing-room__subtitle">
+          {IS_BETRAYALS_EDITION
+            ? 'Choose how you’ll appear at the castle.'
+            : 'Your name. Your story. Your style.'}
+        </p>
         <AppearanceCarousel
+          looks={looks}
+          backdrop={IS_BETRAYALS_EDITION ? betrayalsWardrobe : undefined}
+          figureRole={figureRole}
           selectedId={selectedId}
           onSelect={(lookId) => {
             setSelectedId(lookId)
@@ -217,8 +274,9 @@ export default function DressingRoom() {
         />
         {!creatingProfile && (
           <p className="dressing-room__season-note">
-            Your first character replaces the guest silhouette now. Changing an existing character
-            takes effect next season.
+            {IS_BETRAYALS_EDITION
+              ? 'Your look applies when you start your next season.'
+              : 'Your first character replaces the guest silhouette now. Changing an existing character takes effect next season.'}
           </p>
         )}
       </main>

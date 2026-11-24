@@ -31,9 +31,9 @@ export function BetrayalsBroadcast({
     >
       <div className="betrayals-broadcast__glass">
         {art && <img key={art} className="betrayals-broadcast__art" src={art} alt="" />}
+        {opener}
         <div className="betrayals-broadcast__grain" aria-hidden="true" />
         <span className="betrayals-broadcast__lamp" aria-hidden="true" />
-        {opener}
         <div
           key={cueKey ?? title}
           className="betrayals-broadcast__readout"

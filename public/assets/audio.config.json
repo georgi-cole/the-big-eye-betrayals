@@ -673,6 +673,38 @@
       "preload": false,
       "volume": 1,
       "loop": false
+    },
+    {
+      "path": "sounds/ceremonies/conclave_steps.wav",
+      "key": "tv:ceremony_conclave_steps",
+      "category": "tv",
+      "preload": false,
+      "volume": 0.5,
+      "loop": false
+    },
+    {
+      "path": "sounds/ceremonies/conclave_chair.wav",
+      "key": "tv:ceremony_conclave_chair",
+      "category": "tv",
+      "preload": false,
+      "volume": 0.35,
+      "loop": false
+    },
+    {
+      "path": "sounds/ceremonies/conclave_cloth.wav",
+      "key": "tv:ceremony_conclave_cloth",
+      "category": "tv",
+      "preload": false,
+      "volume": 0.3,
+      "loop": false
+    },
+    {
+      "path": "sounds/ceremonies/conclave_seal.wav",
+      "key": "tv:ceremony_conclave_seal",
+      "category": "tv",
+      "preload": false,
+      "volume": 0.5,
+      "loop": false
     }
   ],
   "keyAliases": {

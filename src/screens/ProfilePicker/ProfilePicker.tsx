@@ -29,12 +29,14 @@ import { getPlayableLastRun } from '../../modes/seasonRulesets'
 import { withRunAutosaveSuspended } from '../../store/runAutosaveGate'
 import { persistCurrentRunSnapshot } from '../../store/store'
 import ConfirmExitModal from '../../components/ConfirmExitModal/ConfirmExitModal'
+import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import { resizeAndCompressImage } from '../../utils/imageUtils'
 import { imageIdToDataUrl, saveImage } from '../../utils/imageDb'
 import { pruneProfilePhotos } from '../../utils/imageDb'
 import { savedProfilePhotoIds } from '../../appearance/profilePhotos'
-import GameBackButton from '../../components/ui/GameBackButton/GameBackButton'
 import ProfileSeasonStatus from '../../components/ProfileSeasonStatus/ProfileSeasonStatus'
+import { IS_BETRAYALS_EDITION } from '../../betrayals/betrayalsAppearance'
+import { betrayalsProfileReturnPath } from '../../betrayals/betrayalsNavigation'
 import ProfileOptionalDetails from '../../components/ProfileOptionalDetails/ProfileOptionalDetails'
 import ProfileEmailFields from '../../components/ProfileEmailFields/ProfileEmailFields'
 import {
@@ -48,6 +50,7 @@ import { warmSelectedAppearance } from '../../appearance/preloadAppearance'
 import { getAppearanceLook, SELECTABLE_LOOKS } from '../../appearance/catalog'
 import { hasAppearanceLookAccess } from '../../appearance/lookAccess'
 import { selectIsVipActive } from '../../store/vipSlice'
+import { useBetrayalsCommerce } from '../../betrayals/commerce/useBetrayalsCommerce'
 import { gameWithInitialProfileAppearance } from '../../appearance/initialSeasonAppearance'
 import { isPlayerSignInConfigured } from '../../services/backend/config'
 import {
@@ -85,12 +88,16 @@ export default function ProfilePicker() {
     ? '/profile/account'
     : requestedReturnTo === '/' || requestedReturnTo === '/profile'
       ? requestedReturnTo
-      : '/game'
+      : IS_BETRAYALS_EDITION
+        ? betrayalsProfileReturnPath(requestedReturnTo)
+        : '/game'
 
   const profiles = useAppSelector(selectAllProfiles)
   const activeProfileId = useAppSelector(selectActiveProfileId)
   const isGuest = useAppSelector(selectIsGuest)
-  const isVip = useAppSelector(selectIsVipActive)
+  const originalVip = useAppSelector(selectIsVipActive)
+  const commerce = useBetrayalsCommerce(IS_BETRAYALS_EDITION)
+  const isVip = IS_BETRAYALS_EDITION ? commerce.paidLooks : originalVip
   const autoSelectingSingle =
     (location.state as { autoSelectSingle?: boolean } | null)?.autoSelectSingle === true &&
     profiles.length === 1
@@ -101,9 +108,10 @@ export default function ProfilePicker() {
 
   const isGameActive = useAppSelector(
     (s) =>
-      s.game.status === 'active' ||
-      s.game.week > 1 ||
-      (s.game.phase !== 'season_start' && s.game.phase !== 'week_start')
+      !IS_BETRAYALS_EDITION &&
+      (s.game.status === 'active' ||
+        s.game.week > 1 ||
+        (s.game.phase !== 'season_start' && s.game.phase !== 'week_start'))
   )
   const hasGuestRunProgress = useAppSelector(
     (s) =>
@@ -205,9 +213,9 @@ export default function ProfilePicker() {
     navigate('/profile/dressing-room', {
       replace: true,
       state: {
-        from: '/',
+        from: IS_BETRAYALS_EDITION ? returnTo : '/',
         createProfile: true,
-        adoptGuestRun: isGuest && hasGuestRunProgress,
+        adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
         ...(playerAccount && { playerAccountId: playerAccount.id }),
         ...(manageOnly && { fromPlayerAccount: true }),
       },
@@ -221,6 +229,7 @@ export default function ProfilePicker() {
     manageOnly,
     navigate,
     playerAccount,
+    returnTo,
     waitingForAccountSync,
   ])
 
@@ -251,6 +260,11 @@ export default function ProfilePicker() {
 
   const commitSwitch = useCallback(
     (id: string) => {
+      if (IS_BETRAYALS_EDITION) {
+        withRunAutosaveSuspended(() => dispatch(selectActiveProfile(id)))
+        navigate('/profile', { replace: true, state: { from: returnTo } })
+        return
+      }
       // Inspect the target profile before changing activeProfileId. This closes a
       // window where visibility autosave could otherwise write the old profile's
       // in-memory game under the newly selected profile ID.
@@ -570,7 +584,11 @@ export default function ProfilePicker() {
                   ? 'Back to profile'
                   : returnTo === '/game'
                     ? 'Back to game'
-                    : 'Back to home'
+                    : returnTo === '/wallet'
+                      ? 'Back to wallet'
+                      : returnTo.startsWith('/store')
+                        ? 'Back to store'
+                        : 'Back to home'
             }
           />
         </div>
@@ -642,7 +660,7 @@ export default function ProfilePicker() {
                       </button>
                     </div>
                   </div>
-                  {!manageOnly && isActive && <ProfileSeasonStatus />}
+                  {!IS_BETRAYALS_EDITION && !manageOnly && isActive && <ProfileSeasonStatus />}
                 </div>
               )
             })}
@@ -693,12 +711,12 @@ export default function ProfilePicker() {
                     // Keep the legacy in-place draft mounted until the router commits the
                     // transition. In production the Changing room route replaces it in the
                     // same interaction; this also gives a safe fallback if navigation fails.
-                    setShowCreateForm(true)
+                    if (!IS_BETRAYALS_EDITION) setShowCreateForm(true)
                     navigate('/profile/dressing-room', {
                       state: {
-                        from: '/',
+                        from: IS_BETRAYALS_EDITION ? returnTo : '/',
                         createProfile: true,
-                        adoptGuestRun: isGuest && hasGuestRunProgress,
+                        adoptGuestRun: !IS_BETRAYALS_EDITION && isGuest && hasGuestRunProgress,
                         ...(playerAccount && { playerAccountId: playerAccount.id }),
                         ...(manageOnly && { fromPlayerAccount: true }),
                       },
@@ -852,16 +870,15 @@ export default function ProfilePicker() {
                     />
                     <ProfileOptionalDetails value={newBio} onChange={setNewBio} />
                     <div className="profile-picker__create-actions">
-                      <button
-                        type="button"
-                        className="profile-picker__btn--cancel"
+                      <GameBackButton
+                        className="profile-picker__create-back"
+                        label="Back to looks"
+                        showLabel
                         disabled={savingProfile}
                         onClick={() => {
                           setCreateStep('look')
                         }}
-                      >
-                        Back to looks
-                      </button>
+                      />
                       <button
                         type="button"
                         className="profile-picker__btn profile-picker__btn--create"
@@ -878,7 +895,7 @@ export default function ProfilePicker() {
           </>
         )}
 
-        {!manageOnly && !showCreateForm && (
+        {!IS_BETRAYALS_EDITION && !manageOnly && !showCreateForm && (
           <>
             <div className="profile-picker__divider">
               <span className="profile-picker__divider-line" />

@@ -61,6 +61,8 @@ const actionEconomy: Record<
   'shield-deny': { cost: shieldConversationCost },
   'ask-shield': { cost: shieldConversationCost },
   'shield-tip': { cost: shieldConversationCost },
+  'shield-request': { cost: { energy: 0, influence: 0, info: 0 } },
+  'shield-plans': { cost: { energy: 0, influence: 0, info: 0 } },
   'group-chat': { cost: { energy: 2, influence: 0, info: 0 } },
   'lay-low': { cost: { energy: 0, influence: 0, info: 0 } },
   'explore-castle': { cost: { energy: 1, influence: 0, info: 0 } },

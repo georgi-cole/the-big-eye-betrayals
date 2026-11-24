@@ -1,19 +1,17 @@
 import type { CSSProperties } from 'react'
-import { appearanceFromAssetUrl } from '../appearance/catalog'
-import { BETRAYALS_AI_POOL } from './cast'
-import { isBetrayalsLook } from './betrayalsAppearance'
+import { cinematicLookId, seatedCutout } from './cinematicCast'
 import './RoundTableShot.css'
 
 type Guest = {
   id: string
   portrait?: string
+  human?: boolean
   exit?: object
   concealed?: boolean
 }
 
 const art = import.meta.env.BASE_URL + 'assets/betrayals/round-table/'
 const room = art + 'observatory.webp'
-const figures = new Set(BETRAYALS_AI_POOL.map(({ id }) => id))
 const anchors = [
   { x: 0.132, top: 0.395 },
   { x: 0.322, top: 0.382 },
@@ -30,15 +28,6 @@ function roundTableCast(cast: readonly Guest[], focusIds: readonly string[] = []
   )
   const order = [...new Set([...focusIds.filter((id) => active.has(id)), ...active.keys()])]
   return order.slice(0, anchors.length).map((id) => active.get(id)!)
-}
-
-function figureFor(guest: Guest) {
-  const look = appearanceFromAssetUrl(guest.portrait)
-  if (look?.kind === 'catalog' && isBetrayalsLook(look.lookId)) {
-    return art + look.lookId + '.webp'
-  }
-  // The default look is public and never depends on the contestant's role.
-  return art + (figures.has(guest.id) ? guest.id : 'pc-005') + '.webp'
 }
 
 export function RoundTableShot({
@@ -80,16 +69,21 @@ export function RoundTableShot({
         <img className="round-table-shot__room" src={room} alt="" draggable={false} />
         {guests.map((guest, index) => {
           const anchor = anchors[chairs[index]]
+          const lookId = cinematicLookId(guest)
+          const cutout = lookId ? seatedCutout(lookId) : undefined
+          const src = cutout?.src ?? guest.portrait
+          if (!src) return null
           return (
-            <img
+            <div
               key={guest.id}
               className="round-table-shot__figure"
               data-guest={guest.id}
-              src={figureFor(guest)}
-              alt=""
-              draggable={false}
+              data-cutout-crop={cutout?.crop ? 'bust' : undefined}
+              data-portrait={!cutout || undefined}
               style={{ left: anchor.x * 100 + '%', top: anchor.top * 100 + '%' }}
-            />
+            >
+              <img src={src} alt="" draggable={false} />
+            </div>
           )
         })}
         <img className="round-table-shot__table" src={room} alt="" draggable={false} />

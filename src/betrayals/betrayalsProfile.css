@@ -1,0 +1,77 @@
+.betrayals-profile-shell {
+  box-sizing: border-box;
+  height: 100dvh;
+  overflow: auto;
+  color-scheme: dark;
+  background: radial-gradient(ellipse at 50% 0%, #322522 0, #110d13 66%);
+  --color-accent: #dfb888;
+  --color-accent-2: #b77f5e;
+}
+
+.betrayals-profile-shell .dressing-room,
+.betrayals-profile-shell .profile-screen,
+.betrayals-profile-shell .profile-picker {
+  background: linear-gradient(165deg, #251c1c, #110d13 68%);
+}
+
+.betrayals-profile-shell .dressing-room.placeholder-screen {
+  height: 100%;
+  overflow: visible;
+  padding-block: max(10px, var(--app-safe-area-top, 0px)) max(12px, var(--safe-bottom, 0px));
+}
+
+.betrayals-profile-shell .appearance-carousel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.betrayals-profile-shell .appearance-carousel__stage {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: min(14rem, 47dvh);
+  border: 1px solid #9d795b99;
+  border-radius: 14px;
+  background-position: center 83%;
+  box-shadow: inset 0 -2rem 3rem #110a10a0;
+}
+
+.betrayals-profile-shell .appearance-carousel__figure {
+  height: 80%;
+  bottom: calc(17% - var(--appearance-foot-bottom-offset, 0%));
+  filter: drop-shadow(0 0.5rem 0.4rem #0c08079c) saturate(0.87);
+}
+
+.betrayals-profile-shell .appearance-carousel__confirm {
+  color: #20130d;
+  background: linear-gradient(160deg, #f4cf9e, #bd8c5e);
+}
+
+.betrayals-profile-shell .player-account__card {
+  border-color: #a77f5d;
+  background: linear-gradient(150deg, #2b1d1e, #130f15 67%);
+}
+
+.betrayals-profile-shell .profile-screen.profile-screen--overview {
+  max-width: 520px;
+  min-height: 30rem;
+  padding-block: max(6px, var(--app-safe-area-top, 0px)) max(6px, var(--safe-bottom, 0px));
+}
+
+.betrayals-profile-shell .profile-screen--overview .profile-screen__character {
+  --profile-figure-floor: clamp(30px, 7cqh, 64px);
+  top: auto;
+  bottom: var(--profile-figure-floor);
+  height: min(calc(100cqh - var(--profile-content-top) - var(--profile-figure-floor)), 170cqw);
+}
+
+.betrayals-profile-shell .profile-screen--overview .profile-screen__quick-actions {
+  padding-bottom: 10px;
+}
+
+.betrayals-profile-shell .profile-screen__page-title,
+.betrayals-profile-shell .profile-screen__quick-action {
+  border-color: #ad885e80;
+  background: linear-gradient(150deg, #4d3429, #251a1c 70%);
+  color: #f3d9b5;
+}

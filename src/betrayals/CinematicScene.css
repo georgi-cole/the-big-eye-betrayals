@@ -572,6 +572,49 @@
   object-position: 50% 42%;
 }
 
+.betrayals-hotel__camera[data-composite] .betrayals-cine__backdrop {
+  object-position: 52% 56%;
+  filter: brightness(0.64) blur(2px);
+}
+
+.betrayals-hotel__reader {
+  position: absolute;
+  left: 51%;
+  bottom: 19%;
+  width: min(104%, 60cqh);
+  aspect-ratio: 24 / 25;
+  transform: translateX(-50%);
+  overflow: hidden;
+  mask-image: linear-gradient(#000 0 73%, transparent 100%);
+  animation: betrayals-hotel-push 5s cubic-bezier(0.22, 0.55, 0.3, 1) both;
+  filter: brightness(0.93) saturate(0.8) drop-shadow(0 0.4rem 1.2rem #080e17b0);
+}
+
+.betrayals-hotel__reader > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.betrayals-hotel__reader[data-crop='bust'] > img {
+  position: absolute;
+  left: -75%;
+  top: -18.3%;
+  width: 250%;
+}
+
+.betrayals-hotel__reader[data-portrait] {
+  width: min(58%, 43cqh);
+  aspect-ratio: 4 / 5;
+  border: 1px solid #b28d6280;
+  border-radius: 48% 48% 18% 18%;
+}
+
+.betrayals-hotel__reader[data-portrait] > img {
+  height: 100%;
+  object-fit: cover;
+}
+
 .betrayals-hotel__camera[data-shot='5'] .betrayals-cine__backdrop {
   filter: brightness(0.39) saturate(0.55) blur(4px);
 }
