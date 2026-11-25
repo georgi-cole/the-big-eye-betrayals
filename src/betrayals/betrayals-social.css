@@ -131,6 +131,9 @@
 }
 
 .betrayals-social-dialog :is(.sp2-move-filters, .sp2-body--focused-target .sp2-move-filters) {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   border-color: #5a4a3e;
   background: #161515;
 }
@@ -139,6 +142,51 @@
   border-color: #c2966c;
   background: linear-gradient(145deg, #6f503b, #493628);
   color: #fff0dc;
+}
+
+.betrayals-investigation-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.26rem 0.55rem;
+  align-items: center;
+  padding: 0.34rem 0.55rem;
+  border-inline-start: 2px solid #947451;
+  border-radius: 0.28rem;
+  background: #261e18;
+  color: #dfcbbb;
+  font-size: 0.72rem;
+}
+
+.betrayals-investigation-result > div:first-child {
+  flex: 1 1 13rem;
+  min-width: 0;
+}
+
+.betrayals-investigation-result p {
+  margin: 0;
+}
+
+.betrayals-investigation-result strong {
+  color: #f2d1a6;
+}
+
+.betrayals-investigation-result small {
+  display: block;
+  color: #ccbaa8;
+  font-size: 0.67rem;
+}
+
+.betrayals-investigation-result__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-inline-start: auto;
+}
+
+.betrayals-social-dialog .hubmate-choice-chip[aria-pressed='true'] {
+  border-color: #a47c51;
+  background: #493226;
+  color: #f7dfc3;
 }
 
 .betrayals-shield-count {

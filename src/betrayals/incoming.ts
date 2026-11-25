@@ -2,23 +2,39 @@ import { getVoiceProfile, pickVariantText } from '../social/interactionVariantBa
 import type { VariantFamily, VoiceTag } from '../social/interactionVariantBank.ts'
 import { SOCIAL_RESOURCE_CALIBRATION as calibration } from '../social/socialResourceCalibration.ts'
 import { mulberry32 } from '../store/rng.ts'
+import { castleSocialMoment, closeCastleMoment, playCastleChoice } from './castleLife.ts'
+import { CASTLE_CHOICES } from './castleLifeBank.ts'
+import type { CastleChoice } from './castleLifeBank.ts'
 import {
   gaveNightShieldToday,
   nightShieldWindowOpen,
   reactionToShieldClaim,
 } from './nightShields.ts'
-import { INCOMING_ANSWERS, isCurrentCommand, publicNightShieldWinners } from './run.ts'
+import {
+  eligibleBanishmentTargets,
+  hashId,
+  INCOMING_ANSWERS,
+  isCurrentCommand,
+  publicNightShieldWinners,
+} from './run.ts'
 import type { CommandToken, Contestant, IncomingAnswer, Run, SocialEntry } from './run.ts'
 import { respondToShieldFollowUp, shieldFollowUpFor } from './shieldSocial.ts'
 import type { ShieldFollowUpAction } from './shieldSocial.ts'
-import { getSocialView, hasAlliance, rapport } from './social.ts'
+import { applySocialMove, getSocialView, hasAlliance, latestPact, rapport } from './social.ts'
 import { recordSocialWallet } from './socialResources.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { tableDiscussionOpen } from './table.ts'
+import { voteOfferId } from './votePlans.ts'
 
 type OrdinaryEncounter = 'confidence' | 'alliance' | 'vote-plan'
-type EncounterKind = OrdinaryEncounter | 'shield-question' | 'shield-message' | 'shield-gift'
-export type IncomingAction = IncomingAnswer | ShieldFollowUpAction
+type EncounterKind =
+  | OrdinaryEncounter
+  | 'shield-question'
+  | 'shield-message'
+  | 'shield-gift'
+  | 'shield-request'
+  | 'castle-moment'
+export type IncomingAction = IncomingAnswer | ShieldFollowUpAction | CastleChoice
 
 export type IncomingInteraction = {
   id: string
@@ -26,7 +42,10 @@ export type IncomingInteraction = {
   speaker: Contestant
   target?: Contestant
   text: string
+  title?: string
   response?: IncomingAnswer
+  required?: boolean
+  castleMoment?: ReturnType<typeof castleSocialMoment>
   shieldFollowUp?: ReturnType<typeof shieldFollowUpFor>
 }
 
@@ -40,7 +59,11 @@ function family(
 }
 
 const lines: Record<
-  OrdinaryEncounter | 'shield-question' | 'public-shield-question',
+  | OrdinaryEncounter
+  | 'shield-question'
+  | 'public-shield-question'
+  | 'vote-change'
+  | 'shield-request',
   VariantFamily[]
 > = {
   confidence: [
@@ -115,6 +138,38 @@ const lines: Record<
       true
     ),
   ],
+  'vote-change': [
+    family(
+      'vote-change-direct',
+      ['direct', 'strategic'],
+      [
+        '{previous} is safe. We promised each other a vote, so let’s talk about {target}.',
+        'Our plan for {previous} is off the table. I’d like to move the vote to {target}.',
+      ]
+    ),
+    family(
+      'vote-change-quiet',
+      ['soft', 'indirect'],
+      [
+        'Now that {previous} is protected, what do you think of {target}? I wanted to ask you first.',
+      ]
+    ),
+  ],
+  'shield-request': [
+    family(
+      'shield-request-direct',
+      ['direct', 'strategic'],
+      [
+        'I think I’m exposed tonight. Would you trust me with your Night Shield?',
+        'If you can spare your shield, I could use it tonight. This stays between us.',
+      ]
+    ),
+    family(
+      'shield-request-quiet',
+      ['sincere', 'soft'],
+      ['I could use your help getting through tonight. Would you pass me your shield?']
+    ),
+  ],
   'shield-question': [
     family(
       'shield-direct',
@@ -154,7 +209,17 @@ const lines: Record<
 }
 
 function shieldInteractions(run: Run): IncomingInteraction[] {
-  if (!['round-table', 'table-reveal', 'night', 'night-resolved'].includes(run.phase)) return []
+  if (
+    ![
+      'shield-deals',
+      'round-table',
+      'table-reveal',
+      'cocktail',
+      'night',
+      'night-resolved',
+    ].includes(run.phase)
+  )
+    return []
   const guests = new Map(run.seats.map((seat) => [seat.id, seat]))
   const messages: IncomingInteraction[] = []
   for (const entry of run.social) {
@@ -196,6 +261,24 @@ function shieldInteractions(run: Run): IncomingInteraction[] {
   }
 
   if (!nightShieldWindowOpen(run)) return messages
+  const requestId = run.private.safetyStandings?.requestId
+  const requester = run.phase === 'shield-deals' && guests.get(requestId ?? '')
+  const requestKey = `${run.day}:shield-request`
+  const reply = run.incomingResponses?.[requestKey]
+  if (requester && !requester.exit && (reply || run.private.nightShieldIds.includes(run.humanId))) {
+    return [
+      ...messages,
+      {
+        id: requestKey,
+        kind: 'shield-request',
+        required: run.dayFlow?.castleDay,
+        speaker: requester,
+        text: phaseLine(run, requester.id, 'shield-request'),
+        response: reply,
+      },
+    ]
+  }
+
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 6733))
   const earlier = run.social.filter(({ day }) => day < run.day)
   const contact = run.seats
@@ -231,11 +314,71 @@ function shieldInteractions(run: Run): IncomingInteraction[] {
   ]
 }
 
+function phaseLine(run: Run, id: string, kind: keyof typeof lines) {
+  return pickVariantText(
+    lines[kind],
+    getVoiceProfile(id),
+    new Set(),
+    0,
+    mulberry32(run.publicSeed ^ Math.imul(run.day, 17137) ^ hashId(id))
+  ).text
+}
+
+function afterImmunityInteractions(run: Run): IncomingInteraction[] {
+  const plans = run.votePlans
+  if (!plans || plans.day !== run.day) return []
+  const eligible = eligibleBanishmentTargets(run, run.humanId)
+  const guest = (id?: string) => run.seats.find((seat) => seat.id === id && !seat.exit)
+  const previous = guest(plans.previousTargetId)
+  return plans.contacts.flatMap(({ speakerId, targetId }, index) => {
+    const speaker = guest(speakerId)
+    const target = guest(targetId)
+    if (!speaker || (targetId && (!target || !eligible.includes(targetId)))) return []
+    const id = voteOfferId(run, index)
+    const kind = target ? 'vote-plan' : 'confidence'
+    const replacement =
+      plans.kind === 'change' &&
+      run.dayFlow?.castleDay &&
+      latestPact(run.social, run.humanId, speakerId, run.day)?.suspectId
+    const text = phaseLine(run, speakerId, plans.kind === 'change' ? 'vote-change' : kind)
+    return [
+      {
+        id,
+        kind,
+        required: Boolean(
+          run.dayFlow?.castleDay &&
+          plans.kind === 'change' &&
+          target &&
+          (!replacement || !eligible.includes(replacement))
+        ),
+        speaker,
+        target,
+        title:
+          plans.kind === 'change'
+            ? 'Change of Plan'
+            : plans.kind === 'offers'
+              ? 'Two Offers'
+              : undefined,
+        text: text
+          .replace('{previous}', () => previous?.name ?? 'Our first pick')
+          .replace('{target}', () => target?.name ?? 'that guest'),
+        response: run.incomingResponses?.[id],
+      },
+    ]
+  })
+}
+
 /** Rebuild a day's delivery slots from the same public state after a reload or response. */
-export function getIncomingInteractions(run: Run): IncomingInteraction[] {
+function ordinaryIncomingInteractions(run: Run): IncomingInteraction[] {
   if (!run.seats.some(({ id, exit }) => id === run.humanId && !exit)) return []
-  const shields = shieldInteractions(run)
-  if (run.phase !== 'social' && !tableDiscussionOpen(run)) return shields
+  if (run.phase === 'after-immunity') return afterImmunityInteractions(run)
+  const afternoon = run.phase === 'social' && run.dayFlow?.castleDay
+  const offers = run.dayFlow ? afterImmunityInteractions(run) : []
+  const messages = [
+    ...shieldInteractions(run),
+    ...offers.filter(({ response }) => afternoon || response),
+  ]
+  if (run.phase !== 'social' && !tableDiscussionOpen(run)) return messages
 
   const atTable = run.phase === 'round-table'
   const random = mulberry32(
@@ -249,8 +392,9 @@ export function getIncomingInteractions(run: Run): IncomingInteraction[] {
       const trust = rapport(earlier, run.humanId, speaker.id)
       return { speaker, trust, initiative: random() + trust * 0.4 }
     })
+    .filter(({ trust }) => !afternoon || trust >= 0.12)
     .sort((first, second) => second.initiative - first.initiative)
-  const count = atTable || run.options.realityMode === 'off' ? 1 : 2
+  const count = atTable || afternoon || run.options.realityMode === 'off' ? 1 : 2
 
   const ordinary = speakers.slice(0, count).map(({ speaker, trust }, index) => {
     const id = `${run.day}:${run.phase}:${index + 1}`
@@ -290,7 +434,36 @@ export function getIncomingInteractions(run: Run): IncomingInteraction[] {
       response: run.incomingResponses?.[id],
     }
   })
-  return [...shields, ...ordinary]
+  return [...messages, ...ordinary]
+}
+
+export function getIncomingInteractions(run: Run): IncomingInteraction[] {
+  const ordinary = ordinaryIncomingInteractions(run)
+  const castleMoment = castleSocialMoment(run)
+  const speaker = castleMoment && run.seats.find(({ id }) => id === castleMoment.guestId)
+  if (!castleMoment || !speaker) return ordinary
+  const moment: IncomingInteraction = {
+    id: castleMoment.id,
+    kind: 'castle-moment',
+    title: castleMoment.title,
+    speaker,
+    text: castleMoment.opening,
+    castleMoment,
+    required: castleMoment.required,
+    response:
+      castleMoment.response === 'passed' ? 'dismiss' : castleMoment.response ? 'engage' : undefined,
+  }
+  return [moment, ...ordinary].sort(
+    (a, b) =>
+      Number(Boolean(b.required && !b.response)) - Number(Boolean(a.required && !a.response))
+  )
+}
+
+export function hasRequiredIncoming(run: Run) {
+  return (
+    !!run.dayFlow?.castleDay &&
+    getIncomingInteractions(run).some(({ required, response }) => required && !response)
+  )
 }
 
 function responseEntry(
@@ -331,6 +504,12 @@ export function respondToIncomingInteraction(
   if (!isCurrentCommand(run, token)) return run
   const encounter = getIncomingInteractions(run).find(({ id }) => id === interactionId)
   if (!encounter) return run
+  if (encounter.kind === 'castle-moment') {
+    if (encounter.response || run.presentation?.length) return run
+    if (answer === 'dismiss') return { ...closeCastleMoment(run), revision: run.revision + 1 }
+    const choice = CASTLE_CHOICES.find((choice) => choice === answer)
+    return choice ? playCastleChoice(run, token, choice) : run
+  }
   if (answer === 'request-shield' || answer === 'ask-shield-plans') {
     if (!encounter.shieldFollowUp || encounter.response === 'dismiss') return run
     const next = respondToShieldFollowUp(run, encounter.speaker.id, answer)
@@ -340,8 +519,26 @@ export function respondToIncomingInteraction(
       incomingResponses: { ...next.incomingResponses, [interactionId]: 'engage' },
     }
   }
-  if (!INCOMING_ANSWERS.includes(answer) || encounter.response) return run
-  const entry = responseEntry(run, encounter, answer)
+  const reply = INCOMING_ANSWERS.find((reply) => reply === answer)
+  if (!reply || encounter.response) return run
+  if (encounter.kind === 'shield-request') {
+    if (answer === 'listen') return run
+    const next =
+      answer === 'engage'
+        ? applySocialMove(run, token, {
+            actorId: run.humanId,
+            recipientId: encounter.speaker.id,
+            kind: 'shield-gift',
+          })
+        : run
+    if (answer === 'engage' && next === run) return run
+    return {
+      ...next,
+      revision: run.revision + 1,
+      incomingResponses: { ...run.incomingResponses, [interactionId]: reply },
+    }
+  }
+  const entry = responseEntry(run, encounter, reply)
   const socialWallets =
     entry?.kind === 'alliance'
       ? recordSocialWallet(run, run.humanId, {
@@ -355,6 +552,6 @@ export function respondToIncomingInteraction(
     revision: run.revision + 1,
     social: entry ? [...run.social, entry] : run.social,
     socialWallets,
-    incomingResponses: { ...run.incomingResponses, [interactionId]: answer },
+    incomingResponses: { ...run.incomingResponses, [interactionId]: reply },
   }
 }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
+import { openDayFlow } from './dayFlow'
 import { challengeGame } from './challengeRotation'
 import { investigationFor } from './investigationRecords'
 import { getConclaveView } from './night'
@@ -139,6 +140,34 @@ async function finishCinematic() {
 }
 
 describe('Betrayals season review', () => {
+  it('blocks a required breakfast reply until the player declines in the Inbox', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'inbox-breakfast', roleSeed: 32, publicSeed: 12 }
+    )
+    const guest = run.seats[1]
+    saveRun(
+      localStorage,
+      'edition-local',
+      openDayFlow({
+        ...run,
+        phase: 'dawn',
+        day: 2,
+        dayFlow: { day: 2, delivery: { kind: 'meeting', guestId: guest.id } },
+      })
+    )
+    render(<BetrayalsScreen />)
+    expect(screen.getByRole('button', { name: 'Reply in the Inbox to continue' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Inbox/ }))
+    const inbox = within(screen.getByRole('dialog', { name: 'Incoming interactions' }))
+    expect(inbox.getByText('Reply required')).toBeVisible()
+    await clickAndSave(inbox.getByRole('button', { name: 'Pass' }))
+    expect(inbox.getByText('You let the moment pass.')).toBeVisible()
+    fireEvent.click(inbox.getByRole('button', { name: 'Close inbox' }))
+    expect(screen.getByRole('button', { name: 'Go to Immunity Challenge' })).toBeEnabled()
+  })
   beforeEach(() => {
     localStorage.clear()
     recharge.request.mockReset()
@@ -577,7 +606,7 @@ describe('Betrayals season review', () => {
     expect(claimRewards.mock.calls[1][0]).toHaveLength(2)
   })
 
-  it('expands the profile, filters saved Intel with guest chips, and retains old notes after reload', async () => {
+  it('keeps traits in the profile and investigates from the Social action grid', async () => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
       BETRAYALS_AI_POOL,
@@ -607,12 +636,26 @@ describe('Betrayals season review', () => {
     const traits = within(social.getByRole('region', { name: `${guest.name} profile traits` }))
     expect(traits.queryByText('Openness')).toBeNull()
     expect(traits.getAllByText('Too little to tell')).toHaveLength(5)
+    expect(traits.queryByRole('button', { name: /Observe|Ask around|Ask to watch/ })).toBeNull()
+    expect(social.queryByRole('region', { name: 'Other accounts' })).toBeNull()
     expect(social.queryByRole('combobox')).toBeNull()
     expect(social.queryByRole('textbox', { name: 'Private note' })).toBeNull()
-    await clickAndSave(social.getByRole('button', { name: 'Observe · 1 Energy' }))
+    fireEvent.click(social.getByRole('tab', { name: 'Intel' }))
+    const moves = within(social.getByRole('region', { name: 'Social actions' }))
+    fireEvent.click(moves.getByRole('button', { name: /^Observe/ }))
+    expect(moves.getByRole('group', { name: 'Observation focus' })).toHaveTextContent(
+      '3 left today'
+    )
+    await clickAndSave(moves.getByRole('button', { name: 'Execute' }))
     expect(social.getByText('You observed')).toBeVisible()
     expect(traits.getByRole('meter', { name: 'Strategic play' })).toBeVisible()
-    expect(social.getByText('Steady focus · 2 left today')).toBeVisible()
+    fireEvent.click(moves.getByRole('button', { name: /^Ask around/ }))
+    expect(moves.getByRole('button', { name: 'Execute' })).toBeDisabled()
+    const partners = within(moves.getByRole('group', { name: 'Speak to a guest' }))
+    fireEvent.click(partners.getByRole('button', { name: otherGuest.name }))
+    expect(moves.getByRole('button', { name: 'Execute' })).toBeEnabled()
+    fireEvent.click(moves.getByRole('button', { name: /^Review accounts/ }))
+    expect(moves.getByRole('group', { name: 'Account to use' })).toBeVisible()
     await clickAndSave(social.getByRole('button', { name: 'Save to Intel' }))
     fireEvent.click(social.getByRole('button', { name: 'Open Intel' }))
     const intel = within(screen.getByRole('dialog', { name: 'My Pulse' }))
@@ -684,6 +727,8 @@ describe('Betrayals season review', () => {
     expect(
       screen.queryByRole('dialog', { name: 'Safety Challenge results' })
     ).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Shield Deals/ })).toBeVisible()
+    await clickAndSave(screen.getByRole('button', { name: 'Continue to Round Table' }))
     expect(screen.getByRole('dialog', { name: 'Round Table' })).toBeVisible()
   }, 10000)
 
@@ -727,7 +772,7 @@ describe('Betrayals season review', () => {
     expect(standings.getByRole('rowheader', { name: opponent.name })).toBeVisible()
     expect(standings.queryByLabelText('Hidden')).not.toBeInTheDocument()
     await clickAndSave(standings.getByRole('button', { name: 'Continue' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Back to castle' }))
+    expect(screen.getByRole('heading', { name: /Shield Deals/ })).toBeVisible()
     const roster = within(screen.getByRole('list', { name: 'Contestant roster' }))
     expect(
       roster.getByRole('button', { name: `${opponent.name}, Won a Night Shield` })
@@ -940,9 +985,7 @@ describe('Betrayals season review', () => {
     } finally {
       vi.useRealTimers()
     }
-    expect(screen.getByRole('heading', { name: 'Dawn' })).toBeInTheDocument()
-    await clickAndSave(screen.getByRole('button', { name: 'Play: enter Social' }))
-    expect(screen.getByRole('heading', { name: 'Social' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeInTheDocument()
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'Season actions' })).getByRole('button', {
         name: /^Social/,
@@ -950,9 +993,10 @@ describe('Betrayals season review', () => {
     )
     const conversations = screen.getByRole('dialog', { name: 'Social' })
     expect(conversations).toBeVisible()
+    expect(within(conversations).queryByText('At breakfast')).toBeNull()
     fireEvent.click(within(conversations).getByRole('button', { name: 'Close social panel' }))
     expect(screen.queryByRole('dialog', { name: 'Social' })).not.toBeInTheDocument()
-    await clickAndSave(screen.getByRole('button', { name: 'Play: begin Immunity Challenge' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Go to Immunity Challenge' }))
     fireEvent.click(screen.getByRole('button', { name: 'Play Hold the Wall' }))
     vi.useFakeTimers()
     try {
@@ -963,6 +1007,14 @@ describe('Betrayals season review', () => {
     }
     await clickAndSave(await screen.findByRole('button', { name: 'Finish challenge' }))
     await finishCinematic()
+    expect(screen.getByRole('heading', { name: 'Lunch' })).toBeVisible()
+    await clickAndSave(screen.getByRole('button', { name: 'Enter the castle afternoon' }))
+    expect(screen.getByRole('heading', { name: 'Around the Castle' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /^Inbox/ }))
+    const afternoon = within(screen.getByRole('dialog', { name: 'Incoming interactions' }))
+    expect(afternoon.getByText('Around the castle')).toBeVisible()
+    fireEvent.click(afternoon.getByRole('button', { name: 'Close inbox' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Go to Safety Challenge' }))
     expect(screen.getByRole('heading', { name: 'Safety Challenge' })).toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'See results' }))
     const results = screen.getByRole('dialog', { name: 'Safety Challenge results' })
@@ -974,6 +1026,8 @@ describe('Betrayals season review', () => {
     expect(firstPlace[1]).toHaveTextContent(/\d/)
     expect(firstPlace[2]).toHaveTextContent(/^Won$/)
     await finishCinematic()
+    expect(screen.getByRole('heading', { name: 'Before the Table' })).toBeVisible()
+    await clickAndSave(screen.getByRole('button', { name: 'Continue to Round Table' }))
     await finishCinematic()
     const chamber = screen.getByRole('dialog', { name: 'Round Table' })
     expect(within(chamber).getByRole('log', { name: 'Round Table conversation' })).toBeVisible()
@@ -994,7 +1048,7 @@ describe('Betrayals season review', () => {
     expect(privateTalk.queryByRole('button', { name: /Propose Personal Pact/ })).toBeNull()
     fireEvent.click(privateTalk.getByRole('button', { name: 'Close social panel' }))
     fireEvent.click(screen.getByRole('button', { name: 'Enter Round Table' }))
-    await clickAndSave(screen.getByRole('button', { name: 'Go to vote' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Hear the room and vote' }))
     expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lock vote' })).toBeDisabled()
   })
@@ -1035,6 +1089,108 @@ describe('Betrayals season review', () => {
     ).toHaveTextContent('I was there.')
   })
 
+  it('honors a shield given through the regular Social action card when the witness takes the floor', async () => {
+    const start = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'review-shield-social', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, accused, witness, nominee] = start.seats
+    saveRun(localStorage, 'edition-local', {
+      ...start,
+      phase: 'shield-deals',
+      dayFlow: { day: 1 },
+      private: { ...start.private, nightShieldIds: ['human'] },
+      investigation: {
+        ...investigationFor(start),
+        reports: [
+          {
+            id: 'intel:1',
+            day: 1,
+            guestId: accused.id,
+            speakerId: witness.id,
+            method: 'ask',
+            access: 'firsthand',
+            claim: { day: 1, behavior: 'lobbied', topicId: nominee.id, contactId: witness.id },
+          },
+        ],
+        witnesses: [{ day: 1, reportId: 'intel:1', accepted: false, shield: 'pending' }],
+      },
+    })
+    render(<BetrayalsScreen />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const television = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(television.getByText(`${witness.name} asked for cover to testify.`)).toBeVisible()
+    expect(television.queryByRole('button')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    fireEvent.click(
+      within(social.getByRole('region', { name: 'Player roster' })).getByRole('button', {
+        name: new RegExp(witness.name),
+      })
+    )
+    expect(social.getByRole('heading', { name: witness.name })).toBeVisible()
+    expect(social.queryByRole('combobox')).toBeNull()
+    fireEvent.click(social.getByRole('button', { name: /Gift a Night Shield/ }))
+    await clickAndSave(social.getByRole('button', { name: 'Give shield' }))
+    expect(social.getByRole('status')).toHaveTextContent(`You gave ${witness.name} a Night Shield.`)
+    fireEvent.click(social.getByRole('button', { name: 'Close social panel' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Continue to Round Table' }))
+    await finishCinematic()
+    const room = within(screen.getByRole('dialog', { name: 'Round Table' }))
+    fireEvent.click(room.getByRole('button', { name: 'Take the floor' }))
+    await clickAndSave(room.getByRole('button', { name: `Call ${witness.name}` }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Faux TV' })).toHaveTextContent('I was there.')
+  })
+
+  it('opens the public vote ledger over cocktails and plays the anonymous Conclave before the murder', async () => {
+    const start = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'cocktail-to-night', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, banished, voter, ...others] = start.seats
+    saveRun(localStorage, 'edition-local', {
+      ...start,
+      phase: 'cocktail',
+      dayFlow: { day: 1, castleDay: true },
+      seats: start.seats.map((seat) =>
+        seat.id === banished.id
+          ? { ...seat, exit: { cause: 'banished', day: 1, revealedRole: 'loyal' } }
+          : seat
+      ),
+      lastTable: {
+        banishedId: banished.id,
+        blind: false,
+        tally: { [banished.id]: 2 },
+        tiedByDraw: false,
+        revealedBallots: [{ voterId: voter.id, targetId: banished.id }],
+      },
+      private: { ...start.private, betrayers: others.slice(0, 3).map(({ id }) => id) },
+    })
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByRole('heading', { name: 'Cocktails' })).toBeVisible()
+    fireEvent.click(tv.getByRole('button', { name: 'Review the vote' }))
+    const ledger = within(screen.getByRole('dialog', { name: 'All Round Table votes' }))
+    expect(ledger.getByRole('list', { name: 'All ballots' })).toHaveTextContent(voter.name)
+    expect(ledger.getByText(/They were a Loyal/)).toBeVisible()
+    fireEvent.click(ledger.getByRole('button', { name: 'Back to Cocktails' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Continue to Night' }))
+    expect(tv.getByText('Everyone is trying to sleep. However, evil never sleeps.')).toBeVisible()
+    expect(screen.getAllByRole('button', { name: /Asleep/ }).length).toBeGreaterThan(0)
+    await clickAndSave(screen.getByRole('button', { name: 'Go to sleep' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'conclave-shadow')
+    await finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+    await finishCinematic()
+    await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeVisible()
+  })
+
   it('keeps a completed vote count visible after a private check-in', async () => {
     const start = startRun(
       { id: 'human', name: 'Georgi' },
@@ -1055,12 +1211,21 @@ describe('Betrayals season review', () => {
     saveRun(localStorage, 'edition-local', counted)
     render(<BetrayalsScreen />)
     const feed = within(screen.getByRole('region', { name: 'Round Table vote count' }))
-    fireEvent.click(screen.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Round Table ballot reveal' })).getByRole(
+        'button',
+        {
+          name: 'View all votes',
+        }
+      )
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Return to vote totals' }))
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
     expect(
-      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
-    ).not.toBeInTheDocument()
+      within(screen.getByRole('region', { name: 'Faux TV' })).getByRole('button', {
+        name: 'View all votes',
+      })
+    ).toBeVisible()
 
     fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
     const social = within(screen.getByRole('dialog', { name: 'Social' }))
@@ -1074,8 +1239,10 @@ describe('Betrayals season review', () => {
 
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
     expect(
-      within(screen.getByRole('region', { name: 'Faux TV' })).queryByRole('button')
-    ).not.toBeInTheDocument()
+      within(screen.getByRole('region', { name: 'Faux TV' })).getByRole('button', {
+        name: 'View all votes',
+      })
+    ).toBeVisible()
     expect(screen.getByRole('button', { name: 'Reveal result' })).toBeEnabled()
   })
 
@@ -1297,7 +1464,7 @@ describe('Betrayals season review', () => {
 
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Dawn' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeVisible()
     expect(screen.getByText('Your Night Shield stopped the Conclave’s attempt.')).toBeVisible()
     expect(screen.queryByRole('button', { name: /Eliminated at Night/ })).not.toBeInTheDocument()
   })

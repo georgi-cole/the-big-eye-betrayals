@@ -262,7 +262,6 @@ function Settings({
           checked={seasonOptions.publicMode}
           onToggle={() => updatePreferences({ seasonPublicMode: !seasonOptions.publicMode })}
         />
-        <small>Let the audience award a Public Shield at the Round Table.</small>
         <label className="betrayals-preference-select">
           <span>Reality Mode</span>
           <select

@@ -24,6 +24,12 @@ type Perspective = {
   tableRound?: number
   tablePressure?: ReadonlyMap<string, number>
   shieldReads?: ReturnType<typeof nightShieldReads>
+  spokenReports?: ReadonlySet<string>
+  provisionalTarget?: string
+  nightWitnesses?: readonly { speakerId: string; targetId: string }[]
+  revealedBetrayer?: string
+  finalePressure?: { id: string; strength: number }
+  nightPitch?: { id: string; weight: number }
 }
 
 export function resolutionPerspective(
@@ -37,6 +43,12 @@ export function resolutionPerspective(
   for (const [id, weight] of investigationPressure(run, actorId)) {
     evidence.set(id, (evidence.get(id) ?? 0) + weight)
   }
+  const finale = run.dayFlow?.finale
+  const finalVote = run.phase === 'final-banishment' || run.phase === 'end-vote'
+  const honestMemory =
+    finale && finalVote && run.seats.some(({ id, exit }) => id === finale.guestId && !exit)
+  const skepticism = honestMemory ? getSocialPersonality(actorId).strategicCalculation : 0
+  const bond = honestMemory ? relationship(run.social, actorId, run.humanId).bond : 0
   return {
     actorId,
     role: view.role ?? 'loyal',
@@ -54,10 +66,27 @@ export function resolutionPerspective(
       : undefined,
     evidence,
     shieldReads: run.phase === 'night' ? nightShieldReads(run, actorId) : undefined,
+    spokenReports: new Set(
+      run.tableArguments?.flatMap(({ investigation }) =>
+        investigation?.witness ? [investigation.reportId] : []
+      )
+    ),
+    provisionalTarget: run.dayFlow?.provisional?.[actorId],
+    nightWitnesses: run.lastTable?.witnesses,
+    revealedBetrayer: run.seats.find(
+      ({ id, exit }) => id === run.lastTable?.banishedId && exit?.revealedRole === 'betrayer'
+    )?.id,
+    finalePressure: honestMemory
+      ? {
+          id: finale.guestId,
+          strength:
+            (finale.stance === 'doubt' ? 1 : -1) * (0.045 + bond * 0.11 + skepticism * 0.035),
+        }
+      : undefined,
   }
 }
 
-function privateSignals({ actorId, day, ownConversations }: Perspective) {
+function privateSignals({ actorId, day, ownConversations, spokenReports }: Perspective) {
   const activePacts = new Map<string, string>()
   const caseFor = new Map<string, number>()
   const caseAgainst = new Map<string, number>()
@@ -71,6 +100,7 @@ function privateSignals({ actorId, day, ownConversations }: Perspective) {
       kind === 'vote-plan' &&
       entry.day === day &&
       entry.accepted &&
+      (!entry.witnessReportId || spokenReports?.has(entry.witnessReportId)) &&
       !entry.pledgeResult
     ) {
       activePacts.set(incoming ? speaker : recipientId, suspectId)
@@ -124,7 +154,11 @@ function scoreChoice(
     const ledCase = perspective.campaigns?.some(
       (claim) => claim.speakerId === id && againstUs(claim.targetId)
     )
-    const threat = ledCase ? 0.56 : againstUs(rivalVote) ? 0.34 : 0
+    const wasWitness = perspective.nightWitnesses?.some(
+      ({ speakerId, targetId }) =>
+        speakerId === id && (againstUs(targetId) || targetId === perspective.revealedBetrayer)
+    )
+    const threat = wasWitness ? 0.64 : ledCase ? 0.56 : againstUs(rivalVote) ? 0.34 : 0
     const obvious = ledCase ? threat * personality.strategicCalculation * 0.24 : 0
     const read = perspective.shieldReads?.get(id)
     const confidence = read?.conflicting ? 0.5 : 1
@@ -134,7 +168,8 @@ function scoreChoice(
       uncertainty -
       bond * 0.62 -
       publicHeat * 0.6 +
-      threat -
+      threat +
+      (perspective.nightPitch?.id === id ? perspective.nightPitch.weight : 0) -
       obvious +
       confidence * (opportunity * 0.22 - shieldRisk * (1.07 - personality.riskTolerance * 0.38))
     )
@@ -164,7 +199,10 @@ function scoreChoice(
   const danger = Math.min(1, (publicTally[actorId] ?? 0) / 4)
   const viability = Math.min(1, momentum + pact + Math.max(0, suspicion))
   const selfPreservation = viability * danger * (0.12 + 0.23 * personality.strategicCalculation)
-  return read + momentum + pact + selfPreservation - bond * 0.22
+  const provisional =
+    perspective.phase === 'round-table' && perspective.provisionalTarget === id ? 0.07 : 0
+  const finale = perspective.finalePressure?.id === id ? perspective.finalePressure.strength : 0
+  return read + momentum + pact + selfPreservation + provisional + finale - bond * 0.22
 }
 
 export function chooseTarget(perspective: Perspective, context: TargetContext): string | undefined {
@@ -187,7 +225,8 @@ export function strongestCase(perspective: Perspective) {
         (perspective.evidence?.get(id) ?? 0) +
         (signals.caseFor.get(id) ?? 0) -
         (signals.caseAgainst.get(id) ?? 0) +
-        (perspective.dawnClue === id ? 0.08 : 0)
+        (perspective.dawnClue === id ? 0.08 : 0) +
+        (perspective.finalePressure?.id === id ? perspective.finalePressure.strength : 0)
     )
   )
 }

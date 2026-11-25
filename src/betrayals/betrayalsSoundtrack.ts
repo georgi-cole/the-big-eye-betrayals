@@ -63,7 +63,8 @@ export function resolveBetrayalsSoundtrackScene(
   }
 
   if (cue === 'round-table') return 'round-table'
-  if (cue === 'conclave-arrival' || cue === 'conclave-seal') return 'conclave'
+  if (cue === 'conclave-arrival' || cue === 'conclave-shadow' || cue === 'conclave-seal')
+    return 'conclave'
   if (cue === 'death-letter' || (cue === 'awakening' && run.lastDawn?.eliminatedId)) {
     return 'murder'
   }

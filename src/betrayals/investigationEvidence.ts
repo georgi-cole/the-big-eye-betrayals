@@ -13,7 +13,7 @@ import { getSocialView, relationship } from './perception.ts'
 import { hashId } from './run.ts'
 import type { Run, TableArgument } from './run.ts'
 
-export type InvestigationCase = { reportId: string; witness?: true }
+export type InvestigationCase = { reportId: string; witness?: true; named?: true }
 
 export function caseReports(run: Run, guestId?: string) {
   const { reports, witnesses } = investigationFor(run)
@@ -44,6 +44,7 @@ export function canPresentInvestigation(run: Run, targetId: string, choice: Inve
   const found = caseReports(run, targetId).find(({ report }) => report.id === choice.reportId)
   return Boolean(
     found &&
+    (!choice.named || (choice.named === true && !choice.witness && found.witness)) &&
     (choice.witness === undefined ||
       (choice.witness === true && found.witness && found.witnessAsked?.accepted))
   )
@@ -89,7 +90,7 @@ export function publicCaseWeight(run: Run, listenerId: string, argument: TableAr
     listenerId === argument.targetId
   )
     return 0
-  const { reportId, witness } = argument.investigation
+  const { reportId, witness, named } = argument.investigation
   const { reports, incidents } = investigationFor(run)
   const report = reports.find(({ id }) => id === reportId)
   if (!report || (witness && report.speakerId === listenerId)) return 0
@@ -97,7 +98,7 @@ export function publicCaseWeight(run: Run, listenerId: string, argument: TableAr
   const speaker = relationship(
     social,
     listenerId,
-    witness && report.speakerId ? report.speakerId : run.humanId
+    (witness || named) && report.speakerId ? report.speakerId : argument.speakerId
   )
   const subject = relationship(social, listenerId, argument.targetId)
   const event = incidents.find(({ id }) => id === report.incidentId)
@@ -106,11 +107,30 @@ export function publicCaseWeight(run: Run, listenerId: string, argument: TableAr
   const attention = mulberry32(
     run.publicSeed ^ hashId(`${run.day}:${listenerId}:${argument.targetId}:account`)
   )()
+  const arranged =
+    run.dayFlow?.witness?.reportId === reportId ||
+    investigationFor(run).witnesses.some(
+      (request) =>
+        request.day === run.day && request.reportId === reportId && request.shield === 'met'
+    )
+  if (witness && arranged) {
+    // Direct testimony changes close decisions most for guests who trust the source.
+    const willing = hasOwnAccount || attention < 0.61 + speaker.bond * 0.4 - subject.bond * 0.32
+    return willing
+      ? Math.max(
+          0.04,
+          Math.min(
+            0.36,
+            0.21 + speaker.bond * 0.2 + speaker.reliability * 0.2 - subject.bond * 0.28
+          )
+        )
+      : 0
+  }
   // Public testimony can reinforce a case. Most unconnected listeners still have other priorities.
   const receptiveness =
     0.13 + (witness ? 0.095 : 0) + interested * 0.08 + speaker.bond * 0.42 - subject.bond * 0.31
   if (!hasOwnAccount && attention > receptiveness) return 0
-  const weight = witness ? 0.1 : report.access === 'observed' ? 0.065 : 0.035
+  const weight = witness ? 0.1 : named ? 0.085 : report.access === 'observed' ? 0.065 : 0.035
   const crowded = run.seats.filter(({ exit }) => !exit).length > 14
   return Math.max(
     0,
@@ -153,6 +173,8 @@ export function compareReportAccounts(first: IntelReport, other: IntelReport) {
       return 'The same position on that guest came up on two different days.'
     return 'These accounts describe different days.'
   }
+  if (first.claim.period !== other.claim.period && (first.claim.period || other.claim.period))
+    return 'These accounts describe different times of the day.'
   const firstSource = first.sourceId ?? (first.access === 'firsthand' ? first.speakerId : undefined)
   const otherSource = other.sourceId ?? (other.access === 'firsthand' ? other.speakerId : undefined)
   const sameConversation = sameVoteConversation(first, other)
@@ -171,39 +193,52 @@ export function compareReportAccounts(first: IntelReport, other: IntelReport) {
 }
 
 export function investigationSpeech(run: Run, tableArguments: readonly TableArgument[]) {
-  const argument = tableArguments.find((item) => item.investigation)
-  if (!argument?.investigation) return []
   const reports = investigationFor(run).reports
-  const report = reports.find(({ id }) => id === argument.investigation?.reportId)
-  if (!isVoteClaim(report?.claim)) return []
   const name = (id: string) => guestName(run.seats, id)
-  const { targetId } = argument
-  const account = describeClaim(report.claim, name(targetId), name)
-  const witness = argument.investigation.witness ? report.speakerId : undefined
-  const statement = reports
-    .filter((item) => item.method === 'confront' && sameVoteConversation(report, item))
-    .at(-1)
-  return [
-    {
-      speakerId: argument.speakerId,
-      targetId,
-      verb: 'questions',
-      argument: witness
-        ? `${name(witness)}, will you tell the room what you heard on Day ${report.claim.day}?`
-        : `About Day ${report.claim.day}: ${account} What was behind that?`,
-    },
-    ...(witness
-      ? [{ speakerId: witness, targetId, verb: 'on', argument: `I was there. ${account}` }]
-      : []),
-    {
-      speakerId: targetId,
-      targetId: report.claim.topicId,
-      verb: 'on',
-      argument: statement?.claim?.denies
-        ? report.claim.behavior === 'defended'
-          ? `I stand by what I said. I didn't ask anyone to keep them.`
-          : `I stand by what I said. I didn't ask for that vote.`
-        : 'We were talking through our options. You can ask what I said, but that alone will not tell you why.',
-    },
-  ]
+  return tableArguments.flatMap((argument) => {
+    const report = reports.find(({ id }) => id === argument.investigation?.reportId)
+    if (!argument.investigation || !isVoteClaim(report?.claim)) return []
+    const { targetId } = argument
+    const witness = argument.investigation.witness ? report.speakerId : undefined
+    const named = argument.investigation.named ? report.speakerId : undefined
+    const account = describeClaim(
+      witness || named || !run.dayFlow
+        ? report.claim
+        : {
+            ...report.claim,
+            contactId: undefined,
+            room: undefined,
+          },
+      name(targetId),
+      name
+    )
+    const statement = reports
+      .filter((item) => item.method === 'confront' && sameVoteConversation(report, item))
+      .at(-1)
+    return [
+      {
+        speakerId: argument.speakerId,
+        targetId,
+        verb: 'questions',
+        argument: witness
+          ? `${name(witness)}, will you tell the room what you heard on Day ${report.claim.day}?`
+          : named
+            ? `I heard this from ${name(named)}. ${account}`
+            : `About Day ${report.claim.day}: ${account} What was behind that?`,
+      },
+      ...(witness
+        ? [{ speakerId: witness, targetId, verb: 'on', argument: `I was there. ${account}` }]
+        : []),
+      {
+        speakerId: targetId,
+        targetId: report.claim.topicId,
+        verb: 'on',
+        argument: statement?.claim?.denies
+          ? report.claim.behavior === 'defended'
+            ? `I stand by what I said. I didn't ask anyone to keep them.`
+            : `I stand by what I said. I didn't ask for that vote.`
+          : 'We were talking through our options. You can ask what I said, but that alone will not tell you why.',
+      },
+    ]
+  })
 }

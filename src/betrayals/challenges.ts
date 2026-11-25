@@ -1,8 +1,10 @@
 import { mulberry32 } from '../store/rng.ts'
 import { isCurrentCommand, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
-import { prepareShieldConversations } from './shieldSocial.ts'
+import { openShieldDeals } from './dayAftermath.ts'
+import { prepareVotePlans } from './votePlans.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
+import { openCastleMoment } from './castleLife.ts'
 import { recordBetrayalsChallengeRewards } from './economy.ts'
 import { NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 
@@ -97,9 +99,14 @@ export function resolveChallenge(
     socialWallets: walletsAfterChallenge(run, standings),
   }
   if (run.phase === 'immunity') {
+    const next: Run = {
+      ...afterChallenge,
+      phase: 'after-immunity',
+      immunityId: standings[0].contestantId,
+    }
     return recordBetrayalsChallengeRewards(
       run,
-      { ...afterChallenge, phase: 'safety', immunityId: standings[0].contestantId },
+      openCastleMoment(next.options.publicMode ? next : prepareVotePlans(next), 'lunch'),
       standings
     )
   }
@@ -107,11 +114,10 @@ export function resolveChallenge(
     const nightShieldIds = standings
       .slice(0, NIGHT_SHIELD_COUNT)
       .map(({ contestantId }) => contestantId)
-    return recordBetrayalsChallengeRewards(
-      run,
-      prepareShieldConversations({
+    const next = openCastleMoment(
+      openShieldDeals({
         ...afterChallenge,
-        phase: 'round-table',
+        phase: 'shield-deals',
         private: {
           ...run.private,
           nightShieldIds,
@@ -127,8 +133,9 @@ export function resolveChallenge(
           },
         },
       }),
-      standings
+      'supper'
     )
+    return recordBetrayalsChallengeRewards(run, next, standings)
   }
   return recordBetrayalsChallengeRewards(
     run,

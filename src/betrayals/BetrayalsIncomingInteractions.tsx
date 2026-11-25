@@ -5,9 +5,11 @@ import {
 } from '../components/IncomingInteractionsInbox/IncomingInboxChrome'
 import type { IncomingInteractionIconName } from '../components/IncomingInteractionsInbox/IncomingInteractionIcon'
 import PlayerAvatar from '../components/PlayerAvatar/PlayerAvatar'
+import { BetrayalsResourceCosts } from './BetrayalsResourceCosts'
 import type { IncomingAction, IncomingInteraction } from './incoming'
 import type { IncomingAnswer } from './run'
 import './betrayals-incoming.css'
+import './ceremonyActions.css'
 
 type Props = {
   interactions: readonly IncomingInteraction[]
@@ -15,6 +17,8 @@ type Props = {
   onClose: () => void
   readIds?: ReadonlySet<string>
   onRead?: (id: string) => void
+  onDiscussVote?: (speakerId: string) => void
+  onOpenIntel?: (guestId: string) => void
 }
 
 type ConversationCard = {
@@ -25,6 +29,12 @@ type ConversationCard = {
 }
 
 const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
+  'castle-moment': {
+    icon: 'check_in',
+    label: 'Castle conversation',
+    priority: 'low',
+    choices: { engage: 'Replied', dismiss: 'Pass' },
+  },
   confidence: {
     icon: 'check_in',
     label: 'Private check-in',
@@ -61,6 +71,12 @@ const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
     priority: 'medium',
     choices: { engage: 'Acknowledge', dismiss: 'Dismiss message' },
   },
+  'shield-request': {
+    icon: 'deal_offer',
+    label: 'An ally needs a shield',
+    priority: 'medium',
+    choices: { engage: 'Give a Night Shield', dismiss: 'Keep my shield' },
+  },
 }
 
 const answerStyles = { engage: 'positive', listen: 'neutral', dismiss: 'dismiss' } as const
@@ -74,7 +90,22 @@ function hasOpenFollowUp({ response, shieldFollowUp }: IncomingInteraction) {
   return response !== 'dismiss' && (shieldFollowUp?.canRequest || shieldFollowUp?.canAskPlans)
 }
 
-function outcome({ response, kind, speaker, target }: IncomingInteraction) {
+function outcome({ response, kind, speaker, target, castleMoment }: IncomingInteraction) {
+  if (castleMoment?.response) {
+    return {
+      shared: 'You had a moment to talk.',
+      guarded: 'They held back. There may be another side to hear.',
+      firsthand: 'Their firsthand account is in Intel.',
+      hearsay: 'Their secondhand account is in Intel.',
+      observed: 'Your sighting is in Intel.',
+      passed: 'You let the moment pass.',
+    }[castleMoment.response]
+  }
+  if (kind === 'shield-request') {
+    return response === 'engage'
+      ? `You passed a Night Shield to ${speaker.name} in private.`
+      : `You kept your Night Shield.`
+  }
   if (kind === 'shield-question') {
     if (response === 'engage') return `You told ${speaker.name} you have a Night Shield.`
     if (response === 'listen') return `You told ${speaker.name} you have no Night Shield.`
@@ -100,14 +131,19 @@ function InboxMessage({
   read,
   onRead,
   onRespond,
+  onDiscussVote,
+  onOpenIntel,
 }: {
   interaction: IncomingInteraction
   read: boolean
   onRead: (id: string) => void
   onRespond: Props['onRespond']
+  onDiscussVote?: Props['onDiscussVote']
+  onOpenIntel?: Props['onOpenIntel']
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const { id, kind, speaker, response, text, shieldFollowUp } = interaction
+  const moment = interaction.castleMoment
   const { icon, label, choices, priority } = cards[kind]
   const unread = !read && !response
   const replies = []
@@ -119,6 +155,21 @@ function InboxMessage({
     )
   }
   if (shieldFollowUp?.plan) replies.push(shieldPlanReplies[shieldFollowUp.plan])
+  const intelLinks = moment && onOpenIntel && (
+    <div className="betrayals-inbox__intel-links">
+      {moment.reportGuestId && (
+        <button
+          type="button"
+          className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
+          onClick={() => onOpenIntel(moment.reportGuestId!)}
+        >
+          Open in Intel
+        </button>
+      )}
+    </div>
+  )
+  const hasIntel = moment?.reportGuestId && onOpenIntel
+  const showFeedback = response || replies.length > 0
 
   useEffect(() => {
     const element = cardRef.current
@@ -155,38 +206,63 @@ function InboxMessage({
         .join(' ')}
       role="listitem"
     >
-      <IncomingInboxCardHeader
-        avatar={
-          <PlayerAvatar
-            size="sm"
-            player={{
-              id: speaker.id,
-              name: speaker.name,
-              avatar: speaker.portrait ?? '',
-              status: 'active',
-            }}
-            showRelationshipOutline={false}
-            showEvictedStyle={false}
-          />
-        }
-        sender={speaker.name}
-        icon={icon}
-        typeLabel={label}
-        status={response ? `Resolved · ${choices[response] ?? 'Heard'}` : unread ? 'New' : null}
-        unread={unread}
-      />
-      <p className="inbox-item__text">{text}</p>
-      {(response || replies.length > 0) && (
-        <div className="inbox-item__feedback" aria-label="Response" aria-live="polite">
-          {replies.length > 0 ? (
-            replies.map((reply) => (
-              <p className="inbox-item__outcome" key={reply}>
-                {reply}
-              </p>
-            ))
-          ) : (
-            <p className="inbox-item__outcome">{outcome(interaction)}</p>
+      <div className="betrayals-inbox__card-head">
+        <IncomingInboxCardHeader
+          avatar={
+            <PlayerAvatar
+              size="sm"
+              player={{
+                id: speaker.id,
+                name: speaker.name,
+                avatar: speaker.portrait ?? '',
+                status: 'active',
+              }}
+              showRelationshipOutline={false}
+              showEvictedStyle={false}
+            />
+          }
+          sender={speaker.name}
+          icon={icon}
+          typeLabel={interaction.title ?? label}
+          status={
+            response
+              ? `Resolved · ${choices[response] ?? 'Heard'}`
+              : interaction.required
+                ? 'Reply required'
+                : unread
+                  ? 'New'
+                  : null
+          }
+          unread={unread}
+        />
+        {moment?.callbackGuestId &&
+          onOpenIntel &&
+          moment.callbackGuestId !== moment.reportGuestId && (
+            <button
+              type="button"
+              className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
+              onClick={() => onOpenIntel(moment.callbackGuestId!)}
+            >
+              Follow up in Intel
+            </button>
           )}
+      </div>
+      {moment?.callback && <p className="inbox-item__outcome">{moment.callback}</p>}
+      <p className="inbox-item__text">{text}</p>
+      {showFeedback && (
+        <div className="inbox-item__feedback betrayals-inbox__result">
+          <div className="betrayals-inbox__response" aria-label="Response" aria-live="polite">
+            {replies.length > 0 ? (
+              replies.map((reply) => (
+                <p className="inbox-item__outcome" key={reply}>
+                  {reply}
+                </p>
+              ))
+            ) : (
+              <p className="inbox-item__outcome">{moment?.reportText ?? outcome(interaction)}</p>
+            )}
+          </div>
+          {hasIntel && intelLinks}
         </div>
       )}
       {(!response || hasOpenFollowUp(interaction)) && (
@@ -210,20 +286,45 @@ function InboxMessage({
             </button>
           )}
           {!response &&
-            (['engage', 'listen', 'dismiss'] as const).map((answer) =>
-              choices[answer] ? (
-                <button
-                  key={answer}
-                  type="button"
-                  className={`inbox-action inbox-action--${answerStyles[answer]}`}
-                  onClick={() => onRespond(id, answer)}
-                >
-                  {choices[answer]}
-                </button>
-              ) : null
+            moment?.options.map(({ action, label, cost, reason }) => (
+              <button
+                key={action}
+                type="button"
+                className="inbox-action inbox-action--neutral"
+                disabled={!!reason}
+                title={reason}
+                onClick={() => onRespond(id, action)}
+              >
+                {label}
+                <BetrayalsResourceCosts cost={cost} />
+              </button>
+            ))}
+          {!response &&
+            (moment ? (['dismiss'] as const) : (['engage', 'listen', 'dismiss'] as const)).map(
+              (answer) =>
+                choices[answer] ? (
+                  <button
+                    key={answer}
+                    type="button"
+                    className={`inbox-action inbox-action--${answerStyles[answer]}`}
+                    onClick={() => onRespond(id, answer)}
+                  >
+                    {choices[answer]}
+                  </button>
+                ) : null
             )}
+          {!response && kind === 'vote-plan' && onDiscussVote && (
+            <button
+              type="button"
+              className="inbox-action inbox-action--neutral"
+              onClick={() => onDiscussVote(speaker.id)}
+            >
+              Counter in Social
+            </button>
+          )}
         </div>
       )}
+      {!showFeedback && hasIntel && intelLinks}
     </div>
   )
 }
@@ -234,6 +335,8 @@ export function BetrayalsIncomingInteractions({
   onClose,
   readIds,
   onRead,
+  onDiscussVote,
+  onOpenIntel,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [localReadIds, setLocalReadIds] = useState<ReadonlySet<string>>(() => new Set())
@@ -276,6 +379,8 @@ export function BetrayalsIncomingInteractions({
       read={(readIds ?? localReadIds).has(interaction.id)}
       onRead={markRead}
       onRespond={respond}
+      onDiscussVote={onDiscussVote}
+      onOpenIntel={onOpenIntel}
     />
   )
 

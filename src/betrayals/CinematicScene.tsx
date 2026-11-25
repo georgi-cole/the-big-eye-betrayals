@@ -35,6 +35,7 @@ export type CinematicCastMember = {
 
 type SceneKind =
   | 'conclave-arrival'
+  | 'conclave-shadow'
   | 'conclave-seal'
   | 'awakening'
   | 'shield'
@@ -95,6 +96,13 @@ const direction: Record<SceneKind, { backdrop: string; beats: readonly SceneBeat
   'conclave-arrival': {
     backdrop: chamber,
     beats: [{ title: 'Behind closed doors', hold: 1800, cue: 'door' }, { title: 'The Conclave' }],
+  },
+  'conclave-shadow': {
+    backdrop: sceneArt + 'conclave/chamber.webp',
+    beats: [
+      { title: 'Behind closed doors', hold: 1450, cue: 'conclave_cloth' },
+      { title: 'The Conclave' },
+    ],
   },
   'conclave-seal': {
     backdrop: chamber,
@@ -682,6 +690,23 @@ export function CinematicScene({
             focusId={arrival?.focusId}
             reducedMotion={motionReduced}
           />
+        ) : scene.kind === 'conclave-shadow' ? (
+          <div
+            className="betrayals-cine__shadow-conclave"
+            data-reverse={beat > 0}
+            aria-hidden="true"
+          >
+            <img className="betrayals-cine__backdrop" src={art} alt="" />
+            <img
+              className="betrayals-cine__shadow-hood"
+              src={
+                sceneArt +
+                (beat === 0 ? 'conclave/seated-quarter.webp' : 'conclave/seated-front.webp')
+              }
+              alt=""
+            />
+            <div className="betrayals-cine__grade" />
+          </div>
         ) : deathLetter ? (
           <HotelCamera
             key={beat}

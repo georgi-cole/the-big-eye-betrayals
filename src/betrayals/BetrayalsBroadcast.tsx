@@ -10,6 +10,7 @@ export interface BetrayalsBroadcastProps {
   art?: string
   opener?: ReactNode
   interactive?: boolean
+  controlsRef?: (node: HTMLDivElement | null) => void
 }
 
 export function BetrayalsBroadcast({
@@ -21,6 +22,7 @@ export function BetrayalsBroadcast({
   art,
   opener,
   interactive = false,
+  controlsRef,
 }: BetrayalsBroadcastProps) {
   return (
     <section
@@ -47,6 +49,7 @@ export function BetrayalsBroadcast({
             {detail && <div className="betrayals-broadcast__detail">{detail}</div>}
           </div>
         </div>
+        {controlsRef && <div className="betrayals-broadcast__controls" ref={controlsRef} />}
       </div>
       <div className="betrayals-broadcast__vents" aria-hidden="true" />
     </section>

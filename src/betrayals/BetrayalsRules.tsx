@@ -65,8 +65,9 @@ const chapters: readonly HandbookChapter[] = [
     body: (
       <>
         <p>
-          At {phaseLabel.dawn}, the castle learns what happened overnight. Use the time before the
-          challenges to speak privately, build alliances, and weigh what you’ve heard.
+          At breakfast, find out who returned and check the Inbox for guests who want to talk. Play
+          the {phaseLabel.immunity}, then catch up at lunch and spend the afternoon speaking
+          privately, comparing accounts, or arranging cover for the {phaseLabel.safety}.
         </p>
         <p>
           The {phaseLabel.immunity} is a chance to earn protection from both banishment and the
@@ -74,9 +75,14 @@ const chapters: readonly HandbookChapter[] = [
           shared pot.
         </p>
         <p>
-          At the {phaseLabel['round-table']}, hear the cases and cast your vote. Then darkness
-          falls, and the Conclave has its turn. In the finale, the remaining guests must decide
-          whether to end the season or banish again.
+          Messages marked Reply required pause the day until you answer or decline. Ordinary
+          conversations can carry on among other guests while you spend your time elsewhere.
+        </p>
+        <p>
+          At the {phaseLabel['round-table']}, hear the cases and cast your vote. Over cocktails,
+          review the public ballot, talk through the result, and make plans with your allies before
+          the Conclave meets. In the finale, the remaining guests decide whether to end the season
+          or banish again.
         </p>
       </>
     ),
@@ -89,8 +95,8 @@ const chapters: readonly HandbookChapter[] = [
     body: (
       <>
         <p>
-          With Public Mode on, the audience may award a Public Shield against banishment. Night
-          Shields protect against the Conclave. The game shows which protection you hold.
+          The Public Shield protects its holder at the Round Table. Night Shields protect against
+          the Conclave. The game shows which protection you hold.
         </p>
         <p>
           Social cards show what each move costs. Each morning restores some Energy. Check in for
@@ -99,8 +105,8 @@ const chapters: readonly HandbookChapter[] = [
           {SOCIAL_RECHARGE_ENERGY} Energy once per real day.
         </p>
         <p>
-          Reality Mode opens deeper guest reads and more ways to act. My Pulse is your journal for
-          the season, including accounts, commitments and votes.
+          With Reality Mode, choose a guest in Social to observe them, ask around, or set a lookout.
+          My Pulse keeps your accounts, commitments and votes together.
         </p>
         <p>
           If you’re eliminated, you can watch the season play out or return to a checkpoint when

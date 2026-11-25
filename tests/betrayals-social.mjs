@@ -299,7 +299,7 @@ test('second wind and podium Energy are awarded once and saved with the balances
   }))
   const token = commandToken(run)
   const next = resolveChallenge(run, token, field)
-  assert.equal(next.phase, 'safety')
+  assert.equal(next.phase, 'after-immunity')
   assert.equal(socialWalletFor(next, actor).energy, 11)
   assert.equal(socialWalletFor(next, actor).influence, 27)
   assert.strictEqual(resolveChallenge(next, token, field), next)

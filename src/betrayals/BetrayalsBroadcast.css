@@ -332,3 +332,14 @@
     transition: none;
   }
 }
+
+.betrayals-broadcast__glass:has(.betrayals-broadcast__controls:not(:empty))
+  .betrayals-broadcast__readout {
+  block-size: calc(100% - 29px);
+}
+
+.betrayals-broadcast__controls {
+  position: absolute;
+  z-index: 2;
+  inset: auto 0.4rem 0.15rem auto;
+}

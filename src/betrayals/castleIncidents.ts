@@ -12,8 +12,15 @@ import { eligibleBanishmentTargets, hashId } from './run.ts'
 import type { Run } from './run.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 
-function castleIncident(run: Run, guestId: string, others: readonly string[]): CastleIncident {
-  const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 3271) ^ hashId(guestId))
+function castleIncident(
+  run: Run,
+  guestId: string,
+  others: readonly string[],
+  period?: 'afternoon'
+): CastleIncident {
+  const random = mulberry32(
+    run.publicSeed ^ Math.imul(run.day, 3271) ^ hashId(guestId) ^ (period ? 213367 : 0)
+  )
   const personality = getSocialPersonality(guestId)
   const relationships = getSocialView(run, guestId)
   const politicalHeat = run.lastTable?.blind === false ? run.lastTable.tally : undefined
@@ -37,9 +44,9 @@ function castleIncident(run: Run, guestId: string, others: readonly string[]): C
           ? 'at ease'
           : 'subdued'
   const incident: CastleIncident = {
-    id: `${run.day}:castle:${guestId}`,
+    id: `${run.day}:castle${period ? '-afternoon' : ''}:${guestId}`,
     guestId,
-    fact: { day: run.day, behavior: 'alone', room, mood },
+    fact: { day: run.day, ...(period ? { period } : {}), behavior: 'alone', room, mood },
     relayIds: [],
   }
   if (!contactId || random() < 0.36 - personality.socialEnergy * 0.28) return incident
@@ -115,9 +122,13 @@ function deliverWatch(run: Run, state: Investigation, watch: WatchRequest): Inve
   })
 }
 
-/** Opening Social commits the world once, before the player chooses whom to observe. */
+/** Commit the day's conversations before the player chooses which lead to follow. */
 export function openInvestigationDay(run: Run): Run {
-  if (run.phase !== 'social' || !isActiveGuest(run, run.humanId)) return run
+  if (
+    (run.phase !== 'social' && !(run.dayFlow && run.phase === 'dawn')) ||
+    !isActiveGuest(run, run.humanId)
+  )
+    return run
   const state = investigationFor(run)
   if (state.incidents.some(({ fact }) => fact.day === run.day)) return run
   const active = run.seats.flatMap(({ id, exit }) => (!exit && id !== run.humanId ? [id] : []))
@@ -139,4 +150,25 @@ export function openInvestigationDay(run: Run): Run {
     }
   })
   return { ...run, investigation: { ...next, watches } }
+}
+
+export function openAfternoonInvestigation(run: Run): Run {
+  const state = investigationFor(run)
+  if (
+    !isActiveGuest(run, run.humanId) ||
+    state.incidents.some(({ fact }) => fact.day === run.day && fact.period === 'afternoon')
+  )
+    return run
+  const guests = run.seats.flatMap(({ id, exit }) => (!exit && id !== run.humanId ? [id] : []))
+  const random = mulberry32(run.publicSeed ^ hashId(`afternoon:${run.day}`))
+  const actors = seededPickN(random, guests, Math.min(guests.length, 8))
+  const incidents = actors.map((actor) =>
+    castleIncident(
+      run,
+      actor,
+      guests.filter((id) => id !== actor),
+      'afternoon'
+    )
+  )
+  return { ...run, investigation: { ...state, incidents: [...state.incidents, ...incidents] } }
 }
