@@ -1,12 +1,12 @@
 {
-  "src/betrayals/BetrayalsRules.tsx": "f2d803dc82e7cefd1d3256a6f088fa163f7e2b67f803b09eebbf6267b8f1b03f",
-  "src/betrayals/BetrayalsScreen.tsx": "e72acd2aef5c3b86fa04cecd7dadb6a8161a851db32bf73b750f561a83bddda0",
+  "src/betrayals/BetrayalsRules.tsx": "3be8d3dac3cf4cb8bd90d5f65e5568db84a8b46b95f9bc31ec33c33245f5e5d7",
+  "src/betrayals/BetrayalsScreen.tsx": "77aa51def748afe7646b1e754963e8119b0d6dbf8ac9c20278b7f25a3ab8a985",
   "src/betrayals/allianceRecords.ts": "651c426fa2dc1bbc2eb1a1fc035c2233fcba8f180c48efeb11e33c154e3ff33f",
   "src/betrayals/challengeRotation.ts": "93a9457713855be40a7337bbbd1ade8c4d69ea64e0d9811c7c3bb08bf04dc6c8",
   "src/betrayals/challenges.ts": "12b238854bbf8fee8ac00c07b563167f105dc8aabf63052560b8229f8889c5d3",
   "src/betrayals/daySocial.ts": "30be82ab421006eaaf715ebca33952146576d6dc66fe984417fe5c33e22b5c08",
   "src/betrayals/economy.ts": "fd3e9f57c6223dc8bb527983844014dddab48c395a4e8eb03bee089c028242f5",
-  "src/betrayals/generalSocial.ts": "a7d62a128655c294ec7ac8ca7654ae265016c30a079b68ab0b0cef7f67e304af",
+  "src/betrayals/generalSocial.ts": "d13559bf0dba4139a1a2e1e33b25f4449a79d16eaceb31ec13e8ff9616184142",
   "src/betrayals/incoming.ts": "59393cddd8b9f57613578cec1e7b4521e2a1a211661333cdebbc464e3fa6b3d2",
   "src/betrayals/investigation.ts": "86bfe7e031b64171e646e14e041489f07a12f60af252e76a9c0c485da5f2a8a4",
   "src/betrayals/night.ts": "cd49dcaabbc8e981a837755b4207e8fde367ce35ac634c0182434b1f47a1fc54",
@@ -19,7 +19,9 @@
   "src/betrayals/settlement.ts": "fc674b2a00310dcdb44b74580a55ab49214a114d3bb923205d9eef7249f6a8f3",
   "src/betrayals/shieldSocial.ts": "8b497acd02a375daaf3efe5af5dd98c7be2c63e4ba783cd7902b35de542aad72",
   "src/betrayals/social.ts": "24dfb941c3b365927911780a67065ef0324903ce6071e512b881be4e66f7562e",
-  "src/betrayals/socialResources.ts": "20a4b7f156afa3256a978f14732636ce8f3fa0c7569644b6f527adb44a924458",
+  "src/betrayals/socialResources.ts": "979909a3f6a7e2586363a604354e3f12566b8042c631a21048e9e4990c14d445",
   "src/betrayals/table.ts": "9f75d23733bc973b3a7e8af8d95e5254b2291560a058512d2b2a6064cb317e58",
-  "src/social/socialResourceCalibration.ts": "ab339faeb94a4fe562ddbb05b5a49a942a317659805ad192f29b236eb55f79db"
+  "src/services/ads/adsService.ts": "b96b6f2baa689b49c33056d35dd3a03e6b6a79dd328303fa9f4eb2fe46dafc9c",
+  "src/social/socialResourceCalibration.ts": "ab339faeb94a4fe562ddbb05b5a49a942a317659805ad192f29b236eb55f79db",
+  "src/social/socialResourceEconomy.ts": "4743a8be1534c844cf376d5eee739a95bcc1d0093f847cd0f5a934479ef97bbf"
 }

@@ -3,6 +3,7 @@ import { installSafetyFixture } from '../../../safety/__tests__/safetyFixture'
 import { declarePlayerAge, setOptionalPlayerFeature } from '../../../safety/playerSafety'
 import type { RootState } from '../../../store/store'
 import {
+  BETRAYALS_SOCIAL_RECHARGE_PLACEMENT,
   canShowAd,
   clearRewardHandler,
   initAdBridge,
@@ -45,8 +46,30 @@ describe('adsService bridge guards', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     clearRewardHandler('social_energy_recharge')
+    clearRewardHandler(BETRAYALS_SOCIAL_RECHARGE_PLACEMENT)
     delete window.GameAds
     delete window.onAdRewardGranted
+  })
+
+  it('limits Betrayals recharge independently of the original energy bank', () => {
+    const placement = BETRAYALS_SOCIAL_RECHARGE_PLACEMENT
+    const today = new Date().toISOString().slice(0, 10)
+    const dispatch = vi.fn()
+    const reward = vi.fn()
+    window.GameAds = { showRewarded: vi.fn(), showInterstitial: vi.fn() }
+    initAdBridge()
+    const state = makeState({ dailyUsage: { social_energy_recharge: today } })
+    expect(showRewarded(placement, state, dispatch, reward)).toBe(true)
+    window.onAdRewardGranted?.(placement)
+    window.onAdRewardGranted?.(placement)
+    expect(reward).toHaveBeenCalledOnce()
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+      type: 'ads/recordAdShown',
+      payload: placement,
+    })
+    const used = makeState({ dailyUsage: { [placement]: today } })
+    expect(canShowAd(placement, used)).toBe(false)
+    expect(canShowAd('social_energy_recharge', used)).toBe(true)
   })
 
   it('does not call an ad bridge for a teen or grant an old pending adult reward', () => {

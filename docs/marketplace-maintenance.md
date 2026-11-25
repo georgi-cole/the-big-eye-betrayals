@@ -50,6 +50,13 @@ store listings or change configured prices.
 
 ## Review log
 
+- 2026-11-25: Reviewed the optional Betrayals Social Energy ad. Players with an
+  empty Energy balance can earn 6 Energy once per UTC day through the existing
+  native rewarded-ad flow. The reward uses the Betrayals season wallet. Store
+  prices, entitlements and automatic ad placements retain their current behavior.
+  The [Social resource map](betrayals-social-resources.md) records how the reward
+  fits into the season economy.
+
 - 2026-11-23: Reviewed the Betrayals Store navigation and dedicated Wallet.
   The compact Store overview leads to separate VIP, Feature unlocks, Season
   items and Wallet views, with a direct Changing room shortcut. The Wallet

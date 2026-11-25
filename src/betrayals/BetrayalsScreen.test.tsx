@@ -13,6 +13,11 @@ import { applySocialMove } from './social'
 import { resolveTable } from './table'
 import { preparePaidNightShieldPurchase, recordBetrayalsEconomy } from './economy'
 
+const recharge = vi.hoisted(() => ({ request: vi.fn(), dailyLimitReached: vi.fn() }))
+vi.mock('../services/ads/useRewardedAd', () => ({
+  useRewardedAd: () => ({ ...recharge, pending: false }),
+}))
+
 const commerce = vi.hoisted(() => ({
   ready: true,
   vip: true,
@@ -136,6 +141,8 @@ async function finishCinematic() {
 describe('Betrayals season review', () => {
   beforeEach(() => {
     localStorage.clear()
+    recharge.request.mockReset()
+    recharge.dailyLimitReached.mockReset().mockReturnValue(false)
     Object.assign(commerce, {
       vip: true,
       myPulse: true,
@@ -298,6 +305,37 @@ describe('Betrayals season review', () => {
     expect(openWalletProfile).toHaveBeenCalledOnce()
     expect(openProfile).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('saves six Social Energy only after a completed ad', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'rewarded-energy', roleSeed: 28, publicSeed: 823 }
+    )
+    const wallet = { day: 1, energy: 0, energySpent: 5, influence: 12, info: 50 }
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'social',
+      socialWallets: { ...run.socialWallets, [run.humanId]: wallet },
+    })
+    recharge.request.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+    const social = within(screen.getByRole('dialog', { name: 'Social' }))
+    const watch = social.getByRole('button', { name: 'Watch ad for +6 Energy' })
+    await clickAndSave(watch)
+    expect(social.getByLabelText('Energy: 0')).toBeVisible()
+    await clickAndSave(watch)
+    expect(recharge.request).toHaveBeenLastCalledWith('betrayals_social_energy_recharge')
+    expect(social.getByLabelText('Energy: 6')).toBeVisible()
+    expect(social.queryByRole('button', { name: 'Watch ad for +6 Energy' })).toBeNull()
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status === 'ready' && saved.run.socialWallets?.human).toEqual({
+      ...wallet,
+      energy: 6,
+    })
   })
 
   it('routes locked Pulse and full profiles to their store unlocks while keeping basic conversation free', async () => {

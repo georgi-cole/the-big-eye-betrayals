@@ -4,11 +4,19 @@ import {
   podiumEnergyForPlacement,
   SOCIAL_RESOURCE_CALIBRATION as calibration,
 } from '../social/socialResourceCalibration.ts'
-import { getSocialResourceEffect } from '../social/socialResourceEconomy.ts'
+import {
+  getSocialResourceEffect,
+  type SocialResourceOutcome,
+} from '../social/socialResourceEconomy.ts'
 import type { RealityPreset, Run, SocialEntry } from './run.ts'
 
 export type SocialResources = { energy: number; influence: number; info: number }
 export type SocialWallet = SocialResources & { day: number; energySpent: number }
+
+export const CASTLE_EXPLORATION_INFO = 25
+export const EAVESDROP_INFO = 100
+export const GROUP_CHAT_INFLUENCE_PER_GUEST = 2
+export const SOCIAL_RECHARGE_ENERGY = calibration.rewardedRechargeEnergy
 
 const shieldConversationCost = { energy: 1, influence: 0, info: 0 }
 const actionEconomy: Record<
@@ -30,7 +38,7 @@ const actionEconomy: Record<
   'end-pact': { cost: { energy: 0, influence: 0, info: 0 } },
   'vote-plan': {
     resourceAction: { id: 'rally_votes_against', kind: 'political_spend' },
-    cost: { energy: 2, influence: 20, info: 50 },
+    cost: { energy: 2, influence: 12, info: 50 },
   },
   'ask-about': {
     resourceAction: { id: 'ask_player_opinion', kind: 'intel_gain' },
@@ -148,35 +156,82 @@ export function recordSocialWallet(
   }
 }
 
-export function walletAfterSocialMove(run: Run, entry: SocialEntry, cost: SocialResources) {
-  const { resourceAction } = actionEconomy[entry.kind]
-  if (!resourceAction) {
-    return recordSocialWallet(run, entry.actorId, { energy: -cost.energy }, cost.energy)
+function socialMoveReward(
+  kind: SocialEntry['kind'],
+  outcome: SocialResourceOutcome,
+  guestCount = 2
+) {
+  if (kind === 'group-chat')
+    return { influence: guestCount * GROUP_CHAT_INFLUENCE_PER_GUEST, info: 0 }
+  if (kind === 'explore-castle' || kind === 'eavesdrop') {
+    return {
+      influence: 0,
+      info:
+        kind === 'eavesdrop' && outcome === 'success' ? EAVESDROP_INFO : CASTLE_EXPLORATION_INFO,
+    }
   }
+
+  const { resourceAction, cost } = actionEconomy[kind]
+  if (!resourceAction) return { influence: 0, info: 0 }
+  const effect = getSocialResourceEffect(
+    { ...resourceAction, title: resourceAction.id, category: 'strategic', baseCost: cost.energy },
+    outcome
+  )
+  // The charged price is the one shown on the card. A poor result can forfeit a
+  // reward or strain the relationship, but cannot add a hidden wallet charge.
+  return {
+    influence:
+      kind === 'alliance' && outcome === 'success'
+        ? calibration.relationships.allianceInfluence
+        : Math.max(0, effect.influence),
+    info: Math.max(0, effect.info),
+  }
+}
+
+export function walletAfterSocialMove(
+  run: Run,
+  entry: SocialEntry,
+  cost: SocialResources,
+  guestCount?: number
+) {
   const outcome =
     entry.reaction === 'backfired'
       ? 'backfire'
       : entry.accepted === false || entry.reaction === 'held-back' || entry.reaction === 'unmoved'
         ? 'failure'
         : 'success'
-  const effect = getSocialResourceEffect(
-    { ...resourceAction, title: resourceAction.id, category: 'strategic', baseCost: cost.energy },
-    outcome
-  )
-  const alliance = entry.kind === 'alliance' && entry.accepted
+  const reward = socialMoveReward(entry.kind, outcome, guestCount)
   return recordSocialWallet(
     run,
     entry.actorId,
     {
       energy: -cost.energy,
-      influence:
-        effect.influence -
-        cost.influence +
-        (alliance ? calibration.relationships.allianceInfluence : 0),
-      info: effect.info - cost.info,
+      influence: reward.influence - cost.influence,
+      info: reward.info - cost.info,
     },
     cost.energy
   )
+}
+
+export function canRechargeSocialEnergy(run: Run): boolean {
+  return (
+    !run.result &&
+    run.phase !== 'settled' &&
+    !run.presentation?.length &&
+    !run.pendingAdBreak &&
+    run.seats.some(({ id, exit }) => id === run.humanId && !exit) &&
+    socialWalletFor(run, run.humanId).energy === 0
+  )
+}
+
+/** Called after a completed ad, for the same season and in-game day as the offer. */
+export function rechargeSocialEnergy(run: Run): Run {
+  if (!canRechargeSocialEnergy(run)) return run
+  return {
+    ...run,
+    revision: run.revision + 1,
+    socialWallets: recordSocialWallet(run, run.humanId, { energy: SOCIAL_RECHARGE_ENERGY }),
+  }
 }
 
 export function walletsAfterChallenge(

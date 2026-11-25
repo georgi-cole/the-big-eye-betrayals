@@ -253,3 +253,27 @@
   padding-inline: 0.42rem;
   border-radius: 999px;
 }
+
+.betrayals-energy-recharge {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.45rem 0.85rem;
+  padding: 0.65rem max(0.85rem, env(safe-area-inset-left));
+  border-block-end: 1px solid #604b36;
+  background: #261d15;
+  color: #f5e3be;
+  font-size: 0.82rem;
+}
+
+.betrayals-energy-recharge small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #d5ba99;
+}
+
+.betrayals-energy-recharge .sp2-execute {
+  min-height: 44px;
+}

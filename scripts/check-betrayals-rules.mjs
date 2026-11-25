@@ -26,7 +26,9 @@ const rulesSources = [
   'src/betrayals/social.ts',
   'src/betrayals/socialResources.ts',
   'src/betrayals/table.ts',
+  'src/services/ads/adsService.ts',
   'src/social/socialResourceCalibration.ts',
+  'src/social/socialResourceEconomy.ts',
 ]
 
 function fingerprint(path) {

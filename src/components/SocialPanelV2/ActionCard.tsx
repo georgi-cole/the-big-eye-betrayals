@@ -11,6 +11,8 @@ export interface ActionCardProps {
   description?: string
   /** Resolved dynamic costs, used by multi-target actions. */
   costs?: { energy: number; influence: number; info: number }
+  /** Resource symbols used in the host's balance header. */
+  resourceIcons?: { energy: string; influence: string; info: string }
   /** Whether this card is currently selected. */
   selected?: boolean
   /** When true the card is non-interactive and shows an overlay. */
@@ -40,6 +42,7 @@ export default function ActionCard({
   action,
   costs,
   description,
+  resourceIcons = { energy: '⚡', influence: '🤝', info: '💡' },
   selected = false,
   disabled = false,
   premiumLocked = false,
@@ -163,7 +166,7 @@ export default function ActionCard({
       <div className="ac-card__chips">
         {energyCost > 0 && (
           <span className="ac-chip ac-chip--energy" aria-label={`Energy cost: ${energyCost}`}>
-            ⚡ {energyCost}
+            {resourceIcons.energy} {energyCost}
           </span>
         )}
         {influenceCost > 0 && (
@@ -171,17 +174,17 @@ export default function ActionCard({
             className="ac-chip ac-chip--influence"
             aria-label={`Influence cost: ${influenceCost}`}
           >
-            🤝 {influenceCost}
+            {resourceIcons.influence} {influenceCost}
           </span>
         )}
         {infoCost > 0 && (
           <span className="ac-chip ac-chip--info" aria-label={`Info cost: ${infoCost}`}>
-            💡 {infoCost}
+            {resourceIcons.info} {infoCost}
           </span>
         )}
         {energyCost === 0 && influenceCost === 0 && infoCost === 0 && (
           <span className="ac-chip ac-chip--energy" aria-label="Energy cost: 0">
-            ⚡ 0
+            {resourceIcons.energy} 0
           </span>
         )}
       </div>

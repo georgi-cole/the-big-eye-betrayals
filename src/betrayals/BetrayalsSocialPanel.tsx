@@ -10,7 +10,7 @@ import PlayerList from '../components/SocialPanelV2/PlayerList'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import { BetrayalsGeneralActions } from './BetrayalsGeneralActions'
 import { generalActionCards } from './generalSocialCards'
-import { alliancePlanningOpen, CASTLE_EXPLORATION_INFO, EAVESDROP_INFO } from './generalSocial'
+import { alliancePlanningOpen } from './generalSocial'
 import type { AllianceMoveDetails, GeneralSocialMove } from './generalSocial'
 import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
@@ -33,7 +33,14 @@ import {
   rapport,
   socialMoveKinds,
 } from './social'
-import { missingSocialResource, socialMoveCost } from './socialResources'
+import {
+  CASTLE_EXPLORATION_INFO,
+  EAVESDROP_INFO,
+  SOCIAL_RECHARGE_ENERGY,
+  missingSocialResource,
+  socialMoveCost,
+} from './socialResources'
+import { BETRAYALS_RESOURCE_ICONS, BETRAYALS_RESOURCE_NAMES } from './socialResourcePresentation'
 import type { SocialResources } from './socialResources'
 import '../components/SocialPanelV2/SocialPanelV2.css'
 import '../components/SocialPanelV2/RecentActivity.css'
@@ -44,7 +51,7 @@ const actions = [
     id: 'rapport',
     title: 'Build trust',
     category: 'friendly',
-    description: 'Get closer to this guest and earn Influence.',
+    description: 'Spend some time getting to know this guest.',
     icon: '🤝',
   },
   {
@@ -65,7 +72,7 @@ const actions = [
     id: 'question',
     title: 'Hear a suspicion',
     category: 'strategic',
-    description: 'Find out whom this guest suspects and earn Info.',
+    description: 'Find out whom this guest suspects.',
     icon: '💬',
   },
   {
@@ -163,11 +170,6 @@ const filters = [
 ] as const
 type Filter = (typeof filters)[number]['id']
 const seasonEndedHint = 'The season has ended. You can still browse your relationships.'
-const resourceNames: Record<keyof SocialResources, string> = {
-  energy: 'Energy',
-  influence: 'Influence',
-  info: 'Info',
-}
 const checkInCopy: Partial<Record<Phase, { title: string; description: string }>> = {
   'role-reveal': {
     title: 'Introduce yourself',
@@ -235,6 +237,12 @@ type Props = {
   hasRealityMode?: boolean
   hasMyPulse?: boolean
   onUpgrade?: (product: 'realityMode' | 'myPulse') => void
+  energyRecharge?: {
+    watch: () => void
+    pending: boolean
+    dailyLimit: boolean
+    notice?: string
+  }
   onClose: () => void
   onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
   onGeneralMove?: (
@@ -543,6 +551,7 @@ export function BetrayalsSocialPanel({
   hasRealityMode = false,
   hasMyPulse = false,
   onUpgrade,
+  energyRecharge,
   onClose,
   onMove,
   onGeneralMove,
@@ -650,7 +659,7 @@ export function BetrayalsSocialPanel({
       return 'No new guests to discuss.'
     const cost = socialMoveCost(kind, realityMode)
     const missing = missingSocialResource(resources, cost)
-    if (missing) return `Requires ${cost[missing]} ${resourceNames[missing]}.`
+    if (missing) return `Requires ${cost[missing]} ${BETRAYALS_RESOURCE_NAMES[missing]}.`
   }
 
   const targetKind =
@@ -708,7 +717,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Energy: ${resources.energy}`}
                   title="Energy"
                 >
-                  ⚡ {resources.energy}
+                  {BETRAYALS_RESOURCE_ICONS.energy} {resources.energy}
                 </span>
                 <span
                   className="sp2-resource-chip sp2-resource-chip--influence"
@@ -716,7 +725,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Influence: ${resources.influence}`}
                   title="Influence"
                 >
-                  🗣️ {resources.influence}
+                  {BETRAYALS_RESOURCE_ICONS.influence} {resources.influence}
                 </span>
                 <span
                   className="sp2-resource-chip sp2-resource-chip--info"
@@ -724,7 +733,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Info: ${resources.info}`}
                   title="Info"
                 >
-                  🔎 {resources.info}
+                  {BETRAYALS_RESOURCE_ICONS.info} {resources.info}
                 </span>
               </>
             )}
@@ -735,6 +744,29 @@ export function BetrayalsSocialPanel({
             onClick={onClose}
           />
         </header>
+        {canAct && resources.energy === 0 && energyRecharge && (
+          <section className="betrayals-energy-recharge" aria-label="Recharge Social Energy">
+            <div>
+              <strong>Out of Energy</strong>
+              {energyRecharge.dailyLimit && (
+                <small>Today’s ad recharge has already been used.</small>
+              )}
+              {energyRecharge.notice && <small role="status">{energyRecharge.notice}</small>}
+            </div>
+            {!energyRecharge.dailyLimit && (
+              <button
+                type="button"
+                className="sp2-execute"
+                disabled={energyRecharge.pending}
+                onClick={energyRecharge.watch}
+              >
+                {energyRecharge.pending
+                  ? 'Opening ad…'
+                  : `Watch ad for +${SOCIAL_RECHARGE_ENERGY} Energy`}
+              </button>
+            )}
+          </section>
+        )}
 
         <div
           id="betrayals-social-body"
@@ -1014,6 +1046,7 @@ export function BetrayalsSocialPanel({
                         key={action.id}
                         action={{ ...action, baseCost: cost.energy }}
                         costs={cost}
+                        resourceIcons={BETRAYALS_RESOURCE_ICONS}
                         selected={action.id === selectedAction}
                         premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
                         onPremiumLockedClick={() => onUpgrade?.('realityMode')}

@@ -1,7 +1,12 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { ReactReduxContext } from 'react-redux'
 import type { AppDispatch, RootState } from '../../store/store'
-import { clearRewardHandler, showRewarded, type AdPlacement } from './adsService'
+import {
+  clearRewardHandler,
+  isAdDailyLimitReached,
+  showRewarded,
+  type AdPlacement,
+} from './adsService'
 
 /** Shared lifecycle for the formerly simulated, standalone reward buttons. */
 export function useRewardedAd() {
@@ -39,5 +44,7 @@ export function useRewardedAd() {
     },
     [context]
   )
-  return { pending, request }
+  const dailyLimitReached = (placement: AdPlacement) =>
+    !!context && isAdDailyLimitReached(placement, context.store.getState() as RootState)
+  return { pending, request, dailyLimitReached }
 }

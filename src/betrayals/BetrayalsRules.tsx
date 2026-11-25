@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
 import { MIN_BETRAYERS, phaseLabel } from './seasonPhases'
+import { SOCIAL_RECHARGE_ENERGY } from './socialResources'
 import './betrayalsRules.css'
 
 type HandbookChapter = {
@@ -92,9 +93,14 @@ const chapters: readonly HandbookChapter[] = [
           Shields protect against the Conclave. The game shows which protection you hold.
         </p>
         <p>
-          Social action cards tell you what each move costs. Reality Mode opens deeper guest reads
-          and more ways to act. My Pulse is your journal for the season, including accounts,
-          commitments and votes.
+          Social cards show what each move costs. Each morning restores some Energy. Check in for
+          Influence, or hear a suspicion and explore the castle for Info. You can still vote when
+          your reserves are empty. At zero Energy, an available optional ad can grant{' '}
+          {SOCIAL_RECHARGE_ENERGY} Energy once per real day.
+        </p>
+        <p>
+          Reality Mode opens deeper guest reads and more ways to act. My Pulse is your journal for
+          the season, including accounts, commitments and votes.
         </p>
         <p>
           If you’re eliminated, you can watch the season play out or return to a checkpoint when
