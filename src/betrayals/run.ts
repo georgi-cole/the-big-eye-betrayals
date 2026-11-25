@@ -195,11 +195,14 @@ export type Run = {
     }
     pendingTable?: TableReceipt
     conclaveVote?: { nominations: Ballot[]; runoff?: Ballot[] }
+    recruitmentSeed?: number
+    humanRecruitmentOffered?: true
     pendingNight?: {
       targetId: string | null
       blocked: boolean
       byDraw?: boolean
       filmPlayed?: boolean
+      recruitedId?: string
     }
   }
   publicSeed: number
@@ -316,6 +319,7 @@ export function startRun(
     private: {
       betrayers: seededPickN(privateRandom, seats, betrayerCount).map(({ id }) => id),
       nightShieldIds: [],
+      recruitmentSeed: Math.floor(privateRandom() * 2 ** 32),
     },
     publicSeed: entropy.publicSeed,
     pot: 0,
