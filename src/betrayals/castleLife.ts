@@ -97,6 +97,15 @@ export function openCastleMoment(run: Run, period: CastlePeriod): Run {
     previous.response.choice === 'rapport'
       ? previous.contactId
       : undefined
+  const broadcast = run.audience?.episode.day === run.day ? run.audience.episode : undefined
+  const audienceId =
+    broadcast?.decision?.kind === 'save'
+      ? broadcast.decision.shares[0]?.guestId
+      : broadcast?.decision?.kind === 'hot-seat'
+        ? broadcast.hotSeat?.speakerId
+        : broadcast?.decision?.kind === 'wager'
+          ? broadcast.decision.volunteerId
+          : undefined
   const state = investigationFor(run)
   const later = period !== 'breakfast'
   const leads = state.incidents.filter(
@@ -117,6 +126,8 @@ export function openCastleMoment(run: Run, period: CastlePeriod): Run {
       (context === 'tie' && !publicVote?.tiedByDraw) ||
       (context === 'after-vote' && !publicVote) ||
       (context === 'full-house' && lostId !== null) ||
+      (context === 'audience' &&
+        (!audienceId || audienceId === run.humanId || !isActiveGuest(run, audienceId))) ||
       (context === 'vote-shift' && !shift) ||
       (context === 'immunity' && (!run.immunityId || run.immunityId === run.humanId))
     )
@@ -152,8 +163,13 @@ export function openCastleMoment(run: Run, period: CastlePeriod): Run {
             ? shift?.previousTargetId
             : context === 'immunity'
               ? run.immunityId
-              : (incident?.guestId ?? subjects[Math.floor(random() * subjects.length)]?.id)
-      if ((context === 'vote' || context === 'immunity') && (!subjectId || subjectId === contactId))
+              : context === 'audience'
+                ? audienceId
+                : (incident?.guestId ?? subjects[Math.floor(random() * subjects.length)]?.id)
+      if (
+        (context === 'vote' || context === 'immunity' || context === 'audience') &&
+        (!subjectId || subjectId === contactId)
+      )
         return []
       const person = getSocialPersonality(contactId)
       const voice =

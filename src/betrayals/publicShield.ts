@@ -8,7 +8,12 @@ export function awardPublicShield(
   token: CommandToken,
   approval: Readonly<Record<string, number>>
 ): Run {
-  if (!isCurrentCommand(run, token) || !publicShieldPending(run)) return run
+  if (
+    run.audience?.episode.day === run.day ||
+    !isCurrentCommand(run, token) ||
+    !publicShieldPending(run)
+  )
+    return run
 
   const yesterday = run.publicShield?.day === run.day - 1 ? run.publicShield.id : undefined
   const ratings = run.seats

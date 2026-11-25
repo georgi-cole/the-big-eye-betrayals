@@ -262,6 +262,9 @@ function Settings({
           checked={seasonOptions.publicMode}
           onToggle={() => updatePreferences({ seasonPublicMode: !seasonOptions.publicMode })}
         />
+        <small>
+          Make a Vote Promise, answer the Hot Seat, or sway viewers during an Audience Save.
+        </small>
         <label className="betrayals-preference-select">
           <span>Reality Mode</span>
           <select

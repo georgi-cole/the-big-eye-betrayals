@@ -1,5 +1,6 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32 } from '../store/rng.ts'
+import { openAudienceEpisode } from './audienceSeason.ts'
 import { openInvestigationDay } from './castleIncidents.ts'
 import { openCastleMoment } from './castleLife.ts'
 import type { DayFlow } from './dayFlowState.ts'
@@ -32,7 +33,7 @@ export function openDayFlow(run: Run): Run {
   if (run.phase !== 'dawn') return run
   const flow = run.dayFlow?.day === run.day ? run.dayFlow : { day: run.day }
   const next: Run = { ...run, dayFlow: { ...flow, castleDay: true } }
-  return openCastleMoment(openInvestigationDay(next), 'breakfast')
+  return openCastleMoment(openAudienceEpisode(openInvestigationDay(next)), 'breakfast')
 }
 
 /** A normal check-in can uncover a real conversation the contact was part of. */

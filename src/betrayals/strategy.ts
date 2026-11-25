@@ -6,6 +6,7 @@ import { nightShieldReads } from './nightShields.ts'
 import { getSocialView, hasAlliance, relationship } from './perception.ts'
 import { hashId, viewFor } from './run.ts'
 import type { Ballot, Phase, Role, Run, SocialEntry, TableArgument } from './run.ts'
+import { audienceWagerPressure } from './audienceSeason.ts'
 
 type Perspective = {
   actorId: string
@@ -26,6 +27,7 @@ type Perspective = {
   shieldReads?: ReturnType<typeof nightShieldReads>
   spokenReports?: ReadonlySet<string>
   provisionalTarget?: string
+  wager?: ReturnType<typeof audienceWagerPressure>
   nightWitnesses?: readonly { speakerId: string; targetId: string }[]
   revealedBetrayer?: string
   finalePressure?: { id: string; strength: number }
@@ -72,6 +74,7 @@ export function resolutionPerspective(
       )
     ),
     provisionalTarget: run.dayFlow?.provisional?.[actorId],
+    wager: run.phase === 'round-table' ? audienceWagerPressure(run, actorId) : undefined,
     nightWitnesses: run.lastTable?.witnesses,
     revealedBetrayer: run.seats.find(
       ({ id, exit }) => id === run.lastTable?.banishedId && exit?.revealedRole === 'betrayer'
@@ -201,8 +204,9 @@ function scoreChoice(
   const selfPreservation = viability * danger * (0.12 + 0.23 * personality.strategicCalculation)
   const provisional =
     perspective.phase === 'round-table' && perspective.provisionalTarget === id ? 0.07 : 0
+  const wager = perspective.wager?.targetId === id ? perspective.wager.weight : 0
   const finale = perspective.finalePressure?.id === id ? perspective.finalePressure.strength : 0
-  return read + momentum + pact + selfPreservation + provisional + finale - bond * 0.22
+  return read + momentum + pact + selfPreservation + provisional + wager + finale - bond * 0.22
 }
 
 export function chooseTarget(perspective: Perspective, context: TargetContext): string | undefined {

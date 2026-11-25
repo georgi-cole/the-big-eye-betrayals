@@ -160,6 +160,7 @@ export type TableSway = {
 export type TableArgument = TableSway & {
   speakerId: string
   basis: 'impression' | 'conversation' | 'record'
+  broadcast?: 'wager' | 'back' | 'challenge'
 }
 
 export type CaseReview = {
@@ -220,6 +221,7 @@ export type Run = {
   publicShieldDecisionDay?: number
   votePlans?: import('./votePlans.ts').VotePlans
   audienceApproval?: Record<string, number>
+  audience?: import('./audienceSeason.ts').AudienceState
   dayFlow?: import('./dayFlowState.ts').DayFlow
   castleMoments?: import('./castleLifeBank.ts').CastleMoment[]
   runoffIds?: string[]
@@ -260,12 +262,26 @@ export function eligibleBanishmentTargets(run: Run, voterId: string): string[] {
 }
 
 export function publicShieldPending(
-  run: Pick<Run, 'phase' | 'day' | 'options' | 'publicShieldDecisionDay'>
+  run: Pick<Run, 'phase' | 'day' | 'options' | 'publicShieldDecisionDay' | 'dayFlow' | 'audience'>
 ) {
+  if (run.audience?.episode.day === run.day)
+    return audienceDecisionPending(run) && run.audience.episode.kind === 'save'
   return (
     (run.phase === 'after-immunity' || run.phase === 'round-table') &&
     run.options.publicMode &&
     run.publicShieldDecisionDay !== run.day
+  )
+}
+
+export function audienceDecisionPending(
+  run: Pick<Run, 'phase' | 'day' | 'options' | 'dayFlow' | 'audience'>
+) {
+  return Boolean(
+    run.dayFlow &&
+    run.options.publicMode &&
+    run.phase === 'after-immunity' &&
+    run.audience?.episode.day === run.day &&
+    !run.audience.episode.decision
   )
 }
 

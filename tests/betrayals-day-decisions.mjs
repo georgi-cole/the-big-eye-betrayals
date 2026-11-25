@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import {
+  addAudienceEvents,
+  openAudienceEpisode,
+  recordAudienceBallot,
+  resolveAudienceDecision,
+  WAGER_BONUS,
+} from '../src/betrayals/audienceSeason.ts'
 import { challengeContestantIds, resolveChallenge } from '../src/betrayals/challenges.ts'
 import { castleGlance, castleSocialMoment, playCastleChoice } from '../src/betrayals/castleLife.ts'
 import { CASTLE_SCENES } from '../src/betrayals/castleLifeBank.ts'
@@ -401,4 +408,101 @@ test('an invalidated vote pact and a direct shield request pause the correspondi
   )
   assert(kept.private.nightShieldIds.includes('me'))
   assert.equal(advanceDayAftermath(kept, commandToken(kept)).phase, 'round-table')
+})
+
+test('a lunch save from before the new Public Mode can still award the existing shield', () => {
+  const lunch = getToVotePlans(seed({ publicMode: true }))
+  const legacy = restore({ ...lunch, audience: undefined })
+  assert.strictEqual(advanceDayAftermath(legacy, commandToken(legacy)), legacy)
+  const revealed = restore(awardPublicShield(legacy, commandToken(legacy), { noa: 100 }))
+  assert.equal(revealed.publicShieldDecisionDay, legacy.day)
+  assert(revealed.publicShield?.id)
+  assert.equal(advanceDayAftermath(revealed, commandToken(revealed)).phase, 'social')
+})
+
+test('the Vote Promise follows the first ballot and deposits to the pot only once', () => {
+  const before = getToVotePlans(seed({ publicMode: true }))
+  assert.equal(before.audience.episode.kind, 'wager')
+  assert.strictEqual(awardPublicShield(before, commandToken(before), { noa: 100 }), before)
+  const wager = restore(
+    resolveAudienceDecision(before, commandToken(before), { kind: 'wager', targetId: 'finn' })
+  )
+  const ready = { ...wager, phase: 'round-table' }
+  const kept = restore(recordAudienceBallot(ready, [{ voterId: 'me', targetId: 'finn' }], []))
+  const switched = restore(recordAudienceBallot(ready, [{ voterId: 'me', targetId: 'pax' }], []))
+  assert.equal(kept.pot, ready.pot + WAGER_BONUS)
+  assert.equal(switched.pot, ready.pot)
+  assert.equal(switched.audience.episode.decision.result, 'switched')
+  assert.strictEqual(recordAudienceBallot(kept, [{ voterId: 'me', targetId: 'pax' }], []), kept)
+  assert.deepEqual(
+    ready.audience.events.filter(({ kind }) => kind === 'wager').map(({ targetId }) => targetId),
+    ['finn']
+  )
+})
+
+test('Hot Seat requires a public contradiction and the player’s public reply changes the relationship', () => {
+  const start = seed({ publicMode: true, day: 2 })
+  const prior = {
+    ...start,
+    day: 1,
+    audience: { ...start.audience, episode: { day: 1, kind: 'wager' } },
+  }
+  const aired = addAudienceEvents(prior, [
+    { kind: 'defend', actorId: 'finn', targetId: 'pax' },
+    { kind: 'ballot', actorId: 'finn', targetId: 'pax' },
+    { kind: 'case', actorId: 'noa', targetId: 'pax' },
+  ])
+  const tomorrow = openAudienceEpisode({ ...start, audience: aired.audience })
+  assert.equal(tomorrow.audience.episode.kind, 'hot-seat')
+  const before = { ...tomorrow, phase: 'after-immunity' }
+  const backing = restore(
+    resolveAudienceDecision(before, commandToken(before), { kind: 'hot-seat', reply: 'back' })
+  )
+  const challenging = restore(
+    resolveAudienceDecision(before, commandToken(before), { kind: 'hot-seat', reply: 'challenge' })
+  )
+  assert.equal(backing.social.at(-1).reaction, 'repaired')
+  assert.equal(challenging.social.at(-1).reaction, 'backfired')
+  assert.equal(challenging.audience.episode.hotSeat.influenceId, 'noa')
+})
+
+test('an on-camera endorsement can decide the Save without seeing any shield holders or roles', () => {
+  const start = seed({ publicMode: true, day: 3 })
+  const prior = {
+    ...start,
+    day: 2,
+    audience: { ...start.audience, episode: { day: 2, kind: 'wager' } },
+  }
+  const aired = addAudienceEvents(prior, [
+    { kind: 'defend', actorId: 'noa', targetId: 'finn' },
+    { kind: 'defend', actorId: 'pax', targetId: 'finn' },
+    { kind: 'defend', actorId: 'rey', targetId: 'finn' },
+    { kind: 'wager', actorId: 'noa', targetId: 'finn' },
+  ])
+  const current = openAudienceEpisode({ ...start, audience: aired.audience })
+  assert.equal(current.audience.episode.kind, 'save')
+  const before = { ...current, phase: 'after-immunity', immunityId: 'rey' }
+  const alone = resolveAudienceDecision(before, commandToken(before), { kind: 'save' })
+  const endorse = (run) =>
+    restore(resolveAudienceDecision(run, commandToken(run), { kind: 'save', guestId: 'pax' }))
+  const backed = endorse(before)
+  const differentSecrets = {
+    ...before,
+    private: { ...before.private, betrayers: ['pax', 'noa', 'me'], nightShieldIds: ['finn'] },
+  }
+  assert.deepEqual(endorse(differentSecrets).audience, backed.audience)
+  assert.equal(alone.publicShield.id, 'noa')
+  assert.equal(backed.publicShield.id, 'pax')
+  assert.equal(eligibleBanishmentTargets(backed, 'me').includes('pax'), false)
+  const { shares, reasons } = backed.audience.episode.decision
+  assert.equal(Math.round(shares.reduce((sum, entry) => sum + entry.percent, 0) * 10), 1000)
+  assert.equal(
+    shares.some(({ guestId }) => guestId === 'rey'),
+    false
+  )
+  assert.ok(
+    reasons.every((event) =>
+      backed.audience.events.some((aired) => JSON.stringify(aired) === JSON.stringify(event))
+    )
+  )
 })

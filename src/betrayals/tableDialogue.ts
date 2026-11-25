@@ -178,7 +178,24 @@ export function tableDialogue(run: Run, argumentsAtTable: readonly TableArgument
   let firmCount = 0
   return argumentsAtTable
     .filter(({ evidence }) => evidence === undefined)
-    .map(({ speakerId, targetId, stance, tone, basis }) => {
+    .map(({ speakerId, targetId, stance, tone, basis, broadcast }) => {
+      if (broadcast)
+        return {
+          speakerId,
+          targetId,
+          verb:
+            broadcast === 'wager'
+              ? 'pledges to vote for'
+              : broadcast === 'back'
+                ? 'backs'
+                : 'challenges',
+          argument:
+            broadcast === 'wager'
+              ? `I named ${names.get(targetId)} on air. If I keep that vote, the audience adds to the pot.`
+              : broadcast === 'back'
+                ? 'I heard the answer on air. Changing your mind can be an honest move.'
+                : 'I challenged that answer on air. I still want a clearer account of what happened.',
+        }
       const votedForMe = run.lastTable?.revealedBallots?.some(
         ({ voterId, targetId: votedFor }) => voterId === targetId && votedFor === speakerId
       )

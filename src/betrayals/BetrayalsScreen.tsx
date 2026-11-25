@@ -29,8 +29,11 @@ import {
   setDurableItem,
 } from '../store/durablePersistence'
 import { currentAudienceApproval } from './audience'
+import { audienceSaveCandidates, resolveAudienceDecision } from './audienceSeason'
+import type { AudienceMove } from './audienceSeason'
 import { finaleMemory, openDayFlow, recordFinalePosition } from './dayFlow'
-import { daySocialContext } from './dayFlowView'
+import { BetrayalsAudienceActions, BetrayalsAudienceResults } from './BetrayalsAudienceBroadcast'
+import { audienceAnnouncement, audienceReadout, daySocialContext } from './dayFlowView'
 import { castleGlance } from './castleLife'
 import { CASTLE_CHOICES } from './castleLifeBank'
 import { waitingShieldWitnesses } from './investigationRecords'
@@ -59,6 +62,7 @@ import { getBetrayalsPortrait, useBetrayalsUtilities } from './betrayalsPreferen
 import type { Run, Phase, RealityPreset, SocialEntry } from './run'
 import {
   acknowledgeRole,
+  audienceDecisionPending,
   commandToken,
   eligibleBanishmentTargets,
   publicShieldPending,
@@ -643,7 +647,17 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const stageTitle = titleFor(run)
   const stageGroup = (castleDay && castlePhaseLabels[stage]?.[0]) || phaseGroupLabel[stage]
   const votePhase = stage === 'round-table' || stage === 'final-banishment'
-  const audiencePending = publicShieldPending(run)
+  const liveAudience = audienceDecisionPending(run)
+  const audienceOnAir = stage === 'after-immunity' && run.audience?.episode.day === run.day
+  const audiencePending = !audienceOnAir && publicShieldPending(run)
+  const audienceTargets =
+    liveAudience && participating
+      ? run.audience?.episode.kind === 'save'
+        ? audienceSaveCandidates(run).filter((id) => id !== run.humanId)
+        : run.audience?.episode.kind === 'wager'
+          ? eligibleBanishmentTargets(run, run.humanId)
+          : undefined
+      : undefined
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
   const conclave = getConclaveView(run, viewerId, selected)
@@ -849,6 +863,10 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     })
   }
 
+  function makeAudienceMove(move: AudienceMove) {
+    apply((active) => resolveAudienceDecision(active, token, move, !participating))
+  }
+
   async function finishChallenge(
     score?: number,
     tieBreak?: number,
@@ -969,20 +987,37 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       }
       break
     case 'after-immunity':
-      message = run.immunityId ? `${label(run.immunityId)} won Immunity.` : 'Guests are at lunch.'
-      detail = audiencePending
-        ? 'Reveal the audience’s choice before agreeing to a vote.'
-        : publicShieldId
-          ? `${label(publicShieldId)} received the Public Shield.`
-          : (glance ??
-            (participating && pendingIncoming.length
-              ? 'Check your Inbox for private vote plans.'
-              : 'Guests can make private vote promises here.'))
+      message =
+        audienceOnAir && liveAudience
+          ? audienceReadout(run, participating, selected)
+          : run.immunityId
+            ? `${label(run.immunityId)} won Immunity.`
+            : 'Guests are at lunch.'
+      detail = liveAudience
+        ? !cue && (
+            <BetrayalsAudienceActions
+              run={run}
+              participating={participating}
+              selected={selected}
+              onMove={makeAudienceMove}
+            />
+          )
+        : audienceOnAir
+          ? audienceReadout(run, participating, selected)
+          : audiencePending
+            ? "Reveal the audience's choice before agreeing to a vote."
+            : publicShieldId
+              ? `${label(publicShieldId)} received the Public Shield.`
+              : (glance ??
+                (participating && pendingIncoming.length
+                  ? 'Check your Inbox for private vote plans.'
+                  : 'Guests can make private vote promises here.'))
       play = audiencePending
         ? { label: 'Reveal Public Shield', faceLabel: 'Reveal', onClick: revealPublicShield }
         : {
             label: castleDay ? 'Enter the castle afternoon' : 'Continue to Safety',
-            faceLabel: castleDay ? 'Afternoon' : 'Safety',
+            faceLabel: liveAudience ? 'On air' : castleDay ? 'Afternoon' : 'Safety',
+            disabled: liveAudience,
             onClick: () => apply((active) => advanceDayAftermath(active, token)),
           }
       break
@@ -1374,10 +1409,16 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         </header>
 
         <BetrayalsBroadcast
-          title={conclave ? 'The Conclave' : stageTitle}
+          title={
+            conclave
+              ? 'The Conclave'
+              : liveAudience
+                ? (audienceAnnouncement(run) ?? stageTitle)
+                : stageTitle
+          }
           message={message}
           detail={detail}
-          interactive={Boolean(tableFeed)}
+          interactive={Boolean(tableFeed) || liveAudience}
           controlsRef={
             !cue && (counting || stage === 'cocktail') ? setVoteActionsTarget : undefined
           }
@@ -1431,7 +1472,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               stage === 'night-resolved' ||
               shownCue === 'awakening'
             }
-            selectableIds={targets.length ? targets : undefined}
+            selectableIds={audienceTargets ?? (targets.length ? targets : undefined)}
             runoffIds={votePhase ? run.runoffIds : undefined}
             announcedNightId={announcedNightId}
             compactExitId={compactExit ? cinematic.subject?.id : undefined}
@@ -1478,6 +1519,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             entries={gameLogFor(run)}
             view={pulseView(run)}
             initial={pulse}
+            todaySummary={<BetrayalsAudienceResults run={run} />}
             onClose={() => setPulse(undefined)}
             onAction={investigate}
             investigation={investigation}

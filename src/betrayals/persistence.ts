@@ -10,6 +10,7 @@ import {
 import type { Run, Seat } from './run.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import { validSeasonCheckpoint, type SeasonRewards } from './seasonRewards.ts'
+import { AUDIENCE_EVENTS, AUDIENCE_FORMATS, HOT_SEAT_ANSWERS } from './audienceSeason.ts'
 import { CASTLE_PERIODS, CASTLE_SCENES } from './castleLifeBank.ts'
 import type { CastleSceneId } from './castleLifeBank.ts'
 import { MORNING_MOVES, SAFETY_MOVES, SHIELD_MOVES, VOTE_MOVES } from './dayFlowState.ts'
@@ -549,6 +550,8 @@ function validTableArguments(value: unknown, ids: Set<string>, reports?: unknown
       (argument.basis !== 'impression' &&
         argument.basis !== 'conversation' &&
         argument.basis !== 'record') ||
+      (argument.broadcast !== undefined &&
+        !['wager', 'back', 'challenge'].includes(String(argument.broadcast))) ||
       (argument.evidence !== undefined &&
         argument.evidence !== 'call-witness' &&
         argument.evidence !== 'name-source') ||
@@ -758,6 +761,82 @@ function validCastleMoments(
   })
 }
 
+function validAudience(value: unknown, ids: Set<string>, day: number) {
+  if (value === undefined) return true
+  const audience = asObject(value)
+  const episode = asObject(audience?.episode)
+  const guest = (id: unknown) => typeof id === 'string' && ids.has(id)
+  const optionalGuest = (id: unknown) => id === undefined || guest(id)
+  function validEvent(value: unknown): boolean {
+    const event = asObject(value)
+    return (
+      !!event &&
+      onOrBefore(event.day, day) &&
+      guest(event.actorId) &&
+      optionalGuest(event.targetId) &&
+      AUDIENCE_EVENTS.some((kind) => kind === event.kind)
+    )
+  }
+  if (
+    !audience ||
+    !episode ||
+    !onOrBefore(episode.day, day) ||
+    !AUDIENCE_FORMATS.some((kind) => kind === episode.kind) ||
+    !Array.isArray(audience.events) ||
+    audience.events.length > 320 ||
+    !audience.events.every(validEvent) ||
+    (audience.lastSaveDay !== undefined && !onOrBefore(audience.lastSaveDay, day)) ||
+    (audience.ballotDay !== undefined && !onOrBefore(audience.ballotDay, day))
+  )
+    return false
+  if (episode.kind === 'hot-seat') {
+    const seat = asObject(episode.hotSeat)
+    if (
+      !seat ||
+      !guest(seat.speakerId) ||
+      !guest(seat.defendedId) ||
+      seat.defendedId !== seat.votedId ||
+      !optionalGuest(seat.influenceId)
+    )
+      return false
+  }
+  if (episode.decision === undefined) return true
+  const decision = asObject(episode.decision)
+  if (!decision || decision.kind !== episode.kind) return false
+  if (decision.kind === 'wager')
+    return (
+      optionalGuest(decision.volunteerId) &&
+      optionalGuest(decision.targetId) &&
+      (decision.result === undefined ||
+        decision.result === 'kept' ||
+        decision.result === 'switched' ||
+        decision.result === 'void')
+    )
+  if (decision.kind === 'hot-seat')
+    return (
+      HOT_SEAT_ANSWERS.some((answer) => answer === decision.answer) &&
+      optionalGuest(decision.respondentId) &&
+      (decision.reply === undefined || decision.reply === 'back' || decision.reply === 'challenge')
+    )
+  return (
+    Array.isArray(decision.shares) &&
+    decision.shares.length <= CAST_SIZE &&
+    decision.shares.every((value) => {
+      const share = asObject(value)
+      return (
+        !!share &&
+        guest(share.guestId) &&
+        typeof share.percent === 'number' &&
+        share.percent >= 0 &&
+        share.percent <= 100
+      )
+    }) &&
+    Array.isArray(decision.reasons) &&
+    decision.reasons.length <= 2 &&
+    decision.reasons.every(validEvent)
+  )
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
@@ -799,6 +878,7 @@ function isRun(value: unknown): value is Run {
     typeof item.humanId === 'string' &&
     ids.has(item.humanId) &&
     validDayFlow(item.dayFlow, ids, item.day, reports) &&
+    validAudience(item.audience, ids, item.day) &&
     validBetrayalsEconomy(item.economy, item.id) &&
     (item.pendingAdBreak === undefined ||
       (adBreak &&
