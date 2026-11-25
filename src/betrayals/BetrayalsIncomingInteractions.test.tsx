@@ -45,7 +45,7 @@ describe('Betrayals incoming inbox', () => {
           onClose={() => {}}
           onRespond={(id, response) => {
             onMove(id, response)
-            if (response === 'request-shield' || response === 'ask-shield-plans') return
+            if (response !== 'engage' && response !== 'listen' && response !== 'dismiss') return
             setItems((current) =>
               current.map((item) => (item.id === id ? { ...item, response } : item))
             )
@@ -86,5 +86,65 @@ describe('Betrayals incoming inbox', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close inbox' }))
     expect(onClose).toHaveBeenCalledOnce()
     expect(onRespond).not.toHaveBeenCalled()
+  })
+
+  it('shows numeric costs with matching resource symbols and opens Intel from the reply row', () => {
+    const onOpenIntel = vi.fn()
+    const moment: IncomingInteraction = {
+      id: 'castle',
+      kind: 'castle-moment',
+      speaker: offer.speaker,
+      text: 'Someone was in the library.',
+      castleMoment: {
+        id: 'castle',
+        required: false,
+        guestId: offer.speaker.id,
+        title: 'Over cocktails',
+        opening: 'Someone was in the library.',
+        options: [
+          {
+            action: 'ask-about',
+            label: 'Ask who was there',
+            cost: { energy: 1, influence: 2, info: 0 },
+            reason: 'Requires 2 Influence.',
+          },
+        ],
+        callback: undefined,
+        callbackGuestId: undefined,
+        reportGuestId: undefined,
+        reportText: undefined,
+        response: undefined,
+      },
+    }
+    const props = { onClose: vi.fn(), onRespond: vi.fn(), onOpenIntel }
+    const { rerender } = render(
+      <BetrayalsIncomingInteractions interactions={[moment]} {...props} />
+    )
+    const reply = within(screen.getByRole('button', { name: /^Ask who was there/ }))
+    expect(reply.getByRole('img', { name: '1 Energy' })).toHaveTextContent('⚡ 1')
+    expect(reply.getByRole('img', { name: '2 Influence' })).toHaveTextContent('🗣️ 2')
+    expect(reply.queryByText('Requires 2 Influence.')).toBeNull()
+    rerender(
+      <BetrayalsIncomingInteractions
+        interactions={[
+          {
+            ...moment,
+            response: 'engage',
+            castleMoment: {
+              ...moment.castleMoment!,
+              options: [],
+              response: 'observed',
+              reportGuestId: 'opal',
+            },
+          },
+        ]}
+        {...props}
+      />
+    )
+    fireEvent.click(screen.getByText('History · 1'))
+    const intel = screen.getByRole('button', { name: 'Open in Intel' })
+    expect(intel.parentElement?.parentElement).toHaveTextContent('Your sighting is in Intel.')
+    fireEvent.click(intel)
+    expect(onOpenIntel).toHaveBeenCalledWith('opal')
   })
 })

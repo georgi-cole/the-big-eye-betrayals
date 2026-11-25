@@ -37,19 +37,21 @@ function CountFeed({
   seats,
   reducedMotion,
   onComplete,
+  recap,
 }: {
   count: TableCount
   actionsTarget?: HTMLElement | null
   seats: readonly Seat[]
   reducedMotion?: boolean
   onComplete?: () => void
+  recap?: string
 }) {
   const { ballots, round, tiedIds } = count
   const perShot = Math.ceil(ballots.length / 4)
   const shots = Math.ceil(ballots.length / Math.max(1, perShot))
   const [shot, setShot] = useState(0)
   const [reviewOpen, setReviewOpen] = useState(false)
-  const complete = Boolean(reducedMotion) || shot > shots || !shots
+  const complete = Boolean(recap || reducedMotion) || shot > shots || !shots
   const visible = complete ? ballots.length : Math.min(shot * perShot, ballots.length)
   const notified = useRef(false)
   const revealed = ballots.slice(0, visible)
@@ -94,57 +96,59 @@ function CountFeed({
       <svg viewBox="0 0 20 20" aria-hidden="true">
         <path d="M5 3h10v14H5zM8 7h4m-4 3h4m-4 3h4" />
       </svg>
-      View all votes
+      {recap ? 'Review the vote' : 'View all votes'}
     </button>
   )
 
   return (
     <>
-      <section
-        className="round-table-feed round-table-feed--count"
-        aria-label="Round Table vote count"
-      >
-        <div className="round-table-feed__lineup">
-          {leaders.length > 0 && (
-            <ol className="round-table-feed__leaders" aria-label="Current vote leaders">
-              {leaders.map(({ id, votes }) => {
-                const seat = seats.find((guest) => guest.id === id)
-                const name = seat?.name ?? 'Contestant'
-                return (
-                  <li key={id}>
-                    <span className="round-table-feed__portrait" aria-hidden="true">
-                      {seat?.portrait ? <img src={seat.portrait} alt="" /> : name.slice(0, 1)}
-                    </span>
-                    <span className="round-table-feed__name" title={name}>
-                      {name}
-                    </span>
-                    <strong key={votes} aria-label={`${votes} ${votes === 1 ? 'vote' : 'votes'}`}>
-                      {votes}
-                    </strong>
-                  </li>
-                )
-              })}
-            </ol>
-          )}
-          {!leaders.length && hiddenTie && (
-            <p className="round-table-feed__tie">{hiddenTie.size}-way tie for the lead</p>
-          )}
-        </div>
-        <div className="round-table-feed__footer">
-          <p className="round-table-feed__summary" role="status">
-            {complete && tiedIds.length > 0
-              ? round >= MAX_TABLE_ROUNDS
-                ? `Draw among ${tiedIds.length} tied guests`
-                : leaders.length
-                  ? `Runoff among ${tiedIds.length} tied guests`
-                  : 'Runoff'
-              : null}
-            {complete && tiedIds.length === 0 && (
-              <span className="round-table-feed__sr-only">The count is complete.</span>
+      {!recap && (
+        <section
+          className="round-table-feed round-table-feed--count"
+          aria-label="Round Table vote count"
+        >
+          <div className="round-table-feed__lineup">
+            {leaders.length > 0 && (
+              <ol className="round-table-feed__leaders" aria-label="Current vote leaders">
+                {leaders.map(({ id, votes }) => {
+                  const seat = seats.find((guest) => guest.id === id)
+                  const name = seat?.name ?? 'Contestant'
+                  return (
+                    <li key={id}>
+                      <span className="round-table-feed__portrait" aria-hidden="true">
+                        {seat?.portrait ? <img src={seat.portrait} alt="" /> : name.slice(0, 1)}
+                      </span>
+                      <span className="round-table-feed__name" title={name}>
+                        {name}
+                      </span>
+                      <strong key={votes} aria-label={`${votes} ${votes === 1 ? 'vote' : 'votes'}`}>
+                        {votes}
+                      </strong>
+                    </li>
+                  )
+                })}
+              </ol>
             )}
-          </p>
-        </div>
-      </section>
+            {!leaders.length && hiddenTie && (
+              <p className="round-table-feed__tie">{hiddenTie.size}-way tie for the lead</p>
+            )}
+          </div>
+          <div className="round-table-feed__footer">
+            <p className="round-table-feed__summary" role="status">
+              {complete && tiedIds.length > 0
+                ? round >= MAX_TABLE_ROUNDS
+                  ? `Draw among ${tiedIds.length} tied guests`
+                  : leaders.length
+                    ? `Runoff among ${tiedIds.length} tied guests`
+                    : 'Runoff'
+                : null}
+              {complete && tiedIds.length === 0 && (
+                <span className="round-table-feed__sr-only">The count is complete.</span>
+              )}
+            </p>
+          </div>
+        </section>
+      )}
       {actionsTarget === undefined
         ? reviewButton
         : actionsTarget && createPortal(reviewButton, actionsTarget)}
@@ -163,10 +167,11 @@ function CountFeed({
             {reviewOpen ? (
               <div className="round-table-ballot__frame round-table-ballot__frame--review">
                 <header className="round-table-ballot__header">
-                  <span>Round {round} votes</span>
+                  <span>{recap ? 'Final ballot' : `Round ${round} votes`}</span>
                   <strong>{ballots.length} counted</strong>
                 </header>
                 <div className="round-table-ballot__ledger" tabIndex={0}>
+                  {recap && <p className="round-table-ballot__recap">{recap}</p>}
                   <ul className="round-table-ballot__ranking" aria-label="All vote totals">
                     {totals.map(({ id, votes }) => (
                       <li key={id}>
@@ -189,7 +194,7 @@ function CountFeed({
                 </div>
                 <GameBackButton
                   className="round-table-feed__utility"
-                  label="Return to vote totals"
+                  label={recap ? 'Back to Cocktails' : 'Return to vote totals'}
                   showLabel
                   onClick={() => setReviewOpen(false)}
                 />
@@ -254,6 +259,25 @@ export function RoundTableFeed(props: RoundTableFeedProps) {
   const { run, reducedMotion, onCountComplete, actionsTarget } = props
   const systemReducedMotion = usePresentationReducedMotion()
   const immediate = reducedMotion || systemReducedMotion
+  if (run.phase === 'cocktail' && run.lastTable?.blind === false) {
+    const { revealedBallots, banishedId, tiedByDraw, tally } = run.lastTable
+    const guest = run.seats.find(({ id }) => id === banishedId)
+    const role = guest?.exit?.revealedRole
+    const count = tally[banishedId] ?? 0
+    const result = tiedByDraw
+      ? 'A draw decided the banishment.'
+      : `${count} votes decided the banishment.`
+    if (!revealedBallots?.length) return null
+    return (
+      <CountFeed
+        key={`${run.id}:${run.day}:cocktail`}
+        count={{ round: 1, ballots: revealedBallots, tiedIds: [] }}
+        seats={run.seats}
+        actionsTarget={actionsTarget}
+        recap={`${guest?.name ?? 'A guest'} was banished.${role ? ` They were a ${role === 'betrayer' ? 'Betrayer' : 'Loyal'}.` : ''} ${result}`}
+      />
+    )
+  }
   if (run.tableCount) {
     return (
       <CountFeed

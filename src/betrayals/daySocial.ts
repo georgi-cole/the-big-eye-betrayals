@@ -8,13 +8,19 @@ import { relationship } from './perception.ts'
 import { applySocialMove, getSocialView, hasAlliance, hasSocialStrain } from './social.ts'
 import type { SocialMove } from './social.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
+import { closeCastleMoment } from './castleLife.ts'
+import { hasRequiredIncoming } from './incoming.ts'
+import { settleUnansweredVoteOffers } from './votePlans.ts'
 
 export function advanceDayBeat(run: Run): Run {
-  if (run.phase === 'dawn') return openInvestigationDay(advancePreparation(run, commandToken(run)))
-  if (run.phase !== 'social') return run
-  let active = run
+  if (run.phase === 'dawn' && !run.dayFlow?.castleDay)
+    return openInvestigationDay(advancePreparation(run, commandToken(run)))
+  if (run.phase !== 'social' && run.phase !== 'dawn') return run
+  if (run.presentation?.length || hasRequiredIncoming(run)) return run
+  let active = closeCastleMoment(run)
   const preset = run.options.realityMode
-  const rng = mulberry32(run.publicSeed ^ (run.day * 917))
+  const afternoon = run.phase === 'social' && run.dayFlow?.castleDay
+  const rng = mulberry32(run.publicSeed ^ (run.day * 917) ^ (afternoon ? 40343 : 0))
   const seats = run.seats.filter(({ exit }) => !exit)
   const actors = seats.filter(({ id }) => id !== run.humanId)
   const count =
@@ -84,6 +90,19 @@ export function advanceDayBeat(run: Run): Run {
       active = next
       break
     }
+  }
+  if (afternoon) active = settleUnansweredVoteOffers(active)
+  if (active.dayFlow && !afternoon) {
+    const provisional = Object.fromEntries(
+      actors.flatMap(({ id }) => {
+        const target = chooseTarget(
+          resolutionPerspective(active, id, eligibleBanishmentTargets(active, id)),
+          'table'
+        )
+        return target ? [[id, target]] : []
+      })
+    )
+    active = { ...active, dayFlow: { ...active.dayFlow, provisional } }
   }
   return advancePreparation(active, commandToken(active))
 }

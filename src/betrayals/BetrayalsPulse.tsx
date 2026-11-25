@@ -6,6 +6,9 @@ import { compareReportAccounts } from './investigationEvidence'
 import type { InvestigationAction } from './investigation'
 import type { GameLogEntry } from './gameLog'
 import { InvestigationAccountCard } from './InvestigationAccountCard'
+import { InvestigationButton } from './BetrayalsInvestigationOptions'
+import type { InvestigationControls } from './socialInvestigation'
+import { isVoteClaim, witnessReply } from './investigationRecords'
 import type { pulseView } from './pulseView'
 import './betrayals-pulse.css'
 
@@ -80,14 +83,15 @@ function Commitments({
           </span>
         </li>
       ))}
-      {witnesses.map(({ reportId, accepted, day: askedDay }) => {
+      {witnesses.map((request) => {
+        const { reportId, day: askedDay } = request
         const account = accounts.find(({ id }) => id === reportId)
         if (!account?.speakerId) return null
         return (
           <li key={`${askedDay}:${reportId}`}>
             <strong>{name(account.speakerId)} · witness</strong>
             <span>
-              Day {askedDay} · {accepted ? 'Agreed to speak' : 'Declined to speak'}
+              Day {askedDay} · {witnessReply(request)}
             </span>
           </li>
         )
@@ -155,6 +159,7 @@ export function BetrayalsPulse({
   initial,
   onClose,
   onAction,
+  investigation,
 }: {
   day: number
   humanId: string
@@ -163,6 +168,7 @@ export function BetrayalsPulse({
   initial: PulseLocation
   onClose: () => void
   onAction: (action: InvestigationAction) => void
+  investigation?: InvestigationControls
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [tab, setTab] = useState(initial.tab)
@@ -357,26 +363,49 @@ export function BetrayalsPulse({
               </details>
             )}
             <div className="pulse-accounts">
-              {accounts.map((account) => (
-                <InvestigationAccountCard key={account.id} account={account} name={name} inPulse>
-                  <button
-                    type="button"
-                    aria-pressed={view.saved.includes(account.id)}
-                    onClick={() => onAction({ kind: 'save', reportId: account.id })}
-                  >
-                    {view.saved.includes(account.id) ? 'Saved' : 'Save'}
-                  </button>
-                  {account.claim && (
+              {accounts.map((account) => {
+                const request = view.witnesses.find(
+                  ({ day: askedDay, reportId }) => askedDay === day && reportId === account.id
+                )
+                const witness =
+                  account.access === 'firsthand' &&
+                  account.speakerId &&
+                  isVoteClaim(account.claim) &&
+                  !account.claim.denies
+                return (
+                  <InvestigationAccountCard key={account.id} account={account} name={name} inPulse>
                     <button
                       type="button"
-                      aria-pressed={compareIds.includes(account.id)}
-                      onClick={() => chooseForComparison(account.id)}
+                      aria-pressed={view.saved.includes(account.id)}
+                      onClick={() => onAction({ kind: 'save', reportId: account.id })}
                     >
-                      Compare
+                      {view.saved.includes(account.id) ? 'Saved' : 'Save'}
                     </button>
-                  )}
-                </InvestigationAccountCard>
-              ))}
+                    {account.claim && (
+                      <button
+                        type="button"
+                        aria-pressed={compareIds.includes(account.id)}
+                        onClick={() => chooseForComparison(account.id)}
+                      >
+                        Compare
+                      </button>
+                    )}
+                    {witness &&
+                      (request ? (
+                        <small>{witnessReply(request)}</small>
+                      ) : (
+                        investigation?.open && (
+                          <InvestigationButton
+                            investigation={investigation}
+                            action={{ kind: 'witness', reportId: account.id }}
+                          >
+                            Ask to testify
+                          </InvestigationButton>
+                        )
+                      ))}
+                  </InvestigationAccountCard>
+                )
+              })}
               {!accounts.length && (
                 <p className="pulse-empty">
                   {savedOnly

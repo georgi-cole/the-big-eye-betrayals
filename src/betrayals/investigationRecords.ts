@@ -40,6 +40,7 @@ export const IMPRESSIONS = [
 /** A claim describes what the speaker says happened, even when they are wrong. */
 export type SocialClaim = {
   day: number
+  period?: 'afternoon'
   behavior?: (typeof SOCIAL_BEHAVIORS)[number]
   room?: (typeof CASTLE_ROOMS)[number]
   mood?: (typeof DEMEANORS)[number]
@@ -101,6 +102,25 @@ export type WitnessRequest = {
   day: number
   reportId: string
   accepted: boolean
+  shield?: 'pending' | 'met' | 'unmet'
+}
+
+export function witnessReply(request: WitnessRequest) {
+  if (request.shield === 'pending') return 'Will speak if protected at Night'
+  if (request.shield === 'unmet') return 'Withheld testimony without Night protection'
+  return request.accepted ? 'Agreed to speak' : 'Declined to speak'
+}
+
+export function waitingShieldWitnesses(run: Run): string[] {
+  const { reports, witnesses } = investigationFor(run)
+  const ids = witnesses.flatMap(({ day, reportId, shield }) => {
+    if (day !== run.day || shield !== 'pending') return []
+    const source = reports.find(({ id }) => id === reportId)?.speakerId
+    return source && isActiveGuest(run, source) ? [source] : []
+  })
+  const legacy = run.dayFlow?.witness
+  if (legacy?.needsShield && legacy.ready === undefined) ids.push(legacy.guestId)
+  return Array.from(new Set(ids))
 }
 
 export type PersonalRead = {

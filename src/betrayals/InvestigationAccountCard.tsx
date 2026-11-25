@@ -24,7 +24,10 @@ export function InvestigationAccountCard({
     >
       <header className={inPulse ? 'house-pulse__card-top' : undefined}>
         <span>{accountLabel(account)}</span>
-        <span>Day {account.claim?.day ?? account.day}</span>
+        <span>
+          Day {account.claim?.day ?? account.day}
+          {account.claim?.period === 'afternoon' ? ' · Afternoon' : ''}
+        </span>
       </header>
       <p>{accountText(account, name)}</p>
       {(account.speakerId || account.nearbyId) && (

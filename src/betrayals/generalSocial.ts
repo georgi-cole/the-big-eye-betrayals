@@ -37,7 +37,16 @@ export function generalSocialOpen(
     !run.result &&
     !run.tableCount &&
     !run.runoffIds &&
-    ['dawn', 'social', 'immunity', 'safety', 'round-table'].includes(run.phase)
+    [
+      'dawn',
+      'social',
+      'immunity',
+      'after-immunity',
+      'safety',
+      'shield-deals',
+      'round-table',
+      'cocktail',
+    ].includes(run.phase)
   )
 }
 

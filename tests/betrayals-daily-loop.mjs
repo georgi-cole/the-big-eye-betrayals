@@ -4,10 +4,15 @@ import {
   acknowledgeRole,
   advancePreparation,
   commandToken,
+  eligibleBanishmentTargets,
   startRun,
   viewFor,
 } from '../src/betrayals/run.ts'
 import { challengeContestantIds, resolveChallenge } from '../src/betrayals/challenges.ts'
+import { advanceDayAftermath } from '../src/betrayals/dayAftermath.ts'
+import { getIncomingInteractions, respondToIncomingInteraction } from '../src/betrayals/incoming.ts'
+import { nightShieldWindowOpen } from '../src/betrayals/nightShields.ts'
+import { awardPublicShield } from '../src/betrayals/publicShield.ts'
 import {
   advanceTableRound,
   buildTableBallots,
@@ -35,6 +40,7 @@ function createRun() {
 
 function afterOpening() {
   let run = createRun()
+  run = { ...run, options: { ...run.options, publicMode: false } }
   run = acknowledgeRole(run, commandToken(run))
   run = advancePreparation(run, commandToken(run))
   return advancePreparation(run, commandToken(run))
@@ -75,24 +81,127 @@ test('daily awards protect distinct players and accept the recorded scores once'
   const champion = run.seats[0].id
   const originalToken = commandToken(run)
   const first = resolveChallenge(run, originalToken, score(run, [champion]))
+  assert.equal(first.phase, 'after-immunity')
   assert.equal(first.immunityId, champion)
   assert.equal(first.pot, 650)
-  assert.equal(challengeContestantIds(first).length, 24)
-  assert.ok(!challengeContestantIds(first).includes(champion))
+  assert.deepEqual(challengeContestantIds(first), [])
   assert.strictEqual(resolveChallenge(first, originalToken, score(run, [champion])), first)
   assert.strictEqual(resolveChallenge(first, commandToken(first), score(first, []).slice(1)), first)
+  const safety = advanceDayAftermath(reload(first), commandToken(first))
+  assert.equal(safety.phase, 'safety')
+  assert.equal(challengeContestantIds(safety).length, 24)
+  assert.ok(!challengeContestantIds(safety).includes(champion))
   const leaders = run.seats.slice(1, 3).map(({ id }) => id)
-  const next = resolveChallenge(first, commandToken(first), score(first, leaders))
+  const next = resolveChallenge(safety, commandToken(safety), score(safety, leaders))
+  assert.equal(next.phase, 'shield-deals')
   assert.deepEqual(next.private.nightShieldIds, leaders)
   assert.equal(next.pot, 1300)
-  assert.ok(tableTargets(next, champion).includes(leaders[0]))
-  assert.ok(!tableTargets(next, leaders[0]).includes(champion))
+  assert.deepEqual(tableTargets(next, champion), [])
+  const table = advanceDayAftermath(reload(next), commandToken(next))
+  assert.ok(tableTargets(table, champion).includes(leaders[0]))
+  assert.ok(!tableTargets(table, leaders[0]).includes(champion))
+  assert.strictEqual(advanceDayAftermath(table, commandToken(next)), table)
+})
+
+test('an audience shield prompts a revised private promise that survives reload and settles at the ballot', () => {
+  const base = afterOpening()
+  const [human, partner, protectedGuest, winner] = base.seats
+  const run = {
+    ...base,
+    options: { ...base.options, publicMode: true },
+    social: [
+      {
+        day: base.day,
+        actorId: human.id,
+        recipientId: partner.id,
+        kind: 'vote-plan',
+        suspectId: protectedGuest.id,
+        accepted: true,
+      },
+    ],
+  }
+  const aftermath = resolveChallenge(run, commandToken(run), score(run, [winner.id]))
+  assert.strictEqual(advanceDayAftermath(aftermath, commandToken(aftermath)), aftermath)
+  assert.deepEqual(getIncomingInteractions(aftermath), [])
+  const announced = awardPublicShield(aftermath, commandToken(aftermath), {
+    [protectedGuest.id]: 100,
+  })
+  assert.equal(announced.publicShield.id, protectedGuest.id)
+  assert.strictEqual(awardPublicShield(announced, commandToken(announced), {}), announced)
+  const restored = reload(announced)
+  const [offer] = getIncomingInteractions(restored)
+  assert.equal(offer.title, 'Change of Plan')
+  assert.equal(offer.speaker.id, partner.id)
+  assert.match(offer.text, new RegExp(protectedGuest.name))
+  assert.ok(eligibleBanishmentTargets(restored, human.id).includes(offer.target.id))
+  const answered = respondToIncomingInteraction(
+    restored,
+    commandToken(restored),
+    offer.id,
+    'engage'
+  )
+  assert.equal(getIncomingInteractions(reload(answered))[0].response, 'engage')
+  assert.strictEqual(
+    respondToIncomingInteraction(answered, commandToken(answered), offer.id, 'engage'),
+    answered
+  )
+  const safety = advanceDayAftermath(answered, commandToken(answered))
+  const deals = resolveChallenge(safety, commandToken(safety), score(safety, []))
+  const table = advanceDayAftermath(deals, commandToken(deals))
+  assert.ok(!tableTargets(table, human.id).includes(protectedGuest.id))
+  const locked = resolveTable(table, commandToken(table), voteAll(table, offer.target.id))
+  const closed = revealTable(locked, commandToken(locked))
+  assert.deepEqual(
+    closed.social.find(
+      ({ kind, suspectId, actorId }) =>
+        kind === 'vote-plan' && suspectId === offer.target.id && actorId === partner.id
+    ).pledgeResult,
+    { actor: true, recipient: true }
+  )
+})
+
+test('a private ally request moves real protection and closes before the Round Table', () => {
+  const base = afterOpening()
+  const [human, ally, winner, second] = base.seats
+  const run = {
+    ...base,
+    social: [
+      { day: base.day, actorId: human.id, recipientId: ally.id, kind: 'alliance', accepted: true },
+    ],
+  }
+  const aftermath = resolveChallenge(run, commandToken(run), score(run, [winner.id]))
+  const safety = advanceDayAftermath(aftermath, commandToken(aftermath))
+  const deals = reload(
+    resolveChallenge(safety, commandToken(safety), score(safety, [human.id, second.id]))
+  )
+  const request = getIncomingInteractions(deals).find(({ kind }) => kind === 'shield-request')
+  assert.equal(request.speaker.id, ally.id)
+  assert.equal(viewFor(deals, null).knownNightShieldIds.length, 0)
+  const gifted = reload(
+    respondToIncomingInteraction(deals, commandToken(deals), request.id, 'engage')
+  )
+  assert.equal(viewFor(gifted, human.id).hasNightShield, false)
+  assert.equal(viewFor(gifted, ally.id).hasNightShield, true)
+  assert.equal(
+    getIncomingInteractions(gifted).find(({ id }) => id === request.id).response,
+    'engage'
+  )
+  const table = reload(advanceDayAftermath(gifted, commandToken(gifted)))
+  assert.equal(nightShieldWindowOpen(table), false)
+  assert.ok(tableTargets(table, human.id).includes(ally.id))
+  assert.equal(viewFor(table, null).knownNightShieldIds.length, 0)
+  assert.strictEqual(
+    respondToIncomingInteraction(table, commandToken(table), request.id, 'engage'),
+    table
+  )
 })
 
 test('locked Round Table result stays hidden until the reveal', () => {
   let run = afterOpening()
   run = resolveChallenge(run, commandToken(run), score(run, [run.seats[0].id]))
+  run = advanceDayAftermath(run, commandToken(run))
   run = resolveChallenge(run, commandToken(run), score(run, []))
+  run = advanceDayAftermath(run, commandToken(run))
   const target = run.private.betrayers.find((id) => id !== run.immunityId)
   const ballotToken = commandToken(run)
   const ballots = voteAll(run, target)
@@ -228,7 +337,9 @@ test('private shield consumes the Night attempt and protection expires at Dawn',
   let run = afterOpening()
   const loyals = run.seats.filter(({ id }) => !run.private.betrayers.includes(id))
   run = resolveChallenge(run, commandToken(run), score(run, [loyals[0].id]))
+  run = advanceDayAftermath(run, commandToken(run))
   run = resolveChallenge(run, commandToken(run), score(run, [loyals[1].id, loyals[2].id]))
+  run = advanceDayAftermath(run, commandToken(run))
   run = resolveTable(run, commandToken(run), voteAll(run, loyals[3].id))
   run = revealTable(run, commandToken(run))
   assert.equal(run.phase, 'night')

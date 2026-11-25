@@ -15,10 +15,33 @@ import type { AllianceMoveDetails, GeneralSocialMove } from './generalSocial'
 import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
-import { BetrayalsGuestProfile, type InvestigationControls } from './BetrayalsGuestProfile'
+import { BetrayalsGuestProfile } from './BetrayalsGuestProfile'
+import {
+  BetrayalsInvestigationOptions,
+  BetrayalsInvestigationResult,
+} from './BetrayalsInvestigationOptions'
+import {
+  BETRAYALS_RESOURCE_ICONS as socialResourceIcons,
+  BETRAYALS_RESOURCE_NAMES as socialResourceNames,
+} from './socialResourcePresentation'
+import {
+  accountsForMove,
+  investigationCommand,
+  investigationCost,
+  investigationMoveIds,
+  investigationMoves,
+  isInvestigationMove,
+} from './socialInvestigation'
+import type {
+  InvestigationControls,
+  InvestigationInput,
+  InvestigationMove,
+} from './socialInvestigation'
 import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 import type { AllianceGroupChange } from './BetrayalsAllianceGroup'
 import type { Contestant, Phase, RealityPreset, SocialEntry } from './run'
+import type { daySocialContext } from './dayFlowView'
+import type { SocialMove } from './social'
 import {
   firsthandShieldReports,
   isNightShieldMove,
@@ -40,7 +63,6 @@ import {
   missingSocialResource,
   socialMoveCost,
 } from './socialResources'
-import { BETRAYALS_RESOURCE_ICONS, BETRAYALS_RESOURCE_NAMES } from './socialResourcePresentation'
 import type { SocialResources } from './socialResources'
 import '../components/SocialPanelV2/SocialPanelV2.css'
 import '../components/SocialPanelV2/RecentActivity.css'
@@ -159,6 +181,42 @@ const actions = [
     description: 'Tell this guest what someone said or what you saw during a handoff.',
     icon: '👂',
   },
+  {
+    id: 'promise-shield',
+    title: 'Promise a Night Shield',
+    category: 'strategic',
+    description: 'Promise to pass your shield to this guest if you win Safety.',
+    icon: '🛡',
+  },
+  {
+    id: 'ask-to-cover',
+    title: 'Ask for cover',
+    category: 'strategic',
+    description: 'Ask this guest to give you their shield if they win Safety.',
+    icon: '🛡',
+  },
+  {
+    id: 'broker-shield',
+    title: 'Broker a shield transfer',
+    category: 'strategic',
+    description:
+      'Ask this guest to pass their shield to someone. They can refuse, or their claim may be a bluff.',
+    icon: '🛡',
+  },
+  {
+    id: 'arrange-breakfast',
+    title: 'Arrange a breakfast meeting',
+    category: 'friendly',
+    description: 'Agree to meet at breakfast if you both return.',
+    icon: '☕',
+  },
+  {
+    id: 'leave-account',
+    title: 'Leave a sealed account',
+    category: 'strategic',
+    description: 'Leave this guest an account to read if you are removed tonight.',
+    icon: '✉',
+  },
 ] satisfies (Omit<SocialActionDefinition, 'baseCost'> & { id: SocialEntry['kind'] })[]
 
 const filters = [
@@ -167,9 +225,16 @@ const filters = [
   { id: 'strategic', label: 'Strategic' },
   { id: 'alliance', label: 'Alliances' },
   { id: 'shields', label: 'Shields' },
+  { id: 'intel', label: 'Intel' },
 ] as const
 type Filter = (typeof filters)[number]['id']
+type MoveId = SocialEntry['kind'] | InvestigationMove
 const seasonEndedHint = 'The season has ended. You can still browse your relationships.'
+const shieldActions: readonly SocialEntry['kind'][] = [
+  'promise-shield',
+  'ask-to-cover',
+  'broker-shield',
+]
 const checkInCopy: Partial<Record<Phase, { title: string; description: string }>> = {
   'role-reveal': {
     title: 'Introduce yourself',
@@ -194,6 +259,10 @@ const checkInCopy: Partial<Record<Phase, { title: string; description: string }>
   'table-reveal': {
     title: 'Check in after the vote',
     description: 'Give a guest a moment to catch their breath.',
+  },
+  cocktail: {
+    title: 'Share a drink',
+    description: 'Take a moment together after the vote and build trust.',
   },
   night: {
     title: 'Talk after dark',
@@ -225,6 +294,9 @@ type Props = {
   realityMode?: RealityPreset
   day?: number
   phase?: Phase
+  initialContact?: string
+  initialAction?: SocialEntry['kind']
+  dayContext?: ReturnType<typeof daySocialContext>
   nightShieldCount?: number
   publicNightShieldWinnerIds?: readonly string[]
   moveKinds?: readonly SocialEntry['kind'][]
@@ -244,7 +316,12 @@ type Props = {
     notice?: string
   }
   onClose: () => void
-  onMove: (kind: SocialEntry['kind'], suspectId: string | undefined, contactId: string) => void
+  onMove: (
+    kind: SocialEntry['kind'],
+    suspectId: string | undefined,
+    contactId: string,
+    options?: Pick<SocialMove, 'witnessReportId' | 'offerVoteFor'>
+  ) => void
   onGeneralMove?: (
     kind: GeneralSocialMove,
     guestIds: readonly string[],
@@ -331,7 +408,8 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
           ? `${person} broke the pact to vote for ${subject}.`
           : `You broke your pact with ${person} to vote for ${subject}.`
       }
-      if (entry.accepted) return `You and ${person} pledged to vote for ${subject}.`
+      if (entry.accepted)
+        return `You and ${person} pledged to vote for ${subject}${entry.witnessReportId ? ' if the witness speaks' : ''}.`
       return outgoing
         ? `${person} declined your plan. Build trust to make a pact.`
         : `You declined a vote plan from ${person}.`
@@ -361,6 +439,8 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
         return `${person} kept their thoughts on the vote private.`
       if (entry.reaction === 'wary')
         return `${person} says the tie showed how divided the castle is.`
+      if (entry.suspectId)
+        return `${person} talked through their vote for ${subject} and what they might do differently tomorrow.`
       return `${person} opened up about how the banishment changed the mood in the castle.`
     case 'ask-end':
       if (entry.reaction === 'end') return `${person} says they’re leaning toward ending the game.`
@@ -402,6 +482,24 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
       if (entry.shieldPlan === 'keep') return `${person} plans to keep the Night Shield.`
       if (entry.shieldPlan === 'open-to-gift') return `${person} might give the Night Shield away.`
       return `${person} kept their shield plans private.`
+    case 'promise-shield':
+      if (entry.reaction === 'backfired')
+        return `You kept the Night Shield you had promised to ${person}.`
+      if (entry.reaction === 'repaired')
+        return `You kept your promise and gave ${person} a Night Shield.`
+      return `You promised ${person} your shield if you win Safety.`
+    case 'ask-to-cover':
+      return entry.accepted
+        ? `${person} agreed to cover you if they win Safety.`
+        : `${person} did not agree to give away their shield.`
+    case 'broker-shield':
+      return entry.accepted
+        ? `${person} passed a Night Shield to ${entry.suspectId === actorId ? 'you' : subject}.`
+        : `${person} did not agree to the transfer.`
+    case 'arrange-breakfast':
+      return `You arranged to see ${person} at breakfast.`
+    case 'leave-account':
+      return `You left ${person} a sealed account.`
     case 'shield-tip': {
       const claim = `${subject} might ${entry.shieldReply === 'has' ? 'have' : 'be without'} a Night Shield.`
       return outgoing ? `You told ${person} that ${claim}` : `${person} told you that ${claim}`
@@ -539,6 +637,9 @@ export function BetrayalsSocialPanel({
   realityMode = 'off',
   day = 1,
   phase = 'social',
+  initialContact,
+  initialAction,
+  dayContext,
   nightShieldCount = 0,
   publicNightShieldWinnerIds = [],
   moveKinds = socialMoveKinds({ phase }),
@@ -558,9 +659,11 @@ export function BetrayalsSocialPanel({
   onAllianceChange,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
-  const [contactId, setContactId] = useState<string>()
-  const [selectedAction, setSelectedAction] = useState<SocialEntry['kind']>()
+  const [contactId, setContactId] = useState(initialContact)
+  const [selectedAction, setSelectedAction] = useState<MoveId | undefined>(initialAction)
+  const [investigationInput, setInvestigationInput] = useState<InvestigationInput>({})
   const [target, setTarget] = useState<string>()
+  const [offerCondition, setOfferCondition] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const contacts: Player[] = prospects
     .filter(({ id }) => id !== actorId)
@@ -572,6 +675,11 @@ export function BetrayalsSocialPanel({
     }))
   const peer = contacts.find(({ id }) => id === contactId)
   const eligible = contacts.filter(({ id }) => id !== peer?.id)
+  const profile = peer && investigation?.profile(peer.id)
+  const donor = dayContext?.donors.find(({ id }) => id === peer?.id)
+  const witness = dayContext?.witnesses.find(({ suspectId }) => suspectId === target)
+  const needsCover = !!peer && dayContext?.waitingForShield.includes(peer.id)
+  const account = dayContext?.account
   const isPrivate = (entry: SocialEntry) => socialEntryVisibleTo(entry, actorId)
   const notes = conversation.filter(isPrivate)
   const shieldReports = firsthandShieldReports(notes, actorId, day)
@@ -594,13 +702,36 @@ export function BetrayalsSocialPanel({
   const allies = contacts.filter(({ id }) => hasPersonalAlliance(notes, actorId, id))
   const groups = castleAlliances(notes).filter(({ memberIds }) => memberIds.includes(actorId))
   const planningOpen = alliancePlanningOpen({ phase }) && moveKinds.includes('alliance')
-  const phaseActions = actions
+  const ordinaryActions = actions
     .filter(({ id }) => moveKinds.includes(id))
     .filter(({ id }) => id !== 'end-pact' || personalPact)
+    .filter(({ id }) => id !== 'broker-shield' || donor)
+    .filter(
+      ({ id }) =>
+        id !== 'leave-account' ||
+        (account && peer?.id !== account.guestId && peer?.id !== account.speakerId)
+    )
     .map((action) => (action.id === 'rapport' ? { ...action, ...checkInCopy[phase] } : action))
+  const intelActions = profile
+    ? investigationMoveIds
+        .filter((id) =>
+          id === 'review'
+            ? profile.accounts.length > 0
+            : investigation?.open &&
+              (id === 'observe' ||
+                ((id === 'ask' || id === 'watch') && eligible.length > 0) ||
+                (id !== 'ask' && accountsForMove(id, profile.accounts, day).length > 0))
+        )
+        .map((id) => ({ id, ...investigationMoves[id], category: 'strategic' as const }))
+    : []
+  const phaseActions = [...ordinaryActions, ...intelActions]
   const inFilter = (action: (typeof phaseActions)[number], category: Filter) =>
     category === 'all' ||
-    (isNightShieldMove(action.id) ? category === 'shields' : action.category === category)
+    (isInvestigationMove(action.id)
+      ? category === 'intel'
+      : isNightShieldMove(action.id) || shieldActions.includes(action.id)
+        ? category === 'shields'
+        : action.category === category)
   const phaseFilters = filters.filter(({ id }) =>
     id === 'all' ? phaseActions.length > 1 : phaseActions.some((action) => inFilter(action, id))
   )
@@ -608,8 +739,14 @@ export function BetrayalsSocialPanel({
 
   function chooseContact(id: string | undefined) {
     setContactId(id)
-    setSelectedAction(undefined)
+    chooseAction()
+  }
+
+  function chooseAction(id?: MoveId) {
+    setSelectedAction(id)
+    setInvestigationInput({})
     setTarget(undefined)
+    setOfferCondition(false)
   }
 
   function browse(direction: -1 | 1) {
@@ -635,6 +772,16 @@ export function BetrayalsSocialPanel({
   }
 
   function subjectsFor(kind: SocialEntry['kind']) {
+    if (kind === 'broker-shield') {
+      const recipients = eligible.filter(({ id }) => id !== dayContext?.immunityId)
+      const you = prospects.find(({ id }) => id === actorId)
+      return you && you.id !== dayContext?.immunityId
+        ? [
+            { id: you.id, name: 'You', avatar: you.portrait ?? '', status: 'active' as const },
+            ...recipients,
+          ]
+        : recipients
+    }
     return eligible.filter(({ id }) => {
       if (kind === 'vote-plan')
         return id !== pact?.suspectId && (!voteTargetIds || voteTargetIds.includes(id))
@@ -645,6 +792,11 @@ export function BetrayalsSocialPanel({
 
   function unavailable(kind: SocialEntry['kind']) {
     if (!peer) return 'Choose a guest first.'
+    if (
+      (kind === 'promise-shield' || kind === 'ask-to-cover') &&
+      peer.id === dayContext?.immunityId
+    )
+      return 'This guest already has Full Immunity and sits out Safety.'
     if (shieldTalkBlockedAfterGift(notes, { actorId, recipientId: peer.id, kind }, day))
       return 'You already gave this guest a Night Shield today.'
     if (kind === 'shield-gift' && !nightShieldCount) return 'You have no Night Shield to give.'
@@ -659,29 +811,65 @@ export function BetrayalsSocialPanel({
       return 'No new guests to discuss.'
     const cost = socialMoveCost(kind, realityMode)
     const missing = missingSocialResource(resources, cost)
-    if (missing) return `Requires ${cost[missing]} ${BETRAYALS_RESOURCE_NAMES[missing]}.`
+    if (missing) return `Requires ${cost[missing]} ${socialResourceNames[missing]}.`
   }
 
-  const targetKind =
-    selectedAction && choosesSocialSubject(selectedAction) ? selectedAction : undefined
+  const intelMove =
+    selectedAction && isInvestigationMove(selectedAction) ? selectedAction : undefined
+  const socialMove =
+    selectedAction && !isInvestigationMove(selectedAction) ? selectedAction : undefined
+  const accountChoices =
+    intelMove && profile ? accountsForMove(intelMove, profile.accounts, day) : []
+  const selectedAccount =
+    accountChoices.find(({ id }) => id === investigationInput.referenceId) ??
+    (intelMove === 'ask' ? undefined : accountChoices[0])
+  const intelCommand =
+    intelMove &&
+    peer &&
+    investigationCommand(intelMove, peer.id, investigationInput, selectedAccount)
+  const intelReason = intelCommand && investigation?.reason(intelCommand)
+  const targetKind = socialMove && choosesSocialSubject(socialMove) ? socialMove : undefined
   const availableTargets = targetKind ? subjectsFor(targetKind) : []
   const canExecute =
     canAct &&
-    Boolean(
-      peer &&
-      selectedAction &&
-      canUseBetrayalsAction(selectedAction, hasRealityMode) &&
-      moveKinds.includes(selectedAction) &&
-      !unavailable(selectedAction) &&
-      (!targetKind || availableTargets.some(({ id }) => id === target))
-    )
+    (intelMove
+      ? Boolean(hasRealityMode && intelCommand && !intelReason)
+      : Boolean(
+          peer &&
+          socialMove &&
+          canUseBetrayalsAction(socialMove, hasRealityMode) &&
+          moveKinds.includes(socialMove) &&
+          !unavailable(socialMove) &&
+          (!targetKind || availableTargets.some(({ id }) => id === target))
+        ))
 
   function execute() {
-    if (!canExecute || !peer || !selectedAction) return
-    onMove(selectedAction, targetKind ? target : undefined, peer.id)
-    setSelectedAction(undefined)
-    setTarget(undefined)
+    if (!canExecute || !peer) return
+    if (intelCommand && investigation) {
+      investigation.act(intelCommand)
+      chooseAction()
+      return
+    }
+    if (!socialMove) return
+    const witnessReportId =
+      selectedAction === 'vote-plan' && offerCondition ? witness?.reportId : undefined
+    const offerVoteFor =
+      selectedAction === 'broker-shield' && offerCondition ? donor?.voteTargetId : undefined
+    if (witnessReportId || offerVoteFor)
+      onMove(socialMove, targetKind ? target : undefined, peer.id, {
+        witnessReportId,
+        offerVoteFor,
+      })
+    else onMove(socialMove, targetKind ? target : undefined, peer.id)
+    chooseAction()
   }
+
+  const condition =
+    selectedAction === 'vote-plan' && witness
+      ? `Only if ${label(witness.witness)} testifies`
+      : selectedAction === 'broker-shield' && donor?.voteTargetId && target
+        ? `Offer to vote for ${label(donor.voteTargetId)} in return`
+        : undefined
 
   return (
     <dialog
@@ -703,9 +891,7 @@ export function BetrayalsSocialPanel({
       <div className="sp2-modal sp2-modal--normal">
         <header className="sp2-header">
           <span className="sp2-header__identity">
-            <span className="sp2-header__title">
-              {phase === 'social' ? 'Social Phase' : 'Social'}
-            </span>
+            <span className="sp2-header__title">Social</span>
             <span className="sp2-header__subtitle">Castle relationships</span>
           </span>
           <div className="sp2-header__resources sp2-header__resources--normal">
@@ -717,7 +903,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Energy: ${resources.energy}`}
                   title="Energy"
                 >
-                  {BETRAYALS_RESOURCE_ICONS.energy} {resources.energy}
+                  {socialResourceIcons.energy} {resources.energy}
                 </span>
                 <span
                   className="sp2-resource-chip sp2-resource-chip--influence"
@@ -725,7 +911,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Influence: ${resources.influence}`}
                   title="Influence"
                 >
-                  {BETRAYALS_RESOURCE_ICONS.influence} {resources.influence}
+                  {socialResourceIcons.influence} {resources.influence}
                 </span>
                 <span
                   className="sp2-resource-chip sp2-resource-chip--info"
@@ -733,7 +919,7 @@ export function BetrayalsSocialPanel({
                   aria-label={`Info: ${resources.info}`}
                   title="Info"
                 >
-                  {BETRAYALS_RESOURCE_ICONS.info} {resources.info}
+                  {socialResourceIcons.info} {resources.info}
                 </span>
               </>
             )}
@@ -861,7 +1047,15 @@ export function BetrayalsSocialPanel({
                   </div>
                   {pact && (
                     <div className="sp2-focus__commitments" aria-label="Shared commitments">
-                      <span>Vote pact · {label(pact.suspectId)}</span>
+                      <span>
+                        Vote pact · {label(pact.suspectId)}
+                        {pact.witnessReportId ? ' if the witness speaks' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {needsCover && (
+                    <div className="sp2-focus__commitments" aria-label="Witness condition">
+                      <span>Will testify if protected at Night.</span>
                     </div>
                   )}
                   {moveKinds.includes('ask-shield') &&
@@ -895,13 +1089,10 @@ export function BetrayalsSocialPanel({
                   </div>
                   {!canAct && <p>{seasonEndedHint}</p>}
                 </div>
-                {investigation && (
+                {profile && (
                   <BetrayalsGuestProfile
                     key={peer.id}
-                    profile={investigation.profile(peer.id)}
-                    investigation={investigation}
-                    contacts={contacts}
-                    name={label}
+                    profile={profile}
                     locked={!hasRealityMode}
                     onUnlock={!hasRealityMode ? () => onUpgrade?.('realityMode') : undefined}
                   />
@@ -1001,8 +1192,7 @@ export function BetrayalsSocialPanel({
                         className={id === activeFilter ? 'is-active' : ''}
                         onClick={() => {
                           setFilter(id)
-                          setSelectedAction(undefined)
-                          setTarget(undefined)
+                          chooseAction()
                         }}
                       >
                         {title}
@@ -1019,7 +1209,9 @@ export function BetrayalsSocialPanel({
                         ? 'Vote target'
                         : targetKind === 'shield-tip'
                           ? 'Whose shield to discuss'
-                          : 'Guest to discuss'
+                          : targetKind === 'broker-shield'
+                            ? 'Shield recipient'
+                            : 'Guest to discuss'
                     }
                   >
                     <div className="sp2-consult-alliance-picker__chips">
@@ -1028,34 +1220,86 @@ export function BetrayalsSocialPanel({
                           key={player.id}
                           player={player}
                           selected={player.id === target}
-                          onClick={() => setTarget(player.id)}
+                          onClick={() => {
+                            setTarget(player.id)
+                            setOfferCondition(false)
+                          }}
                         />
                       ))}
                     </div>
                   </div>
                 )}
+                {condition && (
+                  <button
+                    type="button"
+                    className="hubmate-choice-chip"
+                    aria-pressed={offerCondition}
+                    onClick={() => setOfferCondition(!offerCondition)}
+                  >
+                    {condition}
+                  </button>
+                )}
+                {selectedAction === 'leave-account' && account && (
+                  <p className="betrayals-shield-count">
+                    {label(peer.id)} would receive your account about {label(account.guestId)}.
+                  </p>
+                )}
+                {intelMove && investigation && (
+                  <BetrayalsInvestigationOptions
+                    move={intelMove}
+                    choices={accountChoices}
+                    account={selectedAccount}
+                    contacts={eligible}
+                    remaining={investigation.remaining}
+                    input={investigationInput}
+                    onChange={setInvestigationInput}
+                    name={label}
+                  />
+                )}
+                {intelReason && <p className="betrayals-shield-count">{intelReason}</p>}
               </div>
+              {hasRealityMode && profile && investigation && (
+                <BetrayalsInvestigationResult
+                  profile={profile}
+                  account={selectedAccount ?? profile.accounts[0]}
+                  investigation={investigation}
+                  name={label}
+                  day={day}
+                />
+              )}
               <div className="sp2-action-grid" role="tabpanel" aria-label="Available actions">
                 {phaseActions
                   .filter((action) => inFilter(action, activeFilter))
                   .map((action) => {
-                    const cost = socialMoveCost(action.id, realityMode)
-                    const reason = unavailable(action.id)
+                    const id = action.id
+                    const intel = isInvestigationMove(id)
+                    const cost =
+                      id === 'review'
+                        ? { energy: 0, influence: 0, info: 0 }
+                        : intel
+                          ? investigationCost
+                          : socialMoveCost(id, realityMode)
+                    const reason = intel
+                      ? hasRealityMode && id !== 'review'
+                        ? id === 'observe'
+                          ? investigation?.reason({ kind: id, guestId: peer.id, focus: 'actions' })
+                          : resources.energy < investigationCost.energy
+                            ? `Requires ${investigationCost.energy} Energy.`
+                            : undefined
+                        : undefined
+                      : unavailable(id)
                     return (
                       <ActionCard
-                        key={action.id}
+                        key={id}
+                        resourceIcons={socialResourceIcons}
                         action={{ ...action, baseCost: cost.energy }}
                         costs={cost}
-                        resourceIcons={BETRAYALS_RESOURCE_ICONS}
-                        selected={action.id === selectedAction}
-                        premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
+                        selected={id === selectedAction}
+                        premiumLocked={!hasRealityMode && (intel || isPremiumBetrayalsAction(id))}
                         onPremiumLockedClick={() => onUpgrade?.('realityMode')}
                         disabled={Boolean(reason)}
                         disabledMessage={reason}
-                        onClick={() => {
-                          setSelectedAction(action.id === selectedAction ? undefined : action.id)
-                          setTarget(undefined)
-                        }}
+                        onClick={() => chooseAction(id === selectedAction ? undefined : id)}
                       />
                     )
                   })}

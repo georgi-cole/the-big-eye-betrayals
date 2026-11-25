@@ -10,7 +10,9 @@ import { PortraitGallery } from './PortraitGallery'
 import { WitnessLeadCard } from './WitnessLeadCard'
 import { caseReports } from './investigationEvidence'
 import { InvestigationAccountCard } from './InvestigationAccountCard'
-import { InvestigationButton, type InvestigationControls } from './BetrayalsGuestProfile'
+import { witnessReply } from './investigationRecords'
+import { InvestigationButton } from './BetrayalsInvestigationOptions'
+import type { InvestigationControls } from './socialInvestigation'
 import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
 import { canUseBetrayalsTableSway } from './premiumAccess'
 import './betrayals-pulse.css'
@@ -88,6 +90,11 @@ export function RoundTableDiscussion({
   const candidates = tableTargets(run, run.humanId)
   const target = candidates.includes(targetId) ? seats.get(targetId) : undefined
   const accounts = hasRealityMode && target ? caseReports(run, target.id) : []
+  const arranged = hasRealityMode
+    ? caseReports(run).find(
+        ({ report, witnessAsked }) => witnessAsked?.shield && candidates.includes(report.guestId)
+      )
+    : undefined
   const name = (id: string) => seats.get(id)?.name ?? 'Guest'
 
   useEffect(() => {
@@ -236,7 +243,10 @@ export function RoundTableDiscussion({
                 onSelect={setTargetId}
               />
               {target && accounts.length > 0 && (
-                <details className="round-table-accounts">
+                <details
+                  className="round-table-accounts"
+                  open={arranged?.report.guestId === targetId || undefined}
+                >
                   <summary>Present an account ({accounts.length})</summary>
                   <div>
                     {accounts.map(({ report, witness, witnessAsked }) => (
@@ -251,7 +261,7 @@ export function RoundTableDiscussion({
                             })
                           }
                         >
-                          Cite account
+                          {run.dayFlow ? 'Cite account anonymously' : 'Cite account'}
                         </button>
                         {witness &&
                           (witnessAsked?.accepted ? (
@@ -268,13 +278,31 @@ export function RoundTableDiscussion({
                               Call {name(witness)}
                             </button>
                           ) : witnessAsked ? (
-                            <small>{name(witness)} declined to speak.</small>
+                            <>
+                              <small>
+                                {name(witness)} · {witnessReply(witnessAsked)}
+                              </small>
+                              {witnessAsked.shield === 'unmet' && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    chooseSway({
+                                      targetId,
+                                      tone: 'careful',
+                                      investigation: { reportId: report.id, named: true },
+                                    })
+                                  }
+                                >
+                                  Name {name(witness)} as your source
+                                </button>
+                              )}
+                            </>
                           ) : (
                             investigation && (
                               <InvestigationButton
                                 investigation={investigation}
                                 action={{ kind: 'witness', reportId: report.id }}
-                              >{`Ask ${name(witness)} to testify · 1 Energy`}</InvestigationButton>
+                              >{`Ask ${name(witness)} to testify`}</InvestigationButton>
                             )
                           ))}
                       </InvestigationAccountCard>
@@ -359,7 +387,13 @@ export function RoundTableDiscussion({
                   </button>
                 )}
                 {Boolean(candidates.length) && (
-                  <button type="button" onClick={() => setCaseOpen(true)}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (arranged) setTargetId(arranged.report.guestId)
+                      setCaseOpen(true)
+                    }}
+                  >
                     Take the floor
                   </button>
                 )}
@@ -370,7 +404,7 @@ export function RoundTableDiscussion({
               type="button"
               onClick={() => chooseSway(null)}
             >
-              Go to vote
+              {run.dayFlow && candidates.length ? 'Hear the room and vote' : 'Go to vote'}
             </button>
           </div>
         </footer>

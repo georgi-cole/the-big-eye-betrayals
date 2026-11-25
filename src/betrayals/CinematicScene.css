@@ -76,10 +76,42 @@
 .betrayals-cine__camera,
 .betrayals-cine__backdrop,
 .betrayals-cine__grade,
-.betrayals-cine__edge {
+.betrayals-cine__edge,
+.betrayals-cine__shadow-conclave {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.betrayals-cine__shadow-conclave {
+  overflow: hidden;
+  background: #080a10;
+}
+
+.betrayals-cine__shadow-conclave .betrayals-cine__backdrop {
+  filter: brightness(0.42) blur(3px);
+  transform: scale(1.04);
+}
+
+.betrayals-cine__shadow-hood {
+  position: absolute;
+  inset: 29% auto auto 50%;
+  width: min(88%, 56dvh);
+  translate: -50%;
+  filter: brightness(0.62) saturate(0.85) drop-shadow(-5px 0 12px #a063364d);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 83%);
+}
+
+.betrayals-cine[data-scene='conclave-shadow'][data-reduced='false']
+  .betrayals-cine__shadow-conclave {
+  animation: betrayals-cine-push 6s ease-out both;
+}
+
+.betrayals-cine__shadow-conclave[data-reverse='false'] .betrayals-cine__shadow-hood {
+  inset-inline-start: 15%;
+  inset-block-start: 34%;
+  width: min(110%, 64dvh);
+  filter: brightness(0.43) saturate(0.65);
 }
 
 .betrayals-cine__camera {

@@ -1,6 +1,11 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
-import { MAX_TABLE_ROUNDS, eligibleBanishmentTargets, isCurrentCommand } from './run.ts'
+import {
+  MAX_TABLE_ROUNDS,
+  eligibleBanishmentTargets,
+  isCurrentCommand,
+  publicShieldPending,
+} from './run.ts'
 import type {
   Ballot,
   CaseReview,
@@ -24,6 +29,7 @@ import {
 } from './investigationEvidence.ts'
 import { archiveInvestigationVotes, guestName } from './investigationRecords.ts'
 import { FINALE_CAST_SIZE, FINAL_SURVIVOR_COUNT } from './seasonPhases.ts'
+import { openCastleMoment } from './castleLife.ts'
 
 export type { Ballot } from './run.ts'
 
@@ -47,7 +53,7 @@ export function tableRoundNumber(run: Run): number {
 export function tableDiscussionOpen(run: Run): boolean {
   return (
     run.phase === 'round-table' &&
-    (!run.options.publicMode || run.publicShieldDecisionDay === run.day) &&
+    !publicShieldPending(run) &&
     !run.runoffIds &&
     !run.tableCount &&
     run.tableSway === undefined
@@ -74,8 +80,25 @@ function openingArguments(run: Run): TableArgument[] {
     }))
     .sort((left, right) => right.initiative - left.initiative)
   const argumentsSoFar: TableArgument[] = witness ? [witness] : []
+  const delivery = run.dayFlow?.delivery
+  const deliveredAccount = run.investigation?.reports.find(({ id }) => id === delivery?.reportId)
+  if (
+    delivery?.kind === 'account' &&
+    deliveredAccount &&
+    !argumentsSoFar.some(({ speakerId }) => speakerId === delivery.guestId) &&
+    tableTargets(run, delivery.guestId).includes(deliveredAccount.guestId)
+  ) {
+    argumentsSoFar.push({
+      speakerId: delivery.guestId,
+      targetId: deliveredAccount.guestId,
+      tone: 'careful',
+      basis: 'conversation',
+      investigation: { reportId: deliveredAccount.id },
+    })
+  }
   for (const { id } of order) {
     if (argumentsSoFar.length >= 4) break
+    if (argumentsSoFar.some(({ speakerId }) => speakerId === id)) continue
     const eligible = tableTargets(run, id)
     const last = argumentsSoFar.at(-1)
     if (last && eligible.includes(last.targetId)) {
@@ -154,6 +177,23 @@ export function recordTableSway(run: Run, token: CommandToken, choice: TableSway
         },
       ]
     }
+    if (argument.investigation?.named) {
+      const source = run.investigation?.reports.find(
+        ({ id }) => id === argument.investigation?.reportId
+      )?.speakerId
+      if (source && source !== run.humanId)
+        social = [
+          ...social,
+          {
+            day: run.day,
+            actorId: run.humanId,
+            recipientId: source,
+            kind: 'share-suspicion',
+            suspectId: argument.targetId,
+            reaction: 'backfired',
+          },
+        ]
+    }
   }
 
   return {
@@ -196,10 +236,7 @@ export function tableDiscussion(run: Run): TableSpeech[] {
   const tableArguments = argumentsAtTable(run)
   return [
     ...evidenceSpeech({ ...run, tableArguments }),
-    ...tableDialogue(
-      run,
-      tableArguments.filter((argument) => !argument.investigation)
-    ),
+    ...tableDialogue(run, [...tableArguments.filter((argument) => !argument.investigation)]),
     ...investigationSpeech(run, tableArguments),
   ]
 }
@@ -300,6 +337,10 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
   if (
     !isCurrentCommand(run, token) ||
     run.tableCount ||
+    (run.dayFlow &&
+      run.phase === 'round-table' &&
+      run.tableSway === undefined &&
+      canVoteAtTable(run, run.humanId)) ||
     (run.phase !== 'round-table' && run.phase !== 'final-banishment')
   )
     return run
@@ -396,17 +437,36 @@ export function revealTable(run: Run, token: CommandToken): Run {
       ? 'end-vote'
       : active.length === FINALE_CAST_SIZE
         ? 'final-challenge'
-        : 'night'
+        : run.dayFlow?.castleDay
+          ? 'cocktail'
+          : 'night'
+  const continuingTonight = phase === 'cocktail' || phase === 'night'
   const revealedRole = seats.find(({ id }) => id === outcome.banishedId)?.exit?.revealedRole
   const campaigns = (run.tableArguments ?? []).filter(
     ({ stance, evidence }) => !stance && !evidence
+  )
+  const witnesses = (run.tableArguments ?? []).flatMap(({ targetId, investigation }) => {
+    if (!investigation?.witness) return []
+    const speakerId = run.investigation?.reports.find(
+      ({ id }) => id === investigation.reportId
+    )?.speakerId
+    return speakerId ? [{ speakerId, targetId }] : []
+  })
+  const defenses = (run.tableArguments ?? []).flatMap(({ speakerId, targetId, stance }) =>
+    stance === 'defend' ? [{ speakerId, targetId }] : []
   )
   const revealed: Run = {
     ...run,
     phase,
     revision: run.revision + 1,
     seats,
-    lastTable: { ...outcome, revealedBallots: run.tableCount?.ballots, campaigns },
+    lastTable: {
+      ...outcome,
+      revealedBallots: run.tableCount?.ballots,
+      campaigns,
+      witnesses,
+      defenses,
+    },
     investigation: archiveInvestigationVotes(run, outcome.blind, run.tableCount?.ballots),
     caseReviews: revealedRole
       ? reviewCases(run, campaigns, outcome.banishedId, revealedRole)
@@ -419,19 +479,18 @@ export function revealTable(run: Run, token: CommandToken): Run {
     tableCount: undefined,
     tableSway: undefined,
     tableArguments: undefined,
-    immunityId: phase === 'night' ? run.immunityId : undefined,
+    immunityId: continuingTonight ? run.immunityId : undefined,
     private: {
       ...run.private,
       pendingTable: undefined,
-      nightShieldIds:
-        phase === 'night'
-          ? run.private.nightShieldIds.filter((id) => id !== outcome.banishedId)
-          : [],
-      nightShieldAwardIds: phase === 'night' ? run.private.nightShieldAwardIds : undefined,
+      nightShieldIds: continuingTonight
+        ? run.private.nightShieldIds.filter((id) => id !== outcome.banishedId)
+        : [],
+      nightShieldAwardIds: continuingTonight ? run.private.nightShieldAwardIds : undefined,
     },
   }
   if (lastBetrayer) return settleRun(revealed, 'last-betrayer')
   if (outcome.blind && active.length === FINAL_SURVIVOR_COUNT)
     return settleRun(revealed, 'final-two')
-  return revealed
+  return phase === 'cocktail' ? openCastleMoment(revealed, 'cocktail') : revealed
 }

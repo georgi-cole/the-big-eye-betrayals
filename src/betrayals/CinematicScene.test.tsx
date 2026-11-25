@@ -230,6 +230,42 @@ describe('Betrayals cinematic scenes', () => {
     expect(cinematicFor(night, 'conclave-arrival', banished.id, '').cast).toEqual([])
   })
 
+  it('uses the same anonymous Conclave for a Loyal regardless of the number of Betrayers', () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'anonymous-conclave', roleSeed: 32, publicSeed: 12 }
+    )
+    const strangers = run.seats.slice(1, 5).map(({ id }) => id)
+    const [, , , , , victim] = run.seats
+    const night = {
+      ...run,
+      phase: 'night' as const,
+      dayFlow: { day: 1, castleDay: true as const },
+      private: { ...run.private, betrayers: strangers.slice(0, 3) },
+    }
+    const after = {
+      ...night,
+      phase: 'night-resolved' as const,
+      private: { ...night.private, pendingNight: { targetId: victim.id, blocked: false } },
+    }
+    const larger = { ...after, private: { ...after.private, betrayers: strangers } }
+    expect(presentationAfter(night, after)).toEqual(['conclave-shadow', 'death-letter'])
+    expect(presentationAfter(night, after, false)).toEqual(['death-letter'])
+    expect(cinematicFor(after, 'conclave-shadow', run.humanId, '')).toEqual(
+      cinematicFor(larger, 'conclave-shadow', run.humanId, '')
+    )
+    expect(cinematicFor(after, 'conclave-shadow', run.humanId, '').cast).toBeUndefined()
+    expect(cinematicFor(after, 'death-letter', run.humanId, '').subject?.id).toBe(victim.id)
+    expect(
+      presentationAfter(night, {
+        ...after,
+        private: { ...after.private, pendingNight: { targetId: victim.id, blocked: true } },
+      })
+    ).toEqual(['conclave-shadow'])
+  })
+
   it('keeps a concealed shield recipient absent even when the animation is reduced', () => {
     const { container } = render(
       <CinematicScene

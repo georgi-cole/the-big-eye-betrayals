@@ -9,7 +9,8 @@ type ShieldWindow = Pick<Run, 'phase' | 'tableCount' | 'runoffIds' | 'result'> &
 
 export function nightShieldWindowOpen(run: ShieldWindow): boolean {
   return (
-    run.phase === 'round-table' &&
+    (run.phase === 'shield-deals' ||
+      (run.phase === 'round-table' && !run.private?.safetyStandings?.dealsClosed)) &&
     !run.result &&
     !run.tableCount &&
     !run.runoffIds &&

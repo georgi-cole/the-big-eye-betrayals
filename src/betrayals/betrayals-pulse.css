@@ -33,7 +33,6 @@
 
 .pulse-new > header,
 .pulse-comparison > header,
-.guest-profile__section > header,
 .investigation-account > header {
   display: flex;
   align-items: center;
@@ -81,7 +80,6 @@
 
 .betrayals-pulse
   :is(.house-pulse__link, .investigation-account__actions button)[aria-pressed='true'],
-.guest-profile .investigation-account__actions button[aria-pressed='true'],
 .investigation-choices .hubmate-choice-chip[aria-pressed='true'] {
   color: var(--journal-accent);
   border-color: #987547;
@@ -92,7 +90,6 @@
 .pulse-new,
 .pulse-accounts,
 .guest-profile__body,
-.guest-profile__accounts,
 .round-table-accounts {
   display: grid;
   gap: 9px;
@@ -102,8 +99,7 @@
 .pulse-ballots,
 .pulse-comparison,
 .pulse-commitments li,
-.investigation-account:not(.house-pulse__card),
-.guest-profile__section {
+.investigation-account:not(.house-pulse__card) {
   background: var(--journal-inset);
   border: 1px solid var(--journal-line);
   border-radius: 10px;
@@ -113,8 +109,6 @@
 
 .pulse-timeline summary,
 .pulse-ballots summary,
-.guest-profile__metric-account summary,
-.guest-profile__share > summary,
 .round-table-accounts summary {
   color: var(--journal-accent);
   cursor: pointer;
@@ -164,8 +158,6 @@
 .pulse-commitments li > span,
 .investigation-account small,
 .investigation-account > header span:last-child,
-.guest-profile__section small,
-.guest-profile__section > header > span,
 .pulse-empty {
   color: var(--journal-muted);
   font-size: 0.75rem;
@@ -200,22 +192,18 @@
   margin-top: 5px;
 }
 
-.investigation-account__actions,
-.guest-profile__actions {
+.investigation-account__actions {
   display: flex;
   align-items: end;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.investigation-account__actions,
-.guest-profile__actions,
-.guest-profile__accounts {
+.investigation-account__actions {
   margin-top: 7px;
 }
 
-.pulse-tools,
-.guest-profile__choices {
+.pulse-tools {
   display: grid;
   min-width: 0;
   gap: 7px;
@@ -228,8 +216,7 @@
   gap: 8px;
 }
 
-.pulse-tools__top span,
-.guest-profile__choices > span {
+.pulse-tools__top span {
   color: var(--journal-muted);
   font-size: 0.75rem;
   font-weight: 700;
@@ -273,15 +260,6 @@
   font-size: 0.7rem;
 }
 
-.guest-profile__observe {
-  background: linear-gradient(120deg, #352637, var(--journal-inset));
-}
-
-.guest-profile__section > header {
-  margin-bottom: 6px;
-}
-
-.guest-profile__section h3,
 .pulse-new h3,
 .pulse-comparison h3,
 .pulse-ballots h3 {
@@ -318,10 +296,8 @@
 }
 
 .guest-profile__metrics > small,
-.guest-profile__metric-row small,
-.guest-profile__metric > small,
-.guest-profile__metric-account small {
-  color: #b9adca;
+.guest-profile__metric-row small {
+  color: #ccbaaa;
   font-size: 0.68rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -376,21 +352,6 @@
   font-size: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.guest-profile__metric > small,
-.guest-profile__metric-account {
-  margin-top: 4px;
-}
-
-.guest-profile__metric-account summary {
-  color: #dbbc9c;
-  font-size: 0.72rem;
-}
-
-.guest-profile__observe .investigation-account,
-.guest-profile__share {
-  margin-top: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {

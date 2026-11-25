@@ -7,6 +7,7 @@ import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { getSocialView, rapport } from './social.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
+import { deliverNightDecision } from './dayFlow.ts'
 import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
 import { FINALE_CAST_SIZE } from './seasonPhases.ts'
 import { composeConclaveConversation } from './conclaveConversation.ts'
@@ -181,7 +182,8 @@ function chooseNominee(
   run: Run,
   actorId: string,
   eligibleIds: string[],
-  briefing: readonly ShieldBriefing[]
+  briefing: readonly ShieldBriefing[],
+  pitchId?: string
 ) {
   const perspective = resolutionPerspective(run, actorId, eligibleIds)
   const shieldReads = perspective.shieldReads ?? new Map<string, ShieldRead>()
@@ -200,7 +202,21 @@ function chooseNominee(
       witnessedGift: own?.witnessedGift ?? false,
     })
   }
-  return chooseTarget({ ...perspective, shieldReads }, 'night')
+  const danger =
+    pitchId &&
+    run.lastTable?.witnesses?.some(
+      ({ speakerId, targetId }) =>
+        pitchId === speakerId &&
+        (targetId === actorId ||
+          perspective.teammates.includes(targetId) ||
+          targetId === perspective.revealedBetrayer)
+    )
+  const trust = rapport(run.social, actorId, run.humanId)
+  const nightPitch =
+    run.dayFlow && pitchId
+      ? { id: pitchId, weight: 0.04 + trust * 0.2 + (danger ? 0.16 : 0) }
+      : undefined
+  return chooseTarget({ ...perspective, shieldReads, nightPitch }, 'night')
 }
 
 function nominate(run: Run, briefing: readonly ShieldBriefing[], humanTargetId?: string): Ballot[] {
@@ -210,7 +226,7 @@ function nominate(run: Run, briefing: readonly ShieldBriefing[], humanTargetId?:
     const targetId =
       voterId === run.humanId && humanTargetId && eligibleIds.includes(humanTargetId)
         ? humanTargetId
-        : chooseNominee(run, voterId, eligibleIds, briefing)
+        : chooseNominee(run, voterId, eligibleIds, briefing, humanTargetId)
     return targetId ? [{ voterId, targetId }] : []
   })
 }
@@ -218,6 +234,17 @@ function nominate(run: Run, briefing: readonly ShieldBriefing[], humanTargetId?:
 function caseFor(run: Run, voterId: string, targetId: string) {
   const ownConversations = getSocialView(run, voterId)
   const read = nightShieldReads(run, voterId).get(targetId)
+  const againstUs = new Set([voterId, ...knownTeammateIds(run, voterId)])
+  const namedUs = run.lastTable?.witnesses?.some(
+    ({ speakerId, targetId: accused }) =>
+      speakerId === targetId &&
+      (againstUs.has(accused) ||
+        run.seats.some(({ id, exit }) => id === accused && exit?.revealedRole === 'betrayer'))
+  )
+  if (namedUs)
+    return read?.protected
+      ? 'They testified against one of us. We could stop them speaking again, if their shield story is a bluff.'
+      : 'They testified against one of us. What will they bring to the next Table if they are still here?'
   if (voterId === run.humanId && read) {
     if (read.publicAwardOnly) return 'They won a Night Shield. They could have passed it on.'
     if (read.conflicting) return 'The stories about their Night Shield don’t agree.'
@@ -428,7 +455,7 @@ function resolveConclaveRunoff(
     if (nomination.voterId === run.humanId && humanTargetId)
       return { ...nomination, targetId: humanTargetId }
     const alternatives = targets.filter((id) => id !== nomination.targetId)
-    const preferred = chooseNominee(run, nomination.voterId, alternatives, briefing)
+    const preferred = chooseNominee(run, nomination.voterId, alternatives, briefing, humanTargetId)
     if (!preferred) return nomination
 
     // The closer a proposal is to passing, the easier it is to compromise on it.
@@ -446,13 +473,19 @@ function resolveConclaveRunoff(
 
 export function revealDawn(run: Run, token: CommandToken): Run {
   const night = run.private.pendingNight
-  if (run.phase !== 'night-resolved' || !isCurrentCommand(run, token) || !night) return run
+  if (
+    run.phase !== 'night-resolved' ||
+    !isCurrentCommand(run, token) ||
+    run.presentation?.length ||
+    !night
+  )
+    return run
   const eliminatedId = night.blocked ? null : night.targetId
   const seats = run.seats.map((seat) =>
     seat.id === eliminatedId ? { ...seat, exit: { cause: 'night' as const, day: run.day } } : seat
   )
   const day = run.day + 1
-  return {
+  return deliverNightDecision(run, {
     ...run,
     seats,
     day,
@@ -461,6 +494,7 @@ export function revealDawn(run: Run, token: CommandToken): Run {
     phase:
       seats.filter(({ exit }) => !exit).length === FINALE_CAST_SIZE ? 'final-challenge' : 'dawn',
     immunityId: undefined,
+    votePlans: undefined,
     private: {
       ...run.private,
       nightShieldIds: [],
@@ -469,5 +503,5 @@ export function revealDawn(run: Run, token: CommandToken): Run {
       conclaveVote: undefined,
       pendingNight: undefined,
     },
-  }
+  })
 }

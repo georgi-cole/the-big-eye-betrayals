@@ -12,9 +12,12 @@ export const PHASES = [
   'dawn',
   'social',
   'immunity',
+  'after-immunity',
   'safety',
+  'shield-deals',
   'round-table',
   'table-reveal',
+  'cocktail',
   'night',
   'night-resolved',
   'final-challenge',
@@ -94,8 +97,14 @@ export type SocialEntry = {
     | 'alliance-update'
     | 'shield-request'
     | 'shield-plans'
+    | 'promise-shield'
+    | 'ask-to-cover'
+    | 'broker-shield'
+    | 'arrange-breakfast'
+    | 'leave-account'
     | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
+  witnessReportId?: string
   shieldReply?: NightShieldClaim | 'private'
   shieldPlan?: NightShieldPlan
   accepted?: boolean
@@ -113,10 +122,13 @@ export type TableReceipt = {
   tiedByDraw: boolean
   revealedBallots?: Ballot[]
   campaigns?: TableArgument[]
+  witnesses?: { speakerId: string; targetId: string }[]
+  defenses?: { speakerId: string; targetId: string }[]
 }
 
 export const PRESENTATION_CUES = [
   'conclave-arrival',
+  'conclave-shadow',
   'conclave-seal',
   'sunrise',
   'awakening',
@@ -174,7 +186,13 @@ export type Run = {
     nightShieldIds: string[]
     nightShieldAwardIds?: string[]
     lastShieldSave?: { day: number; id: string }
-    safetyStandings?: { day: number; publicResults?: boolean; rows: SafetyStanding[] }
+    safetyStandings?: {
+      day: number
+      publicResults?: boolean
+      rows: SafetyStanding[]
+      requestId?: string
+      dealsClosed?: true
+    }
     pendingTable?: TableReceipt
     conclaveVote?: { nominations: Ballot[]; runoff?: Ballot[] }
     pendingNight?: {
@@ -200,7 +218,10 @@ export type Run = {
   immunityId?: string
   publicShield?: { id: string; day: number }
   publicShieldDecisionDay?: number
+  votePlans?: import('./votePlans.ts').VotePlans
   audienceApproval?: Record<string, number>
+  dayFlow?: import('./dayFlowState.ts').DayFlow
+  castleMoments?: import('./castleLifeBank.ts').CastleMoment[]
   runoffIds?: string[]
   tableRound?: number
   tableCount?: TableCount
@@ -236,6 +257,16 @@ export function eligibleBanishmentTargets(run: Run, voterId: string): string[] {
         (!run.runoffIds || run.runoffIds.includes(id))
     )
     .map(({ id }) => id)
+}
+
+export function publicShieldPending(
+  run: Pick<Run, 'phase' | 'day' | 'options' | 'publicShieldDecisionDay'>
+) {
+  return (
+    (run.phase === 'after-immunity' || run.phase === 'round-table') &&
+    run.options.publicMode &&
+    run.publicShieldDecisionDay !== run.day
+  )
 }
 
 export function commandToken(run: Run): CommandToken {
@@ -300,8 +331,18 @@ export function acknowledgeRole(run: Run, token: CommandToken): Run {
 
 export function advancePreparation(run: Run, token: CommandToken): Run {
   if (!isCurrentCommand(run, token)) return run
-  if (run.phase === 'dawn') return { ...run, phase: 'social', revision: run.revision + 1 }
-  if (run.phase === 'social') return { ...run, phase: 'immunity', revision: run.revision + 1 }
+  if (run.phase === 'dawn')
+    return {
+      ...run,
+      phase: run.dayFlow?.castleDay ? 'immunity' : 'social',
+      revision: run.revision + 1,
+    }
+  if (run.phase === 'social')
+    return {
+      ...run,
+      phase: run.dayFlow?.castleDay ? 'safety' : 'immunity',
+      revision: run.revision + 1,
+    }
   return run
 }
 
@@ -350,8 +391,10 @@ export function viewFor(run: Run, actorId: string | null) {
   const purchasedNightShieldActive = Boolean(activeActor && hasPaidNightShield(run, actor.id))
   // Teammates see who won at Safety, but don't get updates about private handoffs.
   const shieldCycle =
+    run.phase === 'shield-deals' ||
     run.phase === 'round-table' ||
     (run.phase === 'table-reveal' && !run.private.pendingTable?.blind) ||
+    run.phase === 'cocktail' ||
     run.phase === 'night' ||
     run.phase === 'night-resolved'
   const publicNightShieldWinnerIds = shieldCycle ? publicNightShieldWinners(run) : []
@@ -388,7 +431,10 @@ export function viewFor(run: Run, actorId: string | null) {
       fullImmunity: !exit && id === run.immunityId,
       publicShield:
         !exit &&
-        (run.phase === 'round-table' ||
+        (run.phase === 'after-immunity' ||
+          run.phase === 'safety' ||
+          run.phase === 'shield-deals' ||
+          run.phase === 'round-table' ||
           (run.phase === 'table-reveal' && !run.private.pendingTable?.blind)) &&
         run.day === run.publicShield?.day &&
         id === run.publicShield.id,

@@ -20,18 +20,19 @@ import type {
   ObservationFocus,
   PersonalRead,
   SharedReport,
+  WitnessRequest,
 } from './investigationRecords.ts'
 import { between, getSocialView, relationship } from './perception.ts'
 import { eligibleBanishmentTargets, hashId, isCurrentCommand } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { recordSocialWallet, socialWalletFor } from './socialResources.ts'
 
-const ENERGY_COST = 1
+export const INVESTIGATION_ENERGY_COST = 1
 const OBSERVATION_LIMIT = 3
 
 export type InvestigationAction =
-  | { kind: 'observe'; guestId: string; focus: ObservationFocus }
-  | { kind: 'ask'; guestId: string; speakerId: string; referenceId?: string }
+  | { kind: 'observe'; guestId: string; focus: ObservationFocus; incidentId?: string }
+  | { kind: 'ask'; guestId: string; speakerId: string; referenceId?: string; incidentId?: string }
   | { kind: 'source' | 'confront' | 'witness' | 'save'; reportId: string }
   | { kind: 'watch'; guestId: string; speakerId: string }
   | { kind: 'note'; guestId: string; note: PersonalRead }
@@ -46,8 +47,10 @@ export function observationsRemaining(run: Run) {
   )
 }
 
-function investigationOpen(run: Run) {
-  return run.phase === 'social' && !run.result && isActiveGuest(run, run.humanId)
+export function investigationOpen(run: Run) {
+  const castleWindow =
+    run.dayFlow?.castleDay === true && (run.phase === 'dawn' || run.phase === 'shield-deals')
+  return (run.phase === 'social' || castleWindow) && !run.result && isActiveGuest(run, run.humanId)
 }
 
 function witnessWindow(run: Run) {
@@ -97,13 +100,35 @@ export function investigationActionReason(
       !isActiveGuest(run, action.speakerId))
   )
     return 'Choose another guest to speak with.'
-  if (socialWalletFor(run, run.humanId).energy < ENERGY_COST) return 'Requires 1 Energy.'
+  if (socialWalletFor(run, run.humanId).energy < INVESTIGATION_ENERGY_COST)
+    return `Requires ${INVESTIGATION_ENERGY_COST} Energy.`
 
   const today = state.reports.filter(({ day }) => day === run.day)
+  if (
+    'incidentId' in action &&
+    action.incidentId &&
+    !state.incidents.some(
+      (incident) =>
+        incident.id === action.incidentId &&
+        incident.guestId === guestId &&
+        incident.fact.day === run.day &&
+        (action.kind !== 'ask' ||
+          firsthandAt(incident, action.speakerId) ||
+          incident.relayIds.includes(action.speakerId))
+    )
+  )
+    return 'That conversation is unavailable.'
   switch (action.kind) {
     case 'observe':
       if (!OBSERVATION_FOCI.includes(action.focus)) return 'Choose what to watch.'
-      if (today.some((item) => item.method === 'observe' && item.guestId === guestId))
+      if (
+        today.some(
+          (item) =>
+            item.method === 'observe' &&
+            item.guestId === guestId &&
+            (!action.incidentId || item.incidentId === action.incidentId)
+        )
+      )
         return 'Already observed today.'
       if (observationsRemaining(run) <= 0) return 'Your attention is spent for today.'
       return
@@ -122,7 +147,10 @@ export function investigationActionReason(
       if (
         today.some(
           (item) =>
-            item.method === 'ask' && item.guestId === guestId && item.speakerId === action.speakerId
+            item.method === 'ask' &&
+            item.guestId === guestId &&
+            item.speakerId === action.speakerId &&
+            (!action.incidentId || item.incidentId === action.incidentId)
         )
       )
         return 'You already asked this guest today.'
@@ -150,6 +178,8 @@ export function investigationActionReason(
         return 'You have already asked for a lookout today.'
       return
     case 'witness':
+      if (run.dayFlow?.witness?.reportId === action.reportId)
+        return 'You already spoke to this witness about appearing at the Table.'
       if (
         report?.access !== 'firsthand' ||
         !isVoteClaim(report.claim) ||
@@ -186,7 +216,12 @@ function paid(run: Run, investigation: Investigation): Run {
     ...run,
     investigation,
     revision: run.revision + 1,
-    socialWallets: recordSocialWallet(run, run.humanId, { energy: -ENERGY_COST }, ENERGY_COST),
+    socialWallets: recordSocialWallet(
+      run,
+      run.humanId,
+      { energy: -INVESTIGATION_ENERGY_COST },
+      INVESTIGATION_ENERGY_COST
+    ),
   }
 }
 
@@ -217,13 +252,18 @@ function willingness(run: Run, speakerId: string, guestId: string, publicSetting
 
 function observe(run: Run, action: Extract<InvestigationAction, { kind: 'observe' }>) {
   const state = investigationFor(run)
-  const incident = state.incidents.find(
-    ({ guestId, fact }) => guestId === action.guestId && fact.day === run.day
-  )
+  const incident = state.incidents
+    .filter(
+      ({ id, guestId, fact }) =>
+        guestId === action.guestId &&
+        fact.day === run.day &&
+        (!action.incidentId || id === action.incidentId)
+    )
+    .at(-1)
   const report = { day: run.day, guestId: action.guestId, method: 'observe' } as const
   if (!incident) return addIntelReport(state, { ...report, access: 'unavailable' })
   const focus = observationsRemaining(run)
-  const { day, behavior, room, mood, contactId, topicId } = incident.fact
+  const { day, period, behavior, room, mood, contactId, topicId } = incident.fact
   const claim =
     focus === 1
       ? { day, room, mood: action.focus === 'demeanor' ? mood : undefined }
@@ -252,13 +292,19 @@ function observe(run: Run, action: Extract<InvestigationAction, { kind: 'observe
   return addIntelReport(state, {
     ...report,
     access: 'observed',
-    claim,
+    claim: { ...claim, period },
     incidentId: incident.id,
     nearbyId: focus === 3 && action.focus !== 'demeanor' ? incident.witnessId : undefined,
   })
 }
 
-function bestAccount(run: Run, guestId: string, speakerId: string, reference?: IntelReport) {
+function bestAccount(
+  run: Run,
+  guestId: string,
+  speakerId: string,
+  reference?: IntelReport,
+  incidentId = reference?.incidentId
+) {
   return investigationFor(run)
     .incidents.filter((incident) => {
       const { fact } = incident
@@ -266,17 +312,22 @@ function bestAccount(run: Run, guestId: string, speakerId: string, reference?: I
         incident.guestId === guestId &&
         fact.day >= run.day - 2 &&
         (!reference?.claim || fact.day === reference.claim.day) &&
+        (!incidentId || incident.id === incidentId) &&
         (firsthandAt(incident, speakerId) || incident.relayIds.includes(speakerId))
       )
     })
     .at(-1)
 }
 
-function answerQuestion(run: Run, action: Extract<InvestigationAction, { kind: 'ask' }>) {
+function answerQuestion(
+  run: Run,
+  action: Extract<InvestigationAction, { kind: 'ask' }>,
+  offeredAccount: boolean
+) {
   const state = investigationFor(run)
   const { guestId, speakerId } = action
   const reference = state.reports.find(({ id }) => id === action.referenceId)
-  const incident = bestAccount(run, guestId, speakerId, reference)
+  const incident = bestAccount(run, guestId, speakerId, reference, action.incidentId)
   const base = {
     day: run.day,
     method: 'ask',
@@ -284,9 +335,14 @@ function answerQuestion(run: Run, action: Extract<InvestigationAction, { kind: '
     guestId,
     referenceId: reference?.id,
   } as const
-  const chance = roll(run, 'ask', guestId, speakerId)
+  const chance = roll(
+    run,
+    action.incidentId ? `ask:${action.incidentId}` : 'ask',
+    guestId,
+    speakerId
+  )
   const openness = willingness(run, speakerId, guestId)
-  if (chance > openness + (reference ? 0.15 : 0))
+  if (!(offeredAccount && incident) && chance > openness + (reference ? 0.15 : 0))
     return addIntelReport(state, { ...base, access: 'withheld' })
 
   if (!incident) {
@@ -313,7 +369,7 @@ function answerQuestion(run: Run, action: Extract<InvestigationAction, { kind: '
     isVoteClaim(incident.fact) &&
     wouldProtect &&
     roll(run, 'cover', guestId, speakerId) < getSocialPersonality(speakerId).deceptionComfort * 0.24
-  const { day, behavior, contactId, topicId, room, mood } = incident.fact
+  const { day, period, behavior, contactId, topicId, room, mood } = incident.fact
   const firmDenial = firsthand && misleading && chance > openness - 0.35
   // A relay can mistake who stood with whom, but its source remains the same.
   const confused =
@@ -344,7 +400,7 @@ function answerQuestion(run: Run, action: Extract<InvestigationAction, { kind: '
   return addIntelReport(state, {
     ...base,
     access: firsthand ? 'firsthand' : 'hearsay',
-    claim,
+    claim: { ...claim, period },
     incidentId: incident.id,
     sourceId: !firsthand && chance < openness - 0.42 ? incident.witnessId : undefined,
   })
@@ -401,6 +457,7 @@ function confront(run: Run, state: Investigation, report: IntelReport) {
       claim && (denies || willing)
         ? {
             day: claim.day,
+            period: claim.period,
             behavior: claim.behavior,
             topicId: claim.topicId,
             denies: denies ? true : undefined,
@@ -412,9 +469,15 @@ function confront(run: Run, state: Investigation, report: IntelReport) {
 export function applyInvestigationAction(
   run: Run,
   token: CommandToken,
-  action: InvestigationAction
+  action: InvestigationAction,
+  { offeredAccount = false }: { offeredAccount?: boolean } = {}
 ): Run {
-  if (!isCurrentCommand(run, token) || investigationActionReason(run, action)) return run
+  if (
+    !isCurrentCommand(run, token) ||
+    run.presentation?.length ||
+    investigationActionReason(run, action)
+  )
+    return run
   const current =
     action.kind === 'observe' || action.kind === 'ask' ? openInvestigationDay(run) : run
   const state = investigationFor(current)
@@ -424,7 +487,7 @@ export function applyInvestigationAction(
     case 'observe':
       return paid(current, observe(current, action))
     case 'ask':
-      return paid(current, answerQuestion(current, action))
+      return paid(current, answerQuestion(current, action, offeredAccount))
     case 'source':
       return paid(current, followSource(current, state, report!))
     case 'confront':
@@ -489,13 +552,72 @@ export function applyInvestigationAction(
     case 'witness': {
       const speakerId = report!.speakerId!
       const guestId = report!.guestId
+      const request: WitnessRequest = { day: run.day, reportId: action.reportId, accepted: false }
       const accepted =
         roll(run, 'table-witness', guestId, speakerId) <
         willingness(run, speakerId, guestId, true) + 0.18
+      if (run.dayFlow && investigationOpen(run)) {
+        const profile = getSocialPersonality(speakerId)
+        const trust = relationship(run.social, speakerId, run.humanId)
+        const confidence =
+          profile.publicConflictComfort * 0.38 + trust.bond * 0.45 + trust.reliability * 0.3
+        if (confidence < 0.48 + roll(run, 'cover for testimony', guestId, speakerId) * 0.29) {
+          request.shield = 'pending'
+        } else request.accepted = accepted
+      } else request.accepted = accepted
       return paid(current, {
         ...state,
-        witnesses: [...state.witnesses, { day: run.day, reportId: action.reportId, accepted }],
+        witnesses: [...state.witnesses, request],
       })
     }
+  }
+}
+
+export function settleDayWitnesses(run: Run): Run {
+  if (!run.dayFlow) return run
+  const state = investigationFor(run)
+  const legacy = run.dayFlow.witness
+  if (
+    !legacy &&
+    !state.witnesses.some(({ day, shield }) => day === run.day && shield === 'pending')
+  )
+    return run
+  const eligible = eligibleBanishmentTargets(run, run.humanId)
+  const protectedAtNight = (id: string) =>
+    id === run.immunityId || run.private.nightShieldIds.includes(id)
+  const witnesses = state.witnesses.map((request): WitnessRequest => {
+    if (request.day !== run.day || request.shield !== 'pending') return request
+    const report = state.reports.find(({ id }) => id === request.reportId)
+    const accepted = Boolean(
+      report?.speakerId &&
+      isActiveGuest(run, report.speakerId) &&
+      protectedAtNight(report.speakerId) &&
+      eligible.includes(report.guestId)
+    )
+    return { ...request, accepted, shield: accepted ? 'met' : 'unmet' }
+  })
+  if (!legacy) return { ...run, investigation: { ...state, witnesses } }
+
+  const guestId = state.reports.find(({ id }) => id === legacy.reportId)?.guestId
+  const ready = Boolean(
+    guestId &&
+    eligible.includes(guestId) &&
+    (!legacy.needsShield || protectedAtNight(legacy.guestId))
+  )
+  return {
+    ...run,
+    dayFlow: { ...run.dayFlow, witness: { ...legacy, ready } },
+    investigation: {
+      ...state,
+      witnesses: [
+        ...witnesses.filter(({ day, reportId }) => day !== run.day || reportId !== legacy.reportId),
+        {
+          day: run.day,
+          reportId: legacy.reportId,
+          accepted: ready,
+          shield: legacy.needsShield ? (ready ? 'met' : 'unmet') : undefined,
+        },
+      ],
+    },
   }
 }

@@ -1,19 +1,14 @@
 import { mulberry32, seededPick } from '../store/rng.ts'
-import { isCurrentCommand } from './run.ts'
+import { isCurrentCommand, publicShieldPending } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
+import { prepareVotePlans } from './votePlans.ts'
 
 export function awardPublicShield(
   run: Run,
   token: CommandToken,
   approval: Readonly<Record<string, number>>
 ): Run {
-  if (
-    !isCurrentCommand(run, token) ||
-    run.phase !== 'round-table' ||
-    !run.options.publicMode ||
-    run.publicShieldDecisionDay === run.day
-  )
-    return run
+  if (!isCurrentCommand(run, token) || !publicShieldPending(run)) return run
 
   const yesterday = run.publicShield?.day === run.day - 1 ? run.publicShield.id : undefined
   const ratings = run.seats
@@ -26,7 +21,7 @@ export function awardPublicShield(
     .sort()
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 10853))
 
-  return {
+  const next = {
     ...run,
     revision: run.revision + 1,
     publicShieldDecisionDay: run.day,
@@ -34,4 +29,5 @@ export function awardPublicShield(
       ? { day: run.day, id: seededPick(random, candidates) }
       : run.publicShield,
   }
+  return next.phase === 'after-immunity' ? prepareVotePlans(next) : next
 }

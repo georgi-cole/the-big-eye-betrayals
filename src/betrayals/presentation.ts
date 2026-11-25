@@ -19,7 +19,9 @@ export function presentationAfter(
     case 'immunity':
       return ['shield']
     case 'safety':
-      return after.day === 1 ? ['safety-results', 'round-table'] : ['safety-results']
+      return ['safety-results']
+    case 'shield-deals':
+      return after.day === 1 ? ['round-table'] : []
     case 'final-challenge':
       return ['round-table']
     case 'table-reveal':
@@ -29,8 +31,20 @@ export function presentationAfter(
         after.seats.some(({ id, exit }) => id === after.humanId && !exit)
         ? ['departure', 'conclave-arrival']
         : ['departure']
+    case 'cocktail':
+      return playNightFilm && conclaveGuests(after, after.humanId).length
+        ? ['conclave-arrival']
+        : []
     case 'night': {
       const decision = after.private.pendingNight
+      if (after.dayFlow?.castleDay) {
+        const cue: PresentationCue = conclaveGuests(after, after.humanId).length
+          ? 'conclave-seal'
+          : 'conclave-shadow'
+        const cues: PresentationCue[] = playNightFilm ? [cue] : []
+        if (decision?.targetId && !decision.blocked) cues.push('death-letter')
+        return cues
+      }
       if (decision?.targetId === after.humanId && !decision.blocked)
         return playNightFilm ? ['death-letter'] : []
       const participating = after.seats.some(({ id, exit }) => id === after.humanId && !exit)
@@ -77,6 +91,17 @@ export function dawnBroadcast(run: Pick<Run, 'lastDawn' | 'seats' | 'publicSeed'
   return dawnLossLines[variant](guest.name)
 }
 
+const nightLines = [
+  'Everyone is trying to sleep. However, evil never sleeps.',
+  'The castle has gone quiet. Somewhere, a door opens.',
+  'The lights are out. Behind one door, the night is just beginning.',
+  'Most of the castle is asleep. Footsteps still echo below.',
+]
+
+export function nightBroadcast(run: Pick<Run, 'day' | 'publicSeed'>) {
+  return nightLines[((run.publicSeed >>> 0) + run.day - 1) % nightLines.length]
+}
+
 export function castleWeather(run: Run, day = run.day): CastleWeather {
   const mix = Math.imul(run.publicSeed ^ Math.imul(day, 3851), 0x45d9f3b)
   return weather[((mix ^ (mix >>> 16)) >>> 0) % weather.length]
@@ -95,6 +120,8 @@ export function cinematicFor(
   const guests = (members: typeof run.seats) =>
     members.map((member) => ({ ...member, human: member.id === run.humanId }))
   switch (cue) {
+    case 'conclave-shadow':
+      return { ...scene, subtitle: 'Whispers drift through the dark.' }
     case 'conclave-arrival': {
       const guestsInRoom = conclaveGuests(run, actorId)
       return {
@@ -130,7 +157,7 @@ export function cinematicFor(
       return { ...scene, subject: seat(run.immunityId) }
     case 'death-letter': {
       const beforeDawn = run.phase === 'night-resolved'
-      const subject = seat(beforeDawn ? run.humanId : victim)
+      const subject = seat(beforeDawn ? run.private.pendingNight?.targetId : victim)
       const night = Math.max(1, run.day - Number(!beforeDawn))
       const skyIndex = (run.publicSeed >>> 0) + night - 1
       const skyCycle = Math.floor(skyIndex / nightSkies.length)

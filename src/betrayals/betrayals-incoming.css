@@ -60,3 +60,64 @@
   border-color: #8b6c50 !important;
   background: linear-gradient(145deg, #594536, #29221c) !important;
 }
+
+.betrayals-incoming-dialog .betrayals-inbox__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.12rem 0.45rem;
+}
+
+.betrayals-inbox__response {
+  flex: 1 1 max-content;
+  min-width: 0;
+}
+
+.betrayals-inbox__intel-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.15rem 0.3rem;
+  margin-inline-start: auto;
+}
+
+.betrayals-inbox__intel-links .betrayals-inbox__intel {
+  display: inline-flex;
+  min-height: 2rem;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.69rem;
+  white-space: nowrap;
+}
+
+.betrayals-incoming-dialog .betrayals-resource-costs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.12em 0.42em;
+  margin-block-start: 0.14rem;
+}
+
+.betrayals-incoming-dialog .betrayals-resource-costs span {
+  white-space: nowrap;
+}
+
+.betrayals-inbox__card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: flex-end;
+  gap: 0.15rem 0.3rem;
+}
+
+.betrayals-inbox__card-head > .inbox-item__header {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.betrayals-inbox__card-head > .betrayals-inbox__intel {
+  display: inline-flex;
+  min-height: 2rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.67rem;
+  white-space: nowrap;
+}

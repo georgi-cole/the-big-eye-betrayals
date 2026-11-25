@@ -1,4 +1,5 @@
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
+import { waitingShieldWitnesses } from './investigationRecords.ts'
 import {
   firsthandShieldReports,
   nightExposure,
@@ -72,10 +73,7 @@ export function shieldFollowUpFor(run: Run, speakerId: string) {
   const plan = replies.find(({ kind }) => kind === 'shield-plans')?.shieldPlan
   // Everyone can follow up on a claim, even if it was a bluff.
   const open =
-    run.phase === 'round-table' &&
-    !run.result &&
-    !run.tableCount &&
-    !run.runoffIds &&
+    nightShieldWindowOpen(run) &&
     run.seats.some(({ id, exit }) => id === speakerId && !exit) &&
     run.seats.some(({ id, exit }) => id === run.humanId && !exit)
 
@@ -143,12 +141,45 @@ export function respondToShieldFollowUp(
 /** Initial choices happen once, when Safety awards the two shields. */
 export function prepareShieldConversations(run: Run): Run {
   const guests = run.seats.filter(({ exit }) => !exit)
-  if (!nightShieldWindowOpen(run) || guests.length <= 6) return run
+  if (!nightShieldWindowOpen(run) || (guests.length <= 6 && !run.dayFlow)) return run
   let next = run
   const winners = nightShieldWinners(run)
 
   for (const actorId of winners) {
     if (actorId === run.humanId) continue
+    const safety = next.dayFlow?.safety
+    if (
+      next.dayFlow &&
+      safety?.kind === 'request' &&
+      safety.guestId === actorId &&
+      safety.accepted
+    ) {
+      const humanId = run.humanId
+      const profile = getSocialPersonality(actorId)
+      const trust = rapport(run.social, actorId, humanId)
+      const risk = run.private.betrayers.includes(actorId) ? 0 : nightExposure(run, actorId)
+      const honors =
+        shieldRoll(next, actorId, 21351) <
+        0.76 + trust * 0.42 + profile.loyalty * 0.19 - risk * 0.39
+      const gifted = honors ? send(next, actorId, humanId, 'shield-gift') : next
+      const kept = gifted !== next
+      next = {
+        ...gifted,
+        dayFlow: { ...next.dayFlow, safety: { ...safety, result: kept ? 'kept' : 'broken' } },
+        social: [
+          ...gifted.social,
+          {
+            day: run.day,
+            actorId,
+            recipientId: humanId,
+            kind: 'shield-request',
+            accepted: kept,
+            reaction: kept ? 'repaired' : 'backfired',
+          },
+        ],
+      }
+      continue
+    }
     const personality = getSocialPersonality(actorId)
     const teammates = knownTeammateIds(next, actorId)
     const recipient = giftTarget(
@@ -229,8 +260,15 @@ export function finishShieldConversations(run: Run): Run {
   const handoffs = run.social.filter(({ day, kind }) => day === run.day && kind === 'shield-gift')
   const donors = new Set(handoffs.map(({ actorId }) => actorId))
   const latestGivers = new Map(handoffs.map(({ actorId, recipientId }) => [recipientId, actorId]))
+  const witnesses = new Set(waitingShieldWitnesses(run))
   for (const { id } of active) {
-    if (id === run.humanId || !next.private.nightShieldIds.includes(id) || donors.has(id)) continue
+    if (
+      id === run.humanId ||
+      !next.private.nightShieldIds.includes(id) ||
+      donors.has(id) ||
+      witnesses.has(id)
+    )
+      continue
     const giver = latestGivers.get(id)
     if (!giver) continue
     // A late gift to the human would leave them without a chance to pass it on.
