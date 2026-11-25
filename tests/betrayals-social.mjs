@@ -5,8 +5,6 @@ import { resolveChallenge } from '../src/betrayals/challenges.ts'
 import {
   applyCastleAllianceChange,
   applyGeneralSocialMove,
-  CASTLE_EXPLORATION_INFO,
-  EAVESDROP_INFO,
 } from '../src/betrayals/generalSocial.ts'
 import { castleAlliances } from '../src/betrayals/allianceRecords.ts'
 import { restoreRun, saveRun } from '../src/betrayals/persistence.ts'
@@ -26,14 +24,21 @@ import {
   latestPact,
   rapport,
 } from '../src/betrayals/social.ts'
-import { recordSocialWallet, socialWalletFor } from '../src/betrayals/socialResources.ts'
+import {
+  CASTLE_EXPLORATION_INFO,
+  EAVESDROP_INFO,
+  rechargeSocialEnergy,
+  recordSocialWallet,
+  socialWalletFor,
+} from '../src/betrayals/socialResources.ts'
 import { chooseTarget } from '../src/betrayals/strategy.ts'
+import { buildTableBallots, resolveTable } from '../src/betrayals/table.ts'
 
-function createRun() {
+function createRun(realityMode = 'tv') {
   const run = startRun(
     { id: 'human', name: 'Human' },
     Array.from({ length: 24 }, (_, index) => ({ id: 'ai-' + index, name: 'Player ' + index })),
-    { publicMode: false, realityMode: 'tv' },
+    { publicMode: false, realityMode },
     { id: 'social', roleSeed: 514, publicSeed: 319 }
   )
   const dawn = acknowledgeRole(run, commandToken(run))
@@ -52,6 +57,7 @@ test('the castle actions spend or conserve Energy, improve group rapport, and sa
   assert.strictEqual(applyGeneralSocialMove(run, token, 'group-chat', [first]), run)
   const group = applyGeneralSocialMove(run, token, 'group-chat', [first, second])
   assert.equal(socialWalletFor(group, actor).energy, socialWalletFor(run, actor).energy - 2)
+  assert.equal(socialWalletFor(group, actor).influence, 4)
   assert.ok(rapport(group.social, actor, first) > 0 && rapport(group.social, second, actor) > 0)
   assert.equal(getSocialView(group, outsider).length, 0)
   assert.strictEqual(
@@ -235,7 +241,7 @@ test('private vote plans close at the Round Table and only target publicly eligi
   assert.strictEqual(exchange(table, actor, peer, 'vote-plan', shielded), table)
   const planned = exchange(table, actor, peer, 'vote-plan', hiddenShield)
   assert.equal(latestPact(planned.social, actor, peer, table.day)?.suspectId, hiddenShield)
-  assert.equal(socialWalletFor(planned, actor).influence, 23)
+  assert.equal(socialWalletFor(planned, actor).influence, 31)
   assert.equal(socialWalletFor(planned, actor).info, 50)
   const atTable = { ...planned, phase: 'round-table' }
   assert.strictEqual(exchange(atTable, actor, peer, 'vote-plan', other), atTable)
@@ -314,6 +320,80 @@ test('second wind and podium Energy are awarded once and saved with the balances
   const legacy = restoreRun(storage, 'test').run
   assert.equal(socialWalletFor(legacy, actor).energy, 7)
   assert.equal(socialWalletFor({ ...legacy, day: 9 }, actor).energy, 14)
+})
+
+for (const preset of ['off', 'casual', 'tv', 'adult']) {
+  test('the first day funds a vote plan outside the podium with the ' + preset + ' preset', () => {
+    let run = createRun(preset)
+    const [actor, peer, suspect] = run.seats.map(({ id }) => id)
+    for (let step = 0; step < 4; step++) run = exchange(run, actor, peer, 'rapport')
+    run = exchange(run, actor, peer, 'question', suspect)
+    assert.equal(socialWalletFor(run, actor).influence, 13)
+    assert.equal(socialWalletFor(run, actor).info, 100)
+    const immunity = { ...run, phase: 'immunity' }
+    const standings = immunity.seats.map(({ id }) => ({
+      contestantId: id,
+      score: id === actor ? 0 : 1,
+      potContribution: 0,
+    }))
+    run = resolveChallenge(immunity, commandToken(immunity), standings)
+    assert.equal(socialWalletFor(run, actor).energy, preset === 'off' ? 3 : 4)
+    const planned = exchange(run, actor, peer, 'vote-plan', suspect)
+    assert.equal(latestPact(planned.social, actor, peer, run.day)?.suspectId, suspect)
+    assert.deepEqual(socialWalletFor(planned, actor), {
+      day: 1,
+      energy: 1,
+      energySpent: preset === 'off' ? 7 : 9,
+      influence: 1,
+      info: 50,
+    })
+    const table = {
+      ...planned,
+      phase: 'round-table',
+      socialWallets: recordSocialWallet(planned, actor, { energy: -1, influence: -1, info: -50 }),
+    }
+    const counted = resolveTable(table, commandToken(table), buildTableBallots(table, suspect))
+    assert.notStrictEqual(counted, table)
+    assert.deepEqual(socialWalletFor(counted, actor), socialWalletFor(table, actor))
+  })
+}
+
+test('a held-back answer charges only the listed Energy and Influence', () => {
+  const original = createRun()
+  const [actor, peer, suspect] = original.seats.map(({ id }) => id)
+  const funded = {
+    ...original,
+    socialWallets: recordSocialWallet(original, actor, { influence: 5 }),
+  }
+  const read = exchange(funded, actor, peer, 'ask-about', suspect)
+  assert.equal(read.social.at(-1).reaction, 'held-back')
+  assert.deepEqual(socialWalletFor(read, actor), {
+    day: 1,
+    energy: 6,
+    energySpent: 1,
+    influence: 3,
+    info: 0,
+  })
+})
+
+test('rewarded recharge adds exactly six Energy to the exhausted season wallet', () => {
+  const original = createRun()
+  const { humanId: actor } = original
+  const ready = {
+    ...original,
+    socialWallets: recordSocialWallet(original, actor, { energy: -7, influence: 5, info: 25 }, 7),
+  }
+  const recharged = rechargeSocialEnergy(ready)
+  assert.deepEqual(socialWalletFor(recharged, actor), {
+    day: 1,
+    energy: 6,
+    energySpent: 7,
+    influence: 5,
+    info: 25,
+  })
+  assert.strictEqual(rechargeSocialEnergy(recharged), recharged)
+  const finished = { ...ready, phase: 'settled' }
+  assert.strictEqual(rechargeSocialEnergy(finished), finished)
 })
 
 test('asking about a guest gives a private opinion and spends Influence', () => {

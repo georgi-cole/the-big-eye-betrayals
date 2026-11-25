@@ -61,8 +61,12 @@ describe('Betrayals private conversations', () => {
     fireEvent.click(picker.getByRole('button', { name: /Ren/ }))
     expect(execute).toBeDisabled()
     fireEvent.click(picker.getByRole('button', { name: /Sable/ }))
+    fireEvent.click(picker.getByRole('button', { name: /Opal/ }))
+    const groupCard = within(general.getByRole('button', { name: /Group Chat/ }))
+    expect(groupCard.getByLabelText('Energy cost: 3')).toBeVisible()
+    expect(groupCard.queryByText(/Earn|\+\d+/)).toBeNull()
     fireEvent.click(execute)
-    expect(onGeneralMove).toHaveBeenCalledWith('group-chat', ['ren', 'sable'])
+    expect(onGeneralMove).toHaveBeenCalledWith('group-chat', ['ren', 'sable', 'opal'])
     const alliances = within(screen.getByRole('region', { name: 'Your alliances' }))
     fireEvent.click(alliances.getByRole('button', { name: /Opal/ }))
     expect(screen.queryByRole('region', { name: 'General actions' })).toBeNull()
@@ -71,6 +75,33 @@ describe('Betrayals private conversations', () => {
       'aria-disabled',
       'true'
     )
+  })
+
+  it('shows matching resource symbols for costs without forecasting rewards', () => {
+    render(
+      <BetrayalsSocialPanel
+        hasRealityMode
+        actorId="human"
+        prospects={prospects}
+        resources={resources}
+        phase="social"
+        onClose={vi.fn()}
+        onMove={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Ren/ }))
+    const ask = within(screen.getByRole('button', { name: /Ask about a player/ }))
+    const share = within(screen.getByRole('button', { name: /Share a suspicion/ }))
+    for (const [cost, balance, card] of [
+      ['Energy cost: 1', 'Energy: 5', ask],
+      ['Influence cost: 2', 'Influence: 20', ask],
+      ['Info cost: 25', 'Info: 100', share],
+    ] as const) {
+      const symbol = screen.getByLabelText(balance).textContent?.split(' ')[0]
+      expect(card.getByLabelText(cost).textContent?.split(' ')[0]).toBe(symbol)
+    }
+    expect(ask.queryByText(/Earn|\+\d+/)).toBeNull()
+    expect(share.queryByText(/Earn|\+\d+/)).toBeNull()
   })
 
   it('chooses a contact independently and sends a vote plan to that contact', () => {

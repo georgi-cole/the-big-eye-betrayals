@@ -15,11 +15,13 @@ import { recordAdShown } from '../../store/adsSlice'
 import { hasEffectiveStoreEntitlement } from '../../vip/effectiveEntitlements'
 import { IS_MOBILE_DEV_BUILD } from '../../config/buildTarget'
 import { setEnergyBankEntry } from '../../social/socialSlice'
+import { SOCIAL_RESOURCE_CALIBRATION } from '../../social/socialResourceCalibration'
 import { subscribePlayerSafety } from '../../safety/playerSafety'
 import { usesContextualAdTreatment } from './adAudience'
 export { getAdAvailabilityMessage } from './adAvailability'
 
-export const SOCIAL_ENERGY_RECHARGE_REWARD = 6
+export const SOCIAL_ENERGY_RECHARGE_REWARD = SOCIAL_RESOURCE_CALIBRATION.rewardedRechargeEnergy
+export const BETRAYALS_SOCIAL_RECHARGE_PLACEMENT = 'betrayals_social_energy_recharge'
 
 export type AdPlacement =
   | 'competition_retry'
@@ -30,6 +32,7 @@ export type AdPlacement =
   | 'final3_part3_break'
   | 'survival_elimination_auto'
   | 'social_energy_recharge'
+  | typeof BETRAYALS_SOCIAL_RECHARGE_PLACEMENT
   | 'public_meter_audience_insight'
   | 'eviction_vote_breakdown'
   | 'vox_nomination_breakdown'
@@ -63,6 +66,7 @@ export const INTERSTITIAL_PLACEMENTS = new Set<AdPlacement>([
 
 export const DAILY_LIMITED_PLACEMENTS = new Set<AdPlacement>([
   'social_energy_recharge',
+  BETRAYALS_SOCIAL_RECHARGE_PLACEMENT,
   'public_meter_audience_insight',
 ])
 

@@ -30,6 +30,9 @@ import {
 } from '../store/durablePersistence'
 import { currentAudienceApproval } from './audience'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
+import { BETRAYALS_SOCIAL_RECHARGE_PLACEMENT } from '../services/ads/adsService'
+import { getAdAvailabilityMessage } from '../services/ads/adAvailability'
+import { useRewardedAd } from '../services/ads/useRewardedAd'
 import { BetrayalsBroadcast } from './BetrayalsBroadcast'
 import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
 import { BetrayalsConclave, ConclaveDiscussion } from './BetrayalsConclave'
@@ -93,7 +96,7 @@ import { SafetyResults } from './SafetyResults'
 import { resolveBetrayalsSoundtrackScene, useBetrayalsSoundtrack } from './betrayalsSoundtrack'
 import { intendsToEnd, resolveEndVote } from './settlement'
 import { applySocialMove, getSocialView, socialMoveKinds } from './social'
-import { socialWalletFor } from './socialResources'
+import { canRechargeSocialEnergy, rechargeSocialEnergy, socialWalletFor } from './socialResources'
 import { restoreRun, saveRun } from './persistence'
 import { Roster } from './Roster'
 import {
@@ -164,6 +167,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<string>()
   const [socialOpen, setSocialOpen] = useState(false)
+  const rechargeAd = useRewardedAd()
+  const recharging = useRef(false)
+  const [rechargeNotice, setRechargeNotice] = useState<string>()
   const [incomingOpen, setIncomingOpen] = useState(false)
   const [pulse, setPulse] = useState<PulseLocation>()
   const [homeOpen, setHomeOpen] = useState(false)
@@ -705,6 +711,44 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     }
     const next = transform(active)
     if (next !== active) return commit(next)
+  }
+
+  async function watchEnergyRecharge() {
+    const offered = current.current
+    if (
+      recharging.current ||
+      !offered ||
+      offered !== run ||
+      !canSocialize ||
+      !canRechargeSocialEnergy(offered) ||
+      pendingPaidNightShieldPurchase(offered)
+    )
+      return
+
+    recharging.current = true
+    setRechargeNotice(undefined)
+    try {
+      const earned = await rechargeAd.request(BETRAYALS_SOCIAL_RECHARGE_PLACEMENT)
+      const active = current.current
+      if (
+        !mounted.current ||
+        !active ||
+        active.id !== offered.id ||
+        active.day !== offered.day ||
+        pendingPaidNightShieldPurchase(active)
+      )
+        return
+      if (!earned) {
+        setRechargeNotice(getAdAvailabilityMessage() ?? 'The ad did not finish. Please try again.')
+        return
+      }
+      const next = rechargeSocialEnergy(active)
+      if (next !== active) await commit(next, false, false, active)
+    } catch {
+      if (mounted.current) setRechargeNotice('The ad reward could not be completed.')
+    } finally {
+      recharging.current = false
+    }
   }
 
   function advanceConclave() {
@@ -1317,6 +1361,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             prospects={activeCast}
             cast={view.seats}
             resources={socialResources}
+            energyRecharge={{
+              watch: () => void watchEnergyRecharge(),
+              pending: rechargeAd.pending,
+              dailyLimit: rechargeAd.dailyLimitReached(BETRAYALS_SOCIAL_RECHARGE_PLACEMENT),
+              notice: rechargeNotice,
+            }}
             realityMode={run.options.realityMode}
             hasRealityMode={commerce.realityMode}
             hasMyPulse={commerce.myPulse}

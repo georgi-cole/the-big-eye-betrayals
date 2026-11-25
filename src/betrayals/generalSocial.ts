@@ -7,9 +7,9 @@ import { addIntelReport, isVoteClaim } from './investigationRecords.ts'
 import { hasPersonalAlliance, rapport } from './perception.ts'
 import {
   missingSocialResource,
-  recordSocialWallet,
   socialMoveCost,
   socialWalletFor,
+  walletAfterSocialMove,
 } from './socialResources.ts'
 
 export const GENERAL_SOCIAL_MOVES = [
@@ -25,8 +25,6 @@ export type AllianceMoveDetails = { allianceId?: string; subjectId?: string }
 type AllianceChange = NonNullable<SocialEntry['allianceChange']>
 export const MIN_CHAT_GUESTS = 2
 export const MAX_CHAT_GUESTS = 4
-export const CASTLE_EXPLORATION_INFO = 25
-export const EAVESDROP_INFO = 100
 
 export function isGeneralSocialMove(kind: string): kind is GeneralSocialMove {
   return GENERAL_SOCIAL_MOVES.some((move) => move === kind)
@@ -240,7 +238,6 @@ export function applyGeneralSocialMove(
 
   const cost = socialMoveCost(kind, run.options.realityMode, guestIds.length)
   if (missingSocialResource(socialWalletFor(run, actorId), cost)) return run
-  const { energy } = cost
   let investigation = run.investigation
   let entries: SocialEntry[] = (kind === 'group-chat' ? guestIds : [actorId]).map(
     (recipientId) => ({
@@ -327,21 +324,6 @@ export function applyGeneralSocialMove(
     investigation,
     revision: run.revision + 1,
     social: [...run.social, ...entries],
-    socialWallets: recordSocialWallet(
-      run,
-      actorId,
-      {
-        energy: -energy,
-        info:
-          kind === 'explore-castle'
-            ? CASTLE_EXPLORATION_INFO
-            : kind === 'eavesdrop'
-              ? entries[0].suspectId
-                ? EAVESDROP_INFO
-                : CASTLE_EXPLORATION_INFO
-              : 0,
-      },
-      energy
-    ),
+    socialWallets: walletAfterSocialMove(run, entries[0], cost, guestIds.length),
   }
 }

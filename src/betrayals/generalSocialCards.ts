@@ -1,5 +1,4 @@
 import type { SocialActionDefinition } from '../social/socialActions'
-import { CASTLE_EXPLORATION_INFO } from './generalSocial'
 import type { GeneralSocialMove } from './generalSocial'
 
 export const generalActionCards = [
@@ -22,15 +21,14 @@ export const generalActionCards = [
     title: 'Explore the Castle',
     category: 'strategic',
     icon: '🕯️',
-    description: `Listen around the castle and pick up ${CASTLE_EXPLORATION_INFO} Info.`,
+    description: 'Listen around the castle for useful information.',
   },
   {
     id: 'eavesdrop',
     title: 'Eavesdrop',
     category: 'strategic',
     icon: '👂',
-    description:
-      'Listen for a private conversation. You might catch a rumor or pick up a little Info.',
+    description: 'Listen for a private conversation. You might catch a useful lead.',
   },
   {
     id: 'found-alliance',

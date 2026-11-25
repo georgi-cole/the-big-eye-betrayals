@@ -9,6 +9,7 @@ import { castleAlliances } from './allianceRecords'
 import { generalActionCards } from './generalSocialCards'
 import type { RealityPreset, SocialEntry } from './run'
 import { socialMoveCost } from './socialResources'
+import { BETRAYALS_RESOURCE_ICONS } from './socialResourcePresentation'
 import { canUseBetrayalsAction, isPremiumBetrayalsAction } from './premiumAccess'
 
 export function BetrayalsGeneralActions({
@@ -132,6 +133,7 @@ export function BetrayalsGeneralActions({
                 key={action.id}
                 action={{ ...action, baseCost: cost.energy }}
                 costs={cost}
+                resourceIcons={BETRAYALS_RESOURCE_ICONS}
                 selected={selected === action.id}
                 premiumLocked={!hasRealityMode && isPremiumBetrayalsAction(action.id)}
                 onPremiumLockedClick={onUpgrade}
