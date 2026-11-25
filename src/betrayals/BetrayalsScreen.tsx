@@ -90,6 +90,7 @@ import { chooseTarget, resolutionPerspective } from './strategy'
 import { advanceDayBeat } from './daySocial'
 import { advanceDayAftermath } from './dayAftermath'
 import { nightShieldWindowOpen } from './nightShields'
+import { answerRecruitment, recruitmentFor } from './recruitment'
 import { askWitness, leadForPlayer } from './intel'
 import {
   applyInvestigationAction,
@@ -647,6 +648,10 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
   const conclave = getConclaveView(run, viewerId, selected)
+  const recruitment = recruitmentFor(run, viewerId)
+  const recruitmentTargets = recruitment?.kind === 'choose' ? recruitment.targetIds : undefined
+  const recruitmentOffer = recruitment?.kind === 'offer' ? recruitment : undefined
+  const conclaveChoice = Boolean(conclave || recruitmentTargets)
   const conclaveLines = conclave?.discussion ?? []
   const conclaveKey = `${run.id}:${run.day}`
   const conclaveStep = conclaveProgress?.key === conclaveKey ? conclaveProgress.step : 0
@@ -657,7 +662,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       ? tableTargets(run, run.humanId)
       : conclaveLine
         ? []
-        : (conclave?.targetIds ?? [])
+        : (recruitmentTargets ?? conclave?.targetIds ?? [])
   const field = challengeContestantIds(run)
   const canPlay = field.includes(run.humanId)
   const game = challengeGame(run)
@@ -703,11 +708,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const showRevealReward =
     !cue && stage === 'settled' && !!run.result && !run.seasonRewards?.finaleRevealed
   const openingConclave =
-    cue === 'conclave-arrival' && conclave ? (run.day === 1 ? 'first' : 'return') : undefined
+    cue === 'conclave-arrival' && conclaveChoice ? (run.day === 1 ? 'first' : 'return') : undefined
   const conclaveVerdict =
     cue === 'conclave-seal' ? describeConclaveVerdict(run, viewerId) : undefined
-  const filmDiscussion = Boolean(
-    playNightFilm && ((conclave && (!cue || openingConclave)) || conclaveVerdict)
+  const showConclaveDialog = Boolean(
+    (recruitmentTargets && !cue) ||
+    (playNightFilm && ((conclaveChoice && (!cue || openingConclave)) || conclaveVerdict))
   )
   const bypassHotel =
     cue === 'death-letter' && run.presentation?.[1] === 'awakening' && !playNightFilm
@@ -716,7 +722,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const discussionVisible = discussion && !cue && closedDiscussion !== discussionKey
   const cinematic =
     shownCue &&
-    !filmDiscussion &&
+    !showConclaveDialog &&
     !omitConclaveFilm &&
     shownCue !== 'safety-results' &&
     shownCue !== 'sunrise'
@@ -1102,6 +1108,28 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       }
       break
     case 'night':
+      if (recruitmentOffer) {
+        message = 'A sealed invitation'
+        detail = recruitmentOffer.shielded
+          ? 'The Conclave asks you to join. Your Night Shield lets you decline and stay Loyal.'
+          : 'The Conclave asks you to join. If you decline, you leave the castle.'
+        play = {
+          label: 'Join the Betrayers',
+          faceLabel: 'Accept',
+          onClick: () => apply((active) => answerRecruitment(active, token, true)),
+        }
+        break
+      }
+      if (recruitmentTargets) {
+        message = 'Choose a Loyal to recruit.'
+        play = {
+          label: 'Send invitation',
+          faceLabel: 'Invite',
+          disabled: !isTarget,
+          onClick: advanceConclave,
+        }
+        break
+      }
       message = conclave ? undefined : (!castleDay && banishment) || nightBroadcast(run)
       detail = conclave
         ? !playNightFilm && (
@@ -1138,7 +1166,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       }
       break
     case 'night-resolved':
-      message = (!playNightFilm && describeConclaveVerdict(run, viewerId)) || nightBroadcast(run)
+      message =
+        ((!playNightFilm || pendingNight?.recruitedId) && describeConclaveVerdict(run, viewerId)) ||
+        nightBroadcast(run)
       play = {
         label: 'Open Dawn',
         faceLabel: 'Dawn',
@@ -1247,7 +1277,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     </div>
   )
 
-  if (stage === 'night' && run.dayFlow && !conclave && participating) {
+  if (stage === 'night' && run.dayFlow && !conclaveChoice && !recruitmentOffer && participating) {
     const order = run.dayFlow.night
     detail =
       order?.kind === 'meeting'
@@ -1308,7 +1338,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         inert={
           Boolean(cue) ||
           discussionVisible ||
-          filmDiscussion ||
+          showConclaveDialog ||
           Boolean(run.pendingAdBreak) ||
           adBreak.active
         }
@@ -1374,7 +1404,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         </header>
 
         <BetrayalsBroadcast
-          title={conclave ? 'The Conclave' : stageTitle}
+          title={conclaveChoice ? 'The Conclave' : stageTitle}
           message={message}
           detail={detail}
           interactive={Boolean(tableFeed)}
@@ -1427,7 +1457,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             selectedId={selected}
             humanId={run.humanId}
             sleeping={
-              (stage === 'night' && !conclave) ||
+              (stage === 'night' && !conclaveChoice) ||
               stage === 'night-resolved' ||
               shownCue === 'awakening'
             }
@@ -1497,11 +1527,22 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           }
           utility={
             finaleActions ||
+            recruitmentOffer ||
             (stage === 'end-vote' && participating) ||
             rewindTarget ||
             showRevealReward ? (
               <>
                 {finaleActions}
+                {recruitmentOffer && (
+                  <button
+                    type="button"
+                    className="betrayals-inline-action"
+                    disabled={requiredReply || Boolean(pendingPaidNightShieldPurchase(run))}
+                    onClick={() => apply((active) => answerRecruitment(active, token, false))}
+                  >
+                    {recruitmentOffer.shielded ? 'Decline and stay Loyal' : 'Decline and leave'}
+                  </button>
+                )}
                 {stage === 'end-vote' && participating && (
                   <button
                     type="button"
@@ -1670,12 +1711,14 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           onUpgrade={openUpgrade}
         />
       </main>
-      {filmDiscussion && (
+      {showConclaveDialog && (
         <ConclaveDiscussion
           key={conclaveKey}
           cast={conclaveGuests(run, viewerId)}
           view={view}
           vote={conclave ?? undefined}
+          recruitmentTargets={recruitmentTargets}
+          showFilm={playNightFilm}
           line={conclaveLine}
           step={conclaveStep}
           total={conclaveLines.length}

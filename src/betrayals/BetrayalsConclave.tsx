@@ -56,6 +56,8 @@ export function ConclaveDiscussion({
   cast,
   view,
   vote,
+  recruitmentTargets,
+  showFilm = true,
   line,
   step,
   total,
@@ -72,6 +74,8 @@ export function ConclaveDiscussion({
   cast: readonly CinematicCastMember[]
   view: ReturnType<typeof viewFor>
   vote?: ConclaveView
+  recruitmentTargets?: readonly string[]
+  showFilm?: boolean
   line?: ConclaveLine
   step: number
   total: number
@@ -100,7 +104,8 @@ export function ConclaveDiscussion({
       element.removeAttribute('open')
     }
   }, [])
-  const candidates = view.seats.filter(({ id }) => vote?.targetIds.includes(id))
+  const targetIds = recruitmentTargets ?? vote?.targetIds ?? []
+  const candidates = view.seats.filter(({ id }) => targetIds.includes(id))
   const selected = candidates.find(({ id }) => id === selectedId)
   const cameraBeat = opening
     ? conclaveOpeningBeats(cast, opening === 'first')[openingStep]
@@ -138,16 +143,18 @@ export function ConclaveDiscussion({
         skip()
       }}
     >
-      <div className="betrayals-conclave-dialog__shot">
-        <ConclaveFilm
-          cast={cast}
-          frame={frame}
-          revealed={revealed}
-          focusId={opening ? cameraBeat?.focusId : line?.speakerId}
-          discussion={filmStage === 'discussion'}
-          onSurfaceReady={() => setSurfaceReady(true)}
-        />
-      </div>
+      {showFilm && (
+        <div className="betrayals-conclave-dialog__shot">
+          <ConclaveFilm
+            cast={cast}
+            frame={frame}
+            revealed={revealed}
+            focusId={opening ? cameraBeat?.focusId : line?.speakerId}
+            discussion={filmStage === 'discussion'}
+            onSurfaceReady={() => setSurfaceReady(true)}
+          />
+        </div>
+      )}
       <header className="betrayals-conclave-dialog__navigation">
         {!opening && !verdict && step > 0 && !vote?.runoff && (
           <GameBackButton label="Back" onClick={onBack} />
@@ -181,13 +188,21 @@ export function ConclaveDiscussion({
           <blockquote>{line.argument}</blockquote>
         </div>
       ) : (
-        vote && (
+        (vote || recruitmentTargets) && (
           <section
             className="betrayals-conclave-dialog__ballot"
-            aria-label={vote.runoff ? 'Runoff ballot' : 'Night ballot'}
+            aria-label={
+              recruitmentTargets ? 'Recruitment' : vote?.runoff ? 'Runoff ballot' : 'Night ballot'
+            }
           >
-            <h2>{vote.runoff ? 'Runoff ballot' : 'Who do you nominate?'}</h2>
-            {vote.runoff && <p>First ballot · {vote.runoff}. Highest count decides the runoff.</p>}
+            <h2>
+              {recruitmentTargets
+                ? 'Who will you recruit?'
+                : vote?.runoff
+                  ? 'Runoff ballot'
+                  : 'Who do you nominate?'}
+            </h2>
+            {vote?.runoff && <p>First ballot · {vote.runoff}. Highest count decides the runoff.</p>}
             <PortraitGallery
               variant="conclave"
               guests={candidates}
@@ -195,7 +210,7 @@ export function ConclaveDiscussion({
               reducedMotion={reducedMotion}
               onSelect={onSelect}
             />
-            {selected && vote.ownArgument && <p aria-live="polite">{vote.ownArgument}</p>}
+            {selected && vote?.ownArgument && <p aria-live="polite">{vote.ownArgument}</p>}
           </section>
         )
       )}
@@ -221,9 +236,11 @@ export function ConclaveDiscussion({
               ? step + 1 < total
                 ? 'Continue'
                 : 'Open ballot'
-              : vote?.runoff
-                ? 'Lock runoff vote'
-                : 'Lock Night choice'}
+              : recruitmentTargets
+                ? 'Send invitation'
+                : vote?.runoff
+                  ? 'Lock runoff vote'
+                  : 'Lock Night choice'}
           </button>
         )}
       </footer>

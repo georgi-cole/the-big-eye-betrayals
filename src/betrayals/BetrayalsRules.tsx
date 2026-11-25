@@ -28,6 +28,10 @@ const chapters: readonly HandbookChapter[] = [
           banish someone you suspect. Compete to build the pot and earn protection. A Night Shield
           can save you if the Betrayers choose you after dark.
         </p>
+        <p>
+          If you receive a private offer from the Conclave, you can accept and become a Betrayer.
+          Declining takes you out of the game unless a Night Shield protects you.
+        </p>
         <p className="betrayals-rules__oath">
           <strong>How you win.</strong> Survive until every Betrayer is out of the castle.
         </p>
@@ -42,13 +46,17 @@ const chapters: readonly HandbookChapter[] = [
     body: (
       <>
         <p>
-          There are {MIN_BETRAYERS} or more Betrayers in the castle. Keep your role secret. By day,
+          The season starts with at least {MIN_BETRAYERS} Betrayers. Keep your role secret. By day,
           you talk, compete and vote alongside the Loyals.
         </p>
         <p>
           <strong>What you can do.</strong> At night, meet in the secret Conclave. You can propose
           an eligible Loyal and vote on whom to eliminate. By morning, you’re back among the guests.
           What you tell them is up to you.
+        </p>
+        <p>
+          The Conclave may call on a lone Betrayer to recruit an eligible Loyal in place of the
+          regular Night vote. Full Immunity protects guests from the offer that night.
         </p>
         <p className="betrayals-rules__oath">
           <strong>How you win.</strong> If a Betrayer is still in the castle at the end, the

@@ -14,6 +14,8 @@ import { CASTLE_PERIODS, CASTLE_SCENES } from './castleLifeBank.ts'
 import type { CastleSceneId } from './castleLifeBank.ts'
 import { MORNING_MOVES, SAFETY_MOVES, SHIELD_MOVES, VOTE_MOVES } from './dayFlowState.ts'
 import { validBetrayalsEconomy } from './economy.ts'
+import { recruitmentFor, RECRUITMENT_END_DAY } from './recruitment.ts'
+import { MAX_BETRAYERS, MIN_BETRAYERS } from './seasonPhases.ts'
 import {
   CASTLE_ROOMS,
   DEMEANORS,
@@ -814,7 +816,12 @@ function isRun(value: unknown): value is Run {
     typeof options.publicMode === 'boolean' &&
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
     hidden &&
-    validIds(hidden.betrayers, ids, 3, 4) &&
+    validIds(hidden.betrayers, ids, MIN_BETRAYERS, MAX_BETRAYERS + RECRUITMENT_END_DAY - 1) &&
+    (hidden.recruitmentSeed === undefined || Number.isSafeInteger(hidden.recruitmentSeed)) &&
+    (hidden.humanRecruitmentOffered === undefined ||
+      (hidden.humanRecruitmentOffered === true &&
+        hidden.conclaveVote === undefined &&
+        recruitmentFor(value as Run, item.humanId)?.kind === 'offer')) &&
     validConclaveVote(hidden.conclaveVote, item.phase, ids, hidden.betrayers as string[]) &&
     (hidden.hiddenBetrayerIds === undefined ||
       validIds(hidden.hiddenBetrayerIds, new Set(hidden.betrayers as string[]), 0, 4)) &&
@@ -895,6 +902,11 @@ function isRun(value: unknown): value is Run {
         typeof pendingNight.blocked === 'boolean' &&
         (pendingNight.byDraw === undefined || typeof pendingNight.byDraw === 'boolean') &&
         (pendingNight.filmPlayed === undefined || typeof pendingNight.filmPlayed === 'boolean') &&
+        (pendingNight.recruitedId === undefined ||
+          (item.day < RECRUITMENT_END_DAY &&
+            pendingNight.recruitedId === (hidden.betrayers as string[]).at(-1) &&
+            pendingNight.recruitedId !== pendingNight.targetId &&
+            item.seats.some(({ id, exit }) => id === pendingNight.recruitedId && !exit))) &&
         (pendingNight.targetId === null ||
           (typeof pendingNight.targetId === 'string' && ids.has(pendingNight.targetId)))
       : hidden.pendingNight === undefined) &&

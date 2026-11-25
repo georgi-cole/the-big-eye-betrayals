@@ -242,8 +242,9 @@ describe('Betrayals season review', () => {
     )
     fireEvent.click(bookmarks.getByRole('button', { name: 'Betrayers' }))
     const betrayer = rules.getByRole('article', { name: 'The Betrayer' })
-    expect(betrayer).toHaveTextContent('There are 3 or more Betrayers')
+    expect(betrayer).toHaveTextContent('The season starts with at least 3 Betrayers')
     expect(betrayer).toHaveTextContent('meet in the secret Conclave')
+    expect(betrayer).toHaveTextContent('recruit an eligible Loyal')
     expect(betrayer).not.toHaveTextContent(/\b4\b|\bfour\b/i)
     fireEvent.click(bookmarks.getByRole('button', { name: 'The Season' }))
     expect(rules.getByRole('article', { name: 'A Day in the Castle' })).toHaveTextContent(
@@ -1371,6 +1372,112 @@ describe('Betrayals season review', () => {
       }
     }
   )
+
+  it('opens the full recruitment gallery for the sole human Betrayer with animations off', async () => {
+    localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'human-recruits', roleSeed: 32, publicSeed: 12 }
+    )
+    const betrayers = run.seats.slice(0, 3).map(({ id }) => id)
+    const immune = run.seats[3]
+    const recruit = run.seats.at(-1)!
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night',
+      day: 4,
+      immunityId: immune.id,
+      seats: run.seats.map((seat) =>
+        seat.id !== run.humanId && betrayers.includes(seat.id)
+          ? { ...seat, exit: { cause: 'banished', day: 3 } }
+          : seat
+      ),
+      private: { ...run.private, betrayers },
+    })
+    render(<BetrayalsScreen />)
+
+    const conclave = within(screen.getByRole('dialog', { name: 'The Conclave' }))
+    const gallery = within(conclave.getByRole('list', { name: 'Eligible contestants' }))
+    expect(gallery.getAllByRole('button')).toHaveLength(21)
+    expect(gallery.queryByRole('button', { name: immune.name })).not.toBeInTheDocument()
+    expect(conclave.getByRole('button', { name: 'Send invitation' })).toBeDisabled()
+    fireEvent.click(gallery.getByRole('button', { name: recruit.name }))
+    await clickAndSave(conclave.getByRole('button', { name: 'Send invitation' }))
+
+    expect(screen.queryByRole('dialog', { name: 'The Conclave' })).not.toBeInTheDocument()
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(
+      tv.getByText(`${recruit.name} accepted your invitation to join the Betrayers.`)
+    ).toBeVisible()
+  })
+
+  it('lets an invited Loyal answer privately before showing the recruiter', async () => {
+    localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'human-invited', roleSeed: 32, publicSeed: 12 }
+    )
+    const recruiter = run.seats[1]
+    const betrayers = run.seats.slice(1, 4).map(({ id }) => id)
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night',
+      day: 4,
+      seats: run.seats.map((seat) =>
+        seat.id !== recruiter.id && betrayers.includes(seat.id)
+          ? { ...seat, exit: { cause: 'banished', day: 3 } }
+          : seat
+      ),
+      private: { ...run.private, betrayers, humanRecruitmentOffered: true },
+    })
+    render(<BetrayalsScreen />)
+
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText('A sealed invitation')).toBeVisible()
+    expect(tv.queryByText(recruiter.name, { exact: false })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Decline and leave' })).toBeEnabled()
+    await clickAndSave(screen.getByRole('button', { name: 'Join the Betrayers' }))
+    expect(
+      tv.getByText(`You joined the Betrayers. ${recruiter.name} is your teammate.`)
+    ).toBeVisible()
+  })
+
+  it('shows an unaffected Loyal only the attendance result after a recruit joins', async () => {
+    localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'recruitment-breakfast', roleSeed: 32, publicSeed: 12 }
+    )
+    const [recruiter, first, second, recruit] = run.seats.slice(1, 5)
+    saveRun(localStorage, 'edition-local', {
+      ...run,
+      phase: 'night-resolved',
+      day: 4,
+      seats: run.seats.map((seat) =>
+        [first.id, second.id].includes(seat.id)
+          ? { ...seat, exit: { cause: 'banished', day: 3 } }
+          : seat
+      ),
+      private: {
+        ...run.private,
+        betrayers: [recruiter.id, first.id, second.id, recruit.id],
+        pendingNight: { targetId: null, blocked: false, recruitedId: recruit.id },
+      },
+    })
+    render(<BetrayalsScreen />)
+
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.queryByText(/recruit|invitation/i)).not.toBeInTheDocument()
+    await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(tv.getByText('Everyone returned.')).toBeVisible()
+    expect(tv.queryByText(/recruit|invitation/i)).not.toBeInTheDocument()
+  })
 
   it('lets a gift recipient bluff in the Inbox and pass the shield on in Social', async () => {
     const run = startRun(

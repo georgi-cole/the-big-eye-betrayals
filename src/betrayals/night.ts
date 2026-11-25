@@ -9,6 +9,7 @@ import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 import { deliverNightDecision } from './dayFlow.ts'
 import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
+import { requiredRecruiterId, resolveRecruitment } from './recruitment.ts'
 import { FINALE_CAST_SIZE } from './seasonPhases.ts'
 import { composeConclaveConversation } from './conclaveConversation.ts'
 import type { CinematicCastMember } from './CinematicScene'
@@ -49,7 +50,8 @@ function isActiveBetrayer(run: Run, actorId: string) {
 }
 
 export function nightTargets(run: Run, actorId: string): string[] {
-  if (run.phase !== 'night' || !isActiveBetrayer(run, actorId)) return []
+  if (run.phase !== 'night' || !isActiveBetrayer(run, actorId) || requiredRecruiterId(run))
+    return []
   return run.seats
     .filter(({ id, exit }) => !exit && id !== run.immunityId && !run.private.betrayers.includes(id))
     .map(({ id }) => id)
@@ -120,7 +122,7 @@ export function resolveNight(
   nominations: readonly Ballot[] = choices
 ): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
-  if (pendingPaidNightShieldPurchase(run)) return run
+  if (pendingPaidNightShieldPurchase(run) || requiredRecruiterId(run)) return run
   const tally = tallyNightBallots(run, choices)
   const nominated = choices === nominations ? tally : tallyNightBallots(run, nominations)
   if (!tally || !nominated || [...tally.keys()].some((id) => !nominated.has(id))) return run
@@ -299,7 +301,13 @@ export function getConclaveView(
   actorId: string | null,
   selectedId?: string
 ): ConclaveView | null {
-  if (run.phase !== 'night' || !actorId || !isActiveBetrayer(run, actorId)) return null
+  if (
+    run.phase !== 'night' ||
+    !actorId ||
+    !isActiveBetrayer(run, actorId) ||
+    requiredRecruiterId(run)
+  )
+    return null
 
   const known = new Set(knownTeammateIds(run, actorId))
   const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
@@ -379,6 +387,18 @@ export function getConclaveVerdict(run: Run, actorId: string | null) {
 export function describeConclaveVerdict(run: Run, actorId: string | null) {
   const verdict = getConclaveVerdict(run, actorId)
   if (!verdict) return
+  const recruitedId = run.private.pendingNight?.recruitedId
+  if (recruitedId === actorId) {
+    const [teammateId] = knownTeammateIds(run, actorId)
+    const teammate = run.seats.find(({ id }) => id === teammateId)
+    return teammate
+      ? `You joined the Betrayers. ${teammate.name} is your teammate.`
+      : 'You joined the Betrayers.'
+  }
+  if (recruitedId) {
+    const recruit = run.seats.find(({ id }) => id === recruitedId)
+    return `${recruit?.name ?? 'A guest'} accepted your invitation to join the Betrayers.`
+  }
   if (!verdict.targetId) return 'The Conclave chose no one.'
   const name = run.seats.find(({ id }) => id === verdict.targetId)?.name ?? 'A guest'
   const vote = run.private.conclaveVote
@@ -409,6 +429,7 @@ export function describeConclaveVerdict(run: Run, actorId: string | null) {
 export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: string): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
   if (pendingPaidNightShieldPurchase(run)) return run
+  if (requiredRecruiterId(run)) return resolveRecruitment(run, token, humanTargetId)
   const humanIsBetrayer = isActiveBetrayer(run, run.humanId)
   const pending = run.private.conclaveVote
   const briefing = discussShields(run)

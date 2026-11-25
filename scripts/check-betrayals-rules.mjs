@@ -21,6 +21,7 @@ const rulesSources = [
   'src/betrayals/nightShields.ts',
   'src/betrayals/premiumAccess.ts',
   'src/betrayals/publicShield.ts',
+  'src/betrayals/recruitment.ts',
   'src/betrayals/run.ts',
   'src/betrayals/seasonPhases.ts',
   'src/betrayals/seasonRewards.ts',
