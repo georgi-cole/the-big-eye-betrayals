@@ -2,6 +2,7 @@ import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
 import {
   MAX_TABLE_ROUNDS,
+  audienceDecisionPending,
   eligibleBanishmentTargets,
   isCurrentCommand,
   publicShieldPending,
@@ -28,6 +29,7 @@ import {
   publicCaseWeight,
 } from './investigationEvidence.ts'
 import { archiveInvestigationVotes, guestName } from './investigationRecords.ts'
+import { audienceOpening, recordAudienceBallot } from './audienceSeason.ts'
 import { FINALE_CAST_SIZE, FINAL_SURVIVOR_COUNT } from './seasonPhases.ts'
 import { openCastleMoment } from './castleLife.ts'
 
@@ -53,6 +55,7 @@ export function tableRoundNumber(run: Run): number {
 export function tableDiscussionOpen(run: Run): boolean {
   return (
     run.phase === 'round-table' &&
+    !audienceDecisionPending(run) &&
     !publicShieldPending(run) &&
     !run.runoffIds &&
     !run.tableCount &&
@@ -80,6 +83,15 @@ function openingArguments(run: Run): TableArgument[] {
     }))
     .sort((left, right) => right.initiative - left.initiative)
   const argumentsSoFar: TableArgument[] = witness ? [witness] : []
+  const aired = audienceOpening(run)
+  if (
+    aired &&
+    aired.speakerId !== run.humanId &&
+    !argumentsSoFar.some(({ speakerId }) => speakerId === aired.speakerId) &&
+    tableTargets(run, aired.speakerId).includes(aired.targetId)
+  ) {
+    argumentsSoFar.push(aired)
+  }
   const delivery = run.dayFlow?.delivery
   const deliveredAccount = run.investigation?.reports.find(({ id }) => id === delivery?.reportId)
   if (
@@ -234,9 +246,17 @@ export function tableArgumentPressure(
 
 export function tableDiscussion(run: Run): TableSpeech[] {
   const tableArguments = argumentsAtTable(run)
+  const aired = audienceOpening(run)
+  const publicStatement =
+    aired?.speakerId === run.humanId && tableTargets(run, aired.speakerId).includes(aired.targetId)
+      ? [aired]
+      : []
   return [
     ...evidenceSpeech({ ...run, tableArguments }),
-    ...tableDialogue(run, [...tableArguments.filter((argument) => !argument.investigation)]),
+    ...tableDialogue(run, [
+      ...publicStatement,
+      ...tableArguments.filter((argument) => !argument.investigation),
+    ]),
     ...investigationSpeech(run, tableArguments),
   ]
 }
@@ -274,6 +294,8 @@ export function tableSwayResponse(run: Run): string | undefined {
 export function buildTableBallots(run: Run, humanTarget?: string): Ballot[] {
   const tableArguments = argumentsAtTable(run)
   const debate = { ...run, tableArguments }
+  const aired = audienceOpening(run)
+  const statements = aired?.speakerId === run.humanId ? [aired, ...tableArguments] : tableArguments
   return run.seats.flatMap(({ id: voterId }) => {
     const eligible = tableTargets(run, voterId)
     if (!eligible.length) return []
@@ -284,7 +306,7 @@ export function buildTableBallots(run: Run, humanTarget?: string): Ballot[] {
             {
               ...resolutionPerspective(debate, voterId, eligible),
               tableRound: run.runoffIds ? tableRoundNumber(run) : undefined,
-              tablePressure: tableArgumentPressure(debate, voterId, tableArguments),
+              tablePressure: tableArgumentPressure(debate, voterId, statements),
             },
             'table'
           )
@@ -338,9 +360,10 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     !isCurrentCommand(run, token) ||
     run.tableCount ||
     (run.dayFlow &&
-      run.phase === 'round-table' &&
-      run.tableSway === undefined &&
-      canVoteAtTable(run, run.humanId)) ||
+      (audienceDecisionPending(run) ||
+        (run.phase === 'round-table' &&
+          run.tableSway === undefined &&
+          canVoteAtTable(run, run.humanId)))) ||
     (run.phase !== 'round-table' && run.phase !== 'final-banishment')
   )
     return run
@@ -401,8 +424,12 @@ export function advanceTableRound(run: Run, token: CommandToken): Run {
   ) {
     return run
   }
+  const aired =
+    count.round === 1 && run.phase === 'round-table'
+      ? recordAudienceBallot(run, count.ballots, run.tableArguments ?? [])
+      : run
   return {
-    ...run,
+    ...aired,
     revision: run.revision + 1,
     tableRound: count.round + 1,
     social:
@@ -455,8 +482,12 @@ export function revealTable(run: Run, token: CommandToken): Run {
   const defenses = (run.tableArguments ?? []).flatMap(({ speakerId, targetId, stance }) =>
     stance === 'defend' ? [{ speakerId, targetId }] : []
   )
+  const aired =
+    !outcome.blind && run.tableCount?.round === 1
+      ? recordAudienceBallot(run, run.tableCount.ballots, run.tableArguments ?? [])
+      : run
   const revealed: Run = {
-    ...run,
+    ...aired,
     phase,
     revision: run.revision + 1,
     seats,

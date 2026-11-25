@@ -7,6 +7,7 @@ const rulesSources = [
   'src/betrayals/BetrayalsRules.tsx',
   'src/betrayals/BetrayalsScreen.tsx',
   'src/betrayals/allianceRecords.ts',
+  'src/betrayals/audienceSeason.ts',
   'src/betrayals/castleLife.ts',
   'src/betrayals/castleLifeBank.ts',
   'src/betrayals/challengeRotation.ts',

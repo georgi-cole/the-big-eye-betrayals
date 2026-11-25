@@ -29,6 +29,7 @@ type Context =
   | 'public-safety'
   | 'shield-promise'
   | 'full-house'
+  | 'audience'
   | 'familiar'
   | 'after-vote'
 
@@ -681,6 +682,25 @@ export const CASTLE_SCENES = {
         action: 'question',
         label: 'Ask who changed seats when the room filled',
         remembered: '{guest} is still interested in who chooses to sit together.',
+      },
+    ],
+  },
+  'whispered-headline': {
+    period: 'afternoon',
+    context: 'audience',
+    voice: 'gossipPropensity',
+    glance: 'Guests are still replaying the audience broadcast.',
+    opening: 'What the cameras caught and what happened in the room are two different stories.',
+    choices: [
+      {
+        action: 'ask-about',
+        label: 'Ask what {subject} looked like off camera',
+        remembered: '{guest} remembers talking through the moment after the cameras left.',
+      },
+      {
+        action: 'rapport',
+        label: 'Let {guest} talk it out',
+        remembered: '{guest} is at ease with you now the broadcast is over.',
       },
     ],
   },

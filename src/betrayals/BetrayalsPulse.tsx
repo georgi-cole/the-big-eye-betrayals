@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
 import '../components/HousePulse/HousePulse.css'
@@ -160,6 +161,7 @@ export function BetrayalsPulse({
   onClose,
   onAction,
   investigation,
+  todaySummary,
 }: {
   day: number
   humanId: string
@@ -169,6 +171,7 @@ export function BetrayalsPulse({
   onClose: () => void
   onAction: (action: InvestigationAction) => void
   investigation?: InvestigationControls
+  todaySummary?: ReactNode
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [tab, setTab] = useState(initial.tab)
@@ -262,6 +265,7 @@ export function BetrayalsPulse({
                 ))}
               </section>
             )}
+            {todaySummary}
             <Timelines entries={entries} day={day} />
           </>
         )}

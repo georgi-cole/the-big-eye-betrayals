@@ -95,8 +95,10 @@ const chapters: readonly HandbookChapter[] = [
     body: (
       <>
         <p>
-          The Public Shield protects its holder at the Round Table. Night Shields protect against
-          the Conclave. The game shows which protection you hold.
+          With Public Mode on, a Vote Promise can add to the pot. The Hot Seat can bring a
+          disagreement back to the Table. During an Audience Save, you can appeal or endorse a
+          guest. The viewers' choice earns the Public Shield for that Table. Night Shields protect
+          against the Conclave.
         </p>
         <p>
           Social cards show what each move costs. Each morning restores some Energy. Check in for

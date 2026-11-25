@@ -4,6 +4,7 @@ import type { CommandToken, Run } from './run.ts'
 import { openShieldDeals } from './dayAftermath.ts'
 import { prepareVotePlans } from './votePlans.ts'
 import { walletsAfterChallenge } from './socialResources.ts'
+import { addAudienceEvents, openAudienceEpisode } from './audienceSeason.ts'
 import { openCastleMoment } from './castleLife.ts'
 import { recordBetrayalsChallengeRewards } from './economy.ts'
 import { NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
@@ -104,11 +105,12 @@ export function resolveChallenge(
       phase: 'after-immunity',
       immunityId: standings[0].contestantId,
     }
-    return recordBetrayalsChallengeRewards(
-      run,
-      openCastleMoment(next.options.publicMode ? next : prepareVotePlans(next), 'lunch'),
-      standings
-    )
+    const prepared = next.options.publicMode
+      ? addAudienceEvents(openAudienceEpisode(next), [
+          { kind: 'immunity', actorId: standings[0].contestantId },
+        ])
+      : prepareVotePlans(next)
+    return recordBetrayalsChallengeRewards(run, openCastleMoment(prepared, 'lunch'), standings)
   }
   if (run.phase === 'safety') {
     const nightShieldIds = standings
@@ -135,7 +137,13 @@ export function resolveChallenge(
       }),
       'supper'
     )
-    return recordBetrayalsChallengeRewards(run, next, standings)
+    const aired = publicResults
+      ? addAudienceEvents(
+          next,
+          nightShieldIds.map((actorId) => ({ kind: 'safety', actorId }))
+        )
+      : next
+    return recordBetrayalsChallengeRewards(run, aired, standings)
   }
   return recordBetrayalsChallengeRewards(
     run,

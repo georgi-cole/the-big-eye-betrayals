@@ -1191,6 +1191,39 @@ describe('Betrayals season review', () => {
     expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeVisible()
   })
 
+  it('puts the Vote Promise choices in the Faux TV and uses the existing roster', async () => {
+    const start = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: true, realityMode: 'off' },
+      { id: 'audience-inline', roleSeed: 32, publicSeed: 12 }
+    )
+    const [, protectedGuest, target] = start.seats
+    saveRun(localStorage, 'edition-local', {
+      ...start,
+      phase: 'after-immunity',
+      dayFlow: { day: 1 },
+      immunityId: protectedGuest.id,
+      audience: { episode: { day: 1, kind: 'wager' }, events: [] },
+    })
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('combobox')).toBeNull()
+    const cast = within(screen.getByRole('list', { name: 'Contestant roster' }))
+    expect(
+      cast.getByRole('button', { name: `${protectedGuest.name}, Full Immunity` })
+    ).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(cast.getByRole('button', { name: target.name }))
+    expect(tv.getByRole('heading', { name: 'Vote Promise' })).toBeVisible()
+    const controls = within(tv.getByRole('region', { name: 'Vote Promise actions' }))
+    const pledge = controls.getByRole('button', { name: `Pledge to vote for ${target.name}` })
+    expect(pledge).toHaveAccessibleDescription('Add 250 to the pot if kept')
+    await clickAndSave(pledge)
+    expect(tv.getByText(`Georgi pledged on air to vote for ${target.name}.`)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Continue to Safety' })).toBeEnabled()
+  })
+
   it('keeps a completed vote count visible after a private check-in', async () => {
     const start = startRun(
       { id: 'human', name: 'Georgi' },

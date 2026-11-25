@@ -1,4 +1,5 @@
 import {
+  audienceDecisionPending,
   eligibleBanishmentTargets,
   isCurrentCommand,
   NIGHT_SHIELD_MOVES,
@@ -289,7 +290,8 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
     return run
   if (
     move.kind === 'vote-plan' &&
-    (publicShieldPending(run) ||
+    (audienceDecisionPending(run) ||
+      publicShieldPending(run) ||
       !eligibleBanishmentTargets(run, move.recipientId).includes(move.suspectId ?? ''))
   )
     return run

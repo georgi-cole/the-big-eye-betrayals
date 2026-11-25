@@ -287,6 +287,113 @@
   margin-block: 0;
 }
 
+.betrayals-broadcast__detail p + p {
+  margin-block-start: 0.3rem;
+}
+
+.betrayals-layout--game:has(.betrayals-on-air__actions) {
+  grid-template-rows: auto minmax(162px, 0.42fr) auto minmax(193px, 1fr) auto;
+}
+
+.betrayals-broadcast__readout:has(.betrayals-on-air__actions) {
+  padding: 5px 7px;
+}
+
+.betrayals-broadcast__readout:has(.betrayals-on-air__actions) .betrayals-broadcast__title {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0 0 2px;
+  clip-path: none;
+  color: var(--signal-ink);
+  font:
+    700 clamp(0.99rem, 4.5vw, 1.25rem) / 1.1 'Palatino Linotype',
+    Palatino,
+    Georgia,
+    serif;
+  white-space: normal;
+}
+
+.betrayals-broadcast__readout:has(.betrayals-on-air__actions) .betrayals-broadcast__message {
+  font-size: clamp(0.7rem, 2.9vw, 0.81rem);
+  line-height: 1.24;
+}
+
+.betrayals-on-air-controls > p {
+  margin-block: 0 0.25rem;
+  color: #ded2c8;
+  font-size: 0.69rem;
+  line-height: 1.2;
+}
+
+.betrayals-on-air__actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+  margin-inline: auto;
+  max-inline-size: 30rem;
+}
+
+.betrayals-on-air__action {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  min-block-size: 44px;
+  padding: 4px 3px;
+  border: 1px solid #9c7a51;
+  border-radius: 5px;
+  background: linear-gradient(165deg, #4a3526, #241c17);
+  color: #fff0d8;
+  cursor: pointer;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.betrayals-on-air__action:hover {
+  background: #4c3527;
+}
+
+.betrayals-on-air__action:focus-visible {
+  outline: 2px solid var(--signal-ink);
+  outline-offset: -2px;
+}
+
+.betrayals-on-air__action strong {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif;
+  font-size: clamp(0.73rem, 3.2vw, 0.9rem);
+  line-height: 1.05;
+}
+
+.betrayals-on-air__action small {
+  color: #e6c8a6;
+  font-size: clamp(0.62rem, 2.7vw, 0.72rem);
+  line-height: 1.13;
+}
+
+.betrayals-on-air__results {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #685646;
+  border-radius: 0.5rem;
+  color: #eee0d2;
+  text-align: start;
+}
+
+.betrayals-on-air__results summary {
+  padding-block: 0.5rem;
+  cursor: pointer;
+}
+
+.betrayals-on-air__results ol {
+  margin-block: 0.25rem;
+  padding-inline-start: 1.6rem;
+}
+
+.betrayals-on-air__results li strong {
+  float: inline-end;
+}
+
 .betrayals-broadcast__vents {
   width: min(48px, 18%);
   height: 2px;

@@ -1,4 +1,4 @@
-import { isCurrentCommand, publicShieldPending } from './run.ts'
+import { audienceDecisionPending, isCurrentCommand, publicShieldPending } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { hasRequiredIncoming } from './incoming.ts'
 import { finishShieldConversations, prepareShieldConversations } from './shieldSocial.ts'
@@ -40,7 +40,11 @@ export function advanceDayAftermath(run: Run, token: CommandToken): Run {
     const next = closeCastleMoment(run)
     return { ...next, revision: next.revision + 1, phase: 'night' }
   }
-  if (run.phase === 'after-immunity' && !publicShieldPending(run)) {
+  if (
+    run.phase === 'after-immunity' &&
+    !publicShieldPending(run) &&
+    !audienceDecisionPending(run)
+  ) {
     if (run.dayFlow?.castleDay) {
       const previous = prepareVotePlans(closeCastleMoment(run))
       const afternoon: Run = { ...previous, revision: previous.revision + 1, phase: 'social' }
