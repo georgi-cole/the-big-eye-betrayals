@@ -64,10 +64,15 @@ function witnessWindow(run: Run) {
   )
 }
 
-export function investigationActionReason(
+export function investigationActionReason(run: Run, action: InvestigationAction) {
+  const block = investigationActionBlock(run, action)
+  return typeof block === 'object' ? `Requires ${INVESTIGATION_ENERGY_COST} Energy.` : block
+}
+
+export function investigationActionBlock(
   run: Run,
   action: InvestigationAction
-): string | undefined {
+): string | { resource: 'energy' } | undefined {
   const state = investigationFor(run)
   const report =
     'reportId' in action ? state.reports.find(({ id }) => id === action.reportId) : undefined
@@ -101,7 +106,7 @@ export function investigationActionReason(
   )
     return 'Choose another guest to speak with.'
   if (socialWalletFor(run, run.humanId).energy < INVESTIGATION_ENERGY_COST)
-    return `Requires ${INVESTIGATION_ENERGY_COST} Energy.`
+    return { resource: 'energy' }
 
   const today = state.reports.filter(({ day }) => day === run.day)
   if (

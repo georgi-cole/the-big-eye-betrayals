@@ -324,5 +324,9 @@
 }
 
 .betrayals-energy-recharge .sp2-execute {
+  max-width: 100%;
   min-height: 44px;
+  color: #23150c;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

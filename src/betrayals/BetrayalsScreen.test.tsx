@@ -892,6 +892,52 @@ describe('Betrayals season review', () => {
     })
   })
 
+  it('shows the Incoming wallet and adds five Energy only after a completed ad', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'inbox-energy', roleSeed: 32, publicSeed: 12 }
+    )
+    const day = openDayFlow({
+      ...run,
+      phase: 'dawn',
+      day: 2,
+      dayFlow: { day: 2, delivery: { kind: 'meeting', guestId: run.seats[1].id } },
+    })
+    const wallet = { day: day.day, energy: 0, energySpent: 5, influence: 12, info: 50 }
+    saveRun(localStorage, 'edition-local', {
+      ...day,
+      socialWallets: { ...day.socialWallets, [day.humanId]: wallet },
+    })
+    recharge.request.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: /^Inbox/ }))
+    const inbox = within(screen.getByRole('dialog', { name: 'Incoming interactions' }))
+    const balances = within(inbox.getByRole('group', { name: 'Social resources' }))
+    expect(inbox.queryByRole('button', { name: 'Watch ad for +5 Energy' })).toBeNull()
+    expect(balances.getByText(/Energy: 0/)).toBeVisible()
+    expect(balances.getByText(/Influence: 12/)).toBeVisible()
+    expect(balances.getByText(/Info: 50/)).toBeVisible()
+    const blockedReply = inbox.getByRole('button', { name: /^Keep the breakfast appointment/ })
+    expect(within(blockedReply).queryByText('Requires 1 Energy.')).toBeNull()
+    fireEvent.click(blockedReply)
+    const shortage = screen.getByRole('dialog', { name: 'Out of Energy' })
+    const watch = within(shortage).getByRole('button', { name: 'Watch ad for +5 Energy' })
+    await clickAndSave(watch)
+    expect(balances.getByText(/Energy: 0/)).toBeVisible()
+    await clickAndSave(watch)
+    expect(recharge.request).toHaveBeenLastCalledWith('betrayals_social_energy_recharge')
+    expect(balances.getByText(/Energy: 5/)).toBeVisible()
+    expect(shortage).not.toBeInTheDocument()
+    expect(blockedReply).toBeEnabled()
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status === 'ready' && saved.run.socialWallets?.human).toEqual({
+      ...wallet,
+      energy: 5,
+    })
+  })
+
   it('routes locked Pulse and full profiles to their store unlocks while keeping basic conversation free', async () => {
     Object.assign(commerce, {
       vip: false,
@@ -1247,7 +1293,7 @@ describe('Betrayals season review', () => {
     expect(scoreboard.getByRole('region', { name: 'Standings' })).toHaveAttribute('tabindex', '0')
     expect(scoreboard.getByRole('columnheader', { name: 'Adjusted time' })).toBeVisible()
     expect(scoreboard.getByRole('row', { name: /Georgi/ })).toHaveTextContent('2:40.01')
-    expect(scoreboard.getAllByText('Won')).toHaveLength(2)
+    expect(scoreboard.getAllByText('Won')).toHaveLength(1)
     expect(scoreboard.getAllByLabelText('Hidden')).toHaveLength(23)
     await clickAndSave(scoreboard.getByRole('button', { name: 'Continue' }))
     expect(
@@ -1550,7 +1596,7 @@ describe('Betrayals season review', () => {
     const firstPlace = within(standings[0]).getAllByRole('cell')
     expect(firstPlace[0]).toHaveTextContent(/^1$/)
     expect(firstPlace[1]).toHaveTextContent(/\d/)
-    expect(firstPlace[2]).toHaveTextContent(/^Won$/)
+    expect(firstPlace[2]).toHaveAccessibleName('Shield result hidden')
     await finishCinematic()
     expect(screen.getByRole('heading', { name: 'Before the Table' })).toBeVisible()
     await clickAndSave(screen.getByRole('button', { name: 'Continue to Round Table' }))

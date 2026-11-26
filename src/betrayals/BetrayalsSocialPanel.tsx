@@ -8,6 +8,7 @@ import ActionCard from '../components/SocialPanelV2/ActionCard'
 import HubmateChoiceChip from '../components/SocialPanelV2/HubmateChoiceChip'
 import PlayerList from '../components/SocialPanelV2/PlayerList'
 import GameBackButton from '../components/ui/GameBackButton/GameBackButton'
+import { BetrayalsEnergyRecharge, type EnergyRechargeOffer } from './BetrayalsEnergyRecharge'
 import { BetrayalsGeneralActions } from './BetrayalsGeneralActions'
 import { generalActionCards } from './generalSocialCards'
 import { alliancePlanningOpen } from './generalSocial'
@@ -318,12 +319,7 @@ type Props = {
   hasDramaMode?: boolean
   hasMyPulse?: boolean
   onUpgrade?: (product: 'realityMode' | 'myPulse') => void
-  energyRecharge?: {
-    watch: () => void
-    pending: boolean
-    dailyLimit: boolean
-    notice?: string
-  }
+  energyRecharge?: EnergyRechargeOffer
   onClose: () => void
   onMove: (
     kind: SocialEntry['kind'],
@@ -958,27 +954,7 @@ export function BetrayalsSocialPanel({
           />
         </header>
         {canAct && resources.energy === 0 && energyRecharge && (
-          <section className="betrayals-energy-recharge" aria-label="Recharge Social Energy">
-            <div>
-              <strong>Out of Energy</strong>
-              {energyRecharge.dailyLimit && (
-                <small>Today’s ad recharge has already been used.</small>
-              )}
-              {energyRecharge.notice && <small role="status">{energyRecharge.notice}</small>}
-            </div>
-            {!energyRecharge.dailyLimit && (
-              <button
-                type="button"
-                className="sp2-execute"
-                disabled={energyRecharge.pending}
-                onClick={energyRecharge.watch}
-              >
-                {energyRecharge.pending
-                  ? 'Opening ad…'
-                  : `Watch ad for +${SOCIAL_RECHARGE_ENERGY} Energy`}
-              </button>
-            )}
-          </section>
+          <BetrayalsEnergyRecharge offer={energyRecharge} amount={SOCIAL_RECHARGE_ENERGY} />
         )}
 
         <div

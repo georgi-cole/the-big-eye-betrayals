@@ -6,16 +6,21 @@ import {
 import type { IncomingInteractionIconName } from '../components/IncomingInteractionsInbox/IncomingInteractionIcon'
 import PlayerAvatar from '../components/PlayerAvatar/PlayerAvatar'
 import StoreProductIcon from '../components/StoreProductModal/StoreProductIcon'
+import { BetrayalsEnergyRecharge, type EnergyRechargeOffer } from './BetrayalsEnergyRecharge'
 import { BetrayalsResourceCosts } from './BetrayalsResourceCosts'
 import type { IncomingAction, IncomingInteraction } from './incoming'
 import { isPremiumCastleChoice } from './premiumAccess'
 import type { IncomingAnswer } from './run'
+import { BETRAYALS_RESOURCE_ICONS, BETRAYALS_RESOURCE_NAMES } from './socialResourcePresentation'
+import { INBOX_RECHARGE_ENERGY, type SocialResources } from './socialResources'
 import '../components/SocialPanelV2/ActionCard.css'
 import './betrayals-incoming.css'
 import './ceremonyActions.css'
 
 type Props = {
   interactions: readonly IncomingInteraction[]
+  resources?: SocialResources
+  energyRecharge?: EnergyRechargeOffer
   onRespond: (id: string, answer: IncomingAction) => void
   onClose: () => void
   hasRealityMode?: boolean
@@ -26,11 +31,94 @@ type Props = {
   onOpenIntel?: (guestId: string) => void
 }
 
+type BlockedReply = { reason: string } | { resource: keyof SocialResources; cost: number }
+
+function InboxReplyDialog({
+  block,
+  availableEnergy,
+  energyRecharge,
+  onClose,
+}: {
+  block: BlockedReply
+  availableEnergy?: number
+  energyRecharge?: EnergyRechargeOffer
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const resource = 'resource' in block ? BETRAYALS_RESOURCE_NAMES[block.resource] : undefined
+  const title =
+    resource === 'Energy' && availableEnergy === 0
+      ? 'Out of Energy'
+      : resource
+        ? 'Not enough ' + resource
+        : 'Reply unavailable'
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    const trigger = document.activeElement
+    dialog.showModal()
+    return () => {
+      dialog.close()
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={ref}
+      className="betrayals-utility-dialog betrayals-inbox__reply-dialog"
+      aria-labelledby="betrayals-inbox-reply-title"
+      aria-describedby="betrayals-inbox-reply-description"
+      onCancel={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="betrayals-utility-dialog__inner">
+        <header className="betrayals-utility-dialog__header">
+          <h2 id="betrayals-inbox-reply-title">{title}</h2>
+        </header>
+        <p id="betrayals-inbox-reply-description">
+          {'reason' in block ? (
+            block.reason
+          ) : (
+            <>
+              This reply costs {block.cost} {resource}.
+            </>
+          )}
+        </p>
+        {resource === 'Energy' && energyRecharge && (
+          <BetrayalsEnergyRecharge
+            amount={INBOX_RECHARGE_ENERGY}
+            showHeading={false}
+            offer={{
+              ...energyRecharge,
+              watch: async () => {
+                const earned = await energyRecharge.watch()
+                if (earned) onClose()
+                return earned
+              },
+            }}
+          />
+        )}
+        <button type="button" className="betrayals-inline-action" onClick={onClose}>
+          Back to Inbox
+        </button>
+      </div>
+    </dialog>
+  )
+}
+
 type ConversationCard = {
   icon: IncomingInteractionIconName
   label: string
   priority: 'low' | 'medium'
-  choices: Partial<Record<IncomingAnswer, string>> & Record<'engage' | 'dismiss', string>
+  choices: Partial<Record<IncomingAnswer, string>> & Record<'dismiss', string>
 }
 
 const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
@@ -38,7 +126,7 @@ const cards: Record<IncomingInteraction['kind'], ConversationCard> = {
     icon: 'check_in',
     label: 'Castle conversation',
     priority: 'low',
-    choices: { engage: 'Replied', dismiss: 'Pass' },
+    choices: { dismiss: 'Pass' },
   },
   confidence: {
     icon: 'check_in',
@@ -144,6 +232,7 @@ function InboxMessage({
   read,
   onRead,
   onRespond,
+  onBlockedReply,
   onDiscussVote,
   onOpenIntel,
   hasRealityMode,
@@ -153,6 +242,7 @@ function InboxMessage({
   read: boolean
   onRead: (id: string) => void
   onRespond: Props['onRespond']
+  onBlockedReply: (block: BlockedReply) => void
   onDiscussVote?: Props['onDiscussVote']
   onOpenIntel?: Props['onOpenIntel']
   hasRealityMode: boolean
@@ -172,23 +262,36 @@ function InboxMessage({
     )
   }
   if (shieldFollowUp?.plan) replies.push(shieldPlanReplies[shieldFollowUp.plan])
-  const intelLinks = moment && onOpenIntel && (
+  const showFeedback = Boolean(response || replies.length)
+  const showActions = !response || hasOpenFollowUp(interaction)
+  const answers: readonly IncomingAnswer[] = moment
+    ? interaction.required
+      ? ['dismiss']
+      : []
+    : ['engage', 'listen', 'dismiss']
+  const reportGuest = moment?.reportGuestId
+  const callbackGuest = moment?.callbackGuestId
+  function intelLink(guestId: string, label: string) {
+    return (
+      <button
+        type="button"
+        className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
+        aria-description={hasMyPulse ? undefined : 'My Pulse feature'}
+        onClick={() => onOpenIntel?.(guestId)}
+      >
+        {label}
+        {!hasMyPulse && <InboxVipEye feature="My Pulse" />}
+      </button>
+    )
+  }
+  const intelLinks = onOpenIntel && (reportGuest || callbackGuest) && (
     <div className="betrayals-inbox__intel-links">
-      {moment.reportGuestId && (
-        <button
-          type="button"
-          className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
-          aria-description={hasMyPulse ? undefined : 'My Pulse feature'}
-          onClick={() => onOpenIntel(moment.reportGuestId!)}
-        >
-          Open in Intel
-          {!hasMyPulse && <InboxVipEye feature="My Pulse" />}
-        </button>
-      )}
+      {reportGuest && intelLink(reportGuest, 'Open in Intel')}
+      {callbackGuest &&
+        callbackGuest !== reportGuest &&
+        intelLink(callbackGuest, 'Continue in Intel')}
     </div>
   )
-  const hasIntel = moment?.reportGuestId && onOpenIntel
-  const showFeedback = response || replies.length > 0
 
   useEffect(() => {
     const element = cardRef.current
@@ -225,7 +328,7 @@ function InboxMessage({
         .join(' ')}
       role="listitem"
     >
-      <div className="betrayals-inbox__card-head">
+      <div className="betrayals-inbox__card-heading">
         <IncomingInboxCardHeader
           avatar={
             <PlayerAvatar
@@ -244,29 +347,11 @@ function InboxMessage({
           icon={icon}
           typeLabel={interaction.title ?? label}
           status={
-            response
-              ? `Resolved · ${choices[response] ?? 'Heard'}`
-              : interaction.required
-                ? 'Reply required'
-                : unread
-                  ? 'New'
-                  : null
+            !response ? (interaction.required ? 'Reply required' : unread ? 'New' : null) : null
           }
           unread={unread}
         />
-        {moment?.callbackGuestId &&
-          onOpenIntel &&
-          moment.callbackGuestId !== moment.reportGuestId && (
-            <button
-              type="button"
-              className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
-              aria-description={hasMyPulse ? undefined : 'My Pulse feature'}
-              onClick={() => onOpenIntel(moment.callbackGuestId!)}
-            >
-              Follow up in Intel
-              {!hasMyPulse && <InboxVipEye feature="My Pulse" />}
-            </button>
-          )}
+        {onOpenIntel && !showFeedback && callbackGuest && intelLink(callbackGuest, 'Open Intel')}
       </div>
       {moment?.callback && <p className="inbox-item__outcome">{moment.callback}</p>}
       <p className="inbox-item__text">{text}</p>
@@ -283,11 +368,15 @@ function InboxMessage({
               <p className="inbox-item__outcome">{moment?.reportText ?? outcome(interaction)}</p>
             )}
           </div>
-          {hasIntel && intelLinks}
+          {intelLinks}
         </div>
       )}
-      {(!response || hasOpenFollowUp(interaction)) && (
-        <div className="inbox-item__actions">
+      {showActions && (
+        <div
+          className={
+            moment ? 'inbox-item__actions betrayals-inbox__castle-actions' : 'inbox-item__actions'
+          }
+        >
           {response !== 'dismiss' && shieldFollowUp?.canRequest && (
             <button
               type="button"
@@ -307,7 +396,7 @@ function InboxMessage({
             </button>
           )}
           {!response &&
-            moment?.options.map(({ action, label, cost, reason }) => {
+            moment?.options.map(({ action, label, cost, reason, shortfall }) => {
               const locked = !hasRealityMode && isPremiumCastleChoice(action)
               return (
                 <button
@@ -315,29 +404,33 @@ function InboxMessage({
                   type="button"
                   className="inbox-action inbox-action--neutral betrayals-inbox__reply"
                   aria-description={locked ? 'Reality Mode feature' : undefined}
-                  disabled={!!reason}
-                  title={reason}
-                  onClick={() => onRespond(id, action)}
+                  onClick={(event) => {
+                    if (!shortfall && !reason) return onRespond(id, action)
+                    event.currentTarget.focus()
+                    if (shortfall) onBlockedReply({ resource: shortfall, cost: cost[shortfall] })
+                    else if (reason) onBlockedReply({ reason })
+                  }}
                 >
                   <span>{label}</span>
-                  <BetrayalsResourceCosts cost={cost} />
-                  {locked && <InboxVipEye feature="Reality Mode" />}
+                  <span className="betrayals-inbox__reply-price">
+                    <BetrayalsResourceCosts cost={cost} />
+                    {locked && <InboxVipEye feature="Reality Mode" />}
+                  </span>
                 </button>
               )
             })}
           {!response &&
-            (moment ? (['dismiss'] as const) : (['engage', 'listen', 'dismiss'] as const)).map(
-              (answer) =>
-                choices[answer] ? (
-                  <button
-                    key={answer}
-                    type="button"
-                    className={`inbox-action inbox-action--${answerStyles[answer]}`}
-                    onClick={() => onRespond(id, answer)}
-                  >
-                    {choices[answer]}
-                  </button>
-                ) : null
+            answers.map((answer) =>
+              choices[answer] ? (
+                <button
+                  key={answer}
+                  type="button"
+                  className={`inbox-action inbox-action--${answerStyles[answer]}`}
+                  onClick={() => onRespond(id, answer)}
+                >
+                  {choices[answer]}
+                </button>
+              ) : null
             )}
           {!response && kind === 'vote-plan' && onDiscussVote && (
             <button
@@ -350,13 +443,14 @@ function InboxMessage({
           )}
         </div>
       )}
-      {!showFeedback && hasIntel && intelLinks}
     </div>
   )
 }
 
 export function BetrayalsIncomingInteractions({
   interactions,
+  resources,
+  energyRecharge,
   onRespond,
   onClose,
   readIds,
@@ -367,6 +461,7 @@ export function BetrayalsIncomingInteractions({
   hasMyPulse = false,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const [blockedReply, setBlockedReply] = useState<BlockedReply>()
   const [localReadIds, setLocalReadIds] = useState<ReadonlySet<string>>(() => new Set())
   const [recentIds, setRecentIds] = useState<ReadonlySet<string>>(() => new Set())
   const markRead = useCallback(
@@ -407,6 +502,7 @@ export function BetrayalsIncomingInteractions({
       read={(readIds ?? localReadIds).has(interaction.id)}
       onRead={markRead}
       onRespond={respond}
+      onBlockedReply={setBlockedReply}
       onDiscussVote={onDiscussVote}
       onOpenIntel={onOpenIntel}
       hasRealityMode={hasRealityMode}
@@ -431,6 +527,16 @@ export function BetrayalsIncomingInteractions({
           onClose={onClose}
         />
         <div className="inbox-list">
+          {resources && (
+            <div className="betrayals-inbox__wallet" role="group" aria-label="Social resources">
+              {(Object.keys(BETRAYALS_RESOURCE_NAMES) as (keyof SocialResources)[]).map((key) => (
+                <span key={key}>
+                  <span aria-hidden="true">{BETRAYALS_RESOURCE_ICONS[key]}</span>{' '}
+                  {BETRAYALS_RESOURCE_NAMES[key]}: {resources[key]}
+                </span>
+              ))}
+            </div>
+          )}
           {interactions.length ? (
             <div className="inbox-sections">
               {alliances.length > 0 && (
@@ -467,6 +573,16 @@ export function BetrayalsIncomingInteractions({
           )}
         </div>
       </div>
+      {blockedReply && (
+        <InboxReplyDialog
+          block={blockedReply}
+          availableEnergy={resources?.energy}
+          energyRecharge={energyRecharge}
+          onClose={() =>
+            setBlockedReply((current) => (current === blockedReply ? undefined : current))
+          }
+        />
+      )}
     </dialog>
   )
 }

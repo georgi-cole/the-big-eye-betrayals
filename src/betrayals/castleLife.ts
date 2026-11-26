@@ -5,7 +5,7 @@ import type { CastleChoice, CastleMoment, CastlePeriod, CastleSceneId } from './
 import {
   applyInvestigationAction,
   INVESTIGATION_ENERGY_COST,
-  investigationActionReason,
+  investigationActionBlock,
 } from './investigation.ts'
 import type { InvestigationAction } from './investigation.ts'
 import {
@@ -34,7 +34,12 @@ import {
   rapport,
   socialMoveKinds,
 } from './social.ts'
-import { missingSocialResource, socialMoveCost, socialWalletFor } from './socialResources.ts'
+import {
+  missingSocialResource,
+  socialMoveCost,
+  socialWalletFor,
+  type SocialResources,
+} from './socialResources.ts'
 import { chooseTarget, resolutionPerspective } from './strategy.ts'
 
 const momentPhase = {
@@ -211,9 +216,13 @@ function requestedInvestigation(
   if (choice === 'ask') return { kind: 'ask', guestId: subjectId, speakerId: contactId, incidentId }
 }
 
-function reasonForChoice(run: Run, moment: CastleMoment, choice: CastleChoice) {
+function choiceBlock(
+  run: Run,
+  moment: CastleMoment,
+  choice: CastleChoice
+): string | { resource: keyof SocialResources } | undefined {
   const investigation = requestedInvestigation(moment, choice)
-  if (investigation) return investigationActionReason(run, investigation)
+  if (investigation) return investigationActionBlock(run, investigation)
   if (choice === 'ask' || choice === 'observe' || !socialMoveKinds(run).includes(choice))
     return 'Unavailable at this point in the day.'
   if (
@@ -272,7 +281,7 @@ function reasonForChoice(run: Run, moment: CastleMoment, choice: CastleChoice) {
     return 'You already spoke about this today.'
   const cost = socialMoveCost(choice, run.options.realityMode)
   const missing = missingSocialResource(socialWalletFor(run, run.humanId), cost)
-  if (missing) return `Requires ${cost[missing]} ${missing[0].toUpperCase() + missing.slice(1)}.`
+  if (missing) return { resource: missing }
 }
 
 export function playCastleChoice(run: Run, token: CommandToken, choice: CastleChoice): Run {
@@ -285,7 +294,7 @@ export function playCastleChoice(run: Run, token: CommandToken, choice: CastleCh
     !isActiveGuest(run, run.humanId) ||
     !isActiveGuest(run, moment.contactId) ||
     !CASTLE_SCENES[moment.scene].choices.some(({ action }) => action === choice) ||
-    reasonForChoice(run, moment, choice)
+    choiceBlock(run, moment, choice)
   )
     return run
   const action = requestedInvestigation(moment, choice)
@@ -426,15 +435,19 @@ export function castleSocialMoment(run: Run) {
     options: response
       ? []
       : scene.choices
-          .map(({ action, label }) => ({
-            action,
-            label: copyFor(run, moment, label),
-            cost:
-              action === 'ask' || action === 'observe'
-                ? { energy: INVESTIGATION_ENERGY_COST, influence: 0, info: 0 }
-                : socialMoveCost(action, run.options.realityMode),
-            reason: reasonForChoice(run, moment, action),
-          }))
+          .map(({ action, label }) => {
+            const block = choiceBlock(run, moment, action)
+            return {
+              action,
+              label: copyFor(run, moment, label),
+              cost:
+                action === 'ask' || action === 'observe'
+                  ? { energy: INVESTIGATION_ENERGY_COST, influence: 0, info: 0 }
+                  : socialMoveCost(action, run.options.realityMode),
+              reason: typeof block === 'string' ? block : undefined,
+              shortfall: typeof block === 'object' ? block.resource : undefined,
+            }
+          })
           .filter(({ action }) => action !== 'debrief' || run.lastTable?.blind === false),
     response: response?.result,
     reportGuestId: report?.guestId,

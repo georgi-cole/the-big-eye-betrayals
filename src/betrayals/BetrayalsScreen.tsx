@@ -931,6 +931,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const canSocialize = participating && !quietDay && moveKinds.length > 0
   const socialResources = socialWalletFor(run, run.humanId)
   const incoming = getIncomingInteractions(run)
+  const inboxCanRecharge =
+    participating &&
+    incoming.some(
+      ({ response, castleMoment }) =>
+        !response && castleMoment?.options.some(({ cost }) => cost.energy > 0)
+    )
   const pendingIncoming = incoming.filter(({ response }) => !response)
   const requiredReply = pendingIncoming.some(({ required }) => required)
   const readIncoming = new Set(inboxReads?.runId === run.id ? inboxReads.ids : [])
@@ -1091,17 +1097,17 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     }
   }
 
-  async function watchEnergyRecharge() {
+  async function watchEnergyRecharge(source: 'social' | 'inbox'): Promise<boolean> {
     const offered = current.current
     if (
       recharging.current ||
       !offered ||
       offered !== run ||
-      !canSocialize ||
+      !(source === 'inbox' ? inboxCanRecharge : canSocialize) ||
       !canRechargeSocialEnergy(offered) ||
       pendingPaidNightShieldPurchase(offered)
     )
-      return
+      return false
 
     recharging.current = true
     setRechargeNotice(undefined)
@@ -1115,17 +1121,29 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         active.day !== offered.day ||
         pendingPaidNightShieldPurchase(active)
       )
-        return
+        return false
       if (!earned) {
         setRechargeNotice(getAdAvailabilityMessage() ?? 'The ad did not finish. Please try again.')
-        return
+        return false
       }
-      const next = rechargeSocialEnergy(active)
-      if (next !== active) await commit(next, false, false, active)
+      const next = rechargeSocialEnergy(active, source)
+      if (next === active) return false
+      await commit(next, false, false, active)
+      return true
     } catch {
       if (mounted.current) setRechargeNotice('The ad reward could not be completed.')
+      return false
     } finally {
       recharging.current = false
+    }
+  }
+
+  function energyRechargeOffer(source: 'social' | 'inbox') {
+    return {
+      watch: () => watchEnergyRecharge(source),
+      pending: rechargeAd.pending,
+      dailyLimit: rechargeAd.dailyLimitReached(BETRAYALS_SOCIAL_RECHARGE_PLACEMENT),
+      notice: rechargeNotice,
     }
   }
 
@@ -2325,12 +2343,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             prospects={activeCast}
             cast={view.seats}
             resources={socialResources}
-            energyRecharge={{
-              watch: () => void watchEnergyRecharge(),
-              pending: rechargeAd.pending,
-              dailyLimit: rechargeAd.dailyLimitReached(BETRAYALS_SOCIAL_RECHARGE_PLACEMENT),
-              notice: rechargeNotice,
-            }}
+            energyRecharge={energyRechargeOffer('social')}
             realityMode={run.options.realityMode}
             hasRealityMode={commerce.realityMode}
             hasDramaMode={commerce.dramaMode}
@@ -2413,6 +2426,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         {incomingOpen && (
           <BetrayalsIncomingInteractions
             interactions={incoming}
+            resources={socialResources}
+            energyRecharge={
+              inboxCanRecharge && canRechargeSocialEnergy(run)
+                ? energyRechargeOffer('inbox')
+                : undefined
+            }
             hasRealityMode={commerce.realityMode}
             hasMyPulse={commerce.myPulse}
             readIds={readIncoming}
