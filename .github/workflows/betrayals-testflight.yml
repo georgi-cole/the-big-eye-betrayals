@@ -141,8 +141,15 @@ jobs:
             CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
-          archived_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$archive/Products/Applications/App.app/Info.plist")
+          archive_plist="$archive/Products/Applications/App.app/Info.plist"
+          archived_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$archive_plist")
           test "$archived_id" = "$BETRAYALS_BUNDLE_ID"
+          archived_icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$archive_plist" 2>/dev/null || true)
+          if [[ "$archived_icon" != 'AppIcon' ]]; then
+            echo "::error::Expected the Betrayals AppIcon in the archive, found ${archived_icon:-no primary icon}."
+            exit 1
+          fi
+          echo "Verified the Betrayals AppIcon in the archive."
           cat > "$RUNNER_TEMP/BetrayalsExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
