@@ -4,6 +4,7 @@
 }
 
 .betrayals-gallery {
+  --gallery-plaque-space: 1.55rem;
   position: relative;
   isolation: isolate;
   container-type: size;
@@ -112,39 +113,50 @@
 }
 
 .betrayals-painting__plaque {
-  position: absolute;
-  inset: auto 7% 2px;
-  z-index: 1;
-  padding: 2px 4px;
-  border: 1px solid #ad8658a3;
-  border-radius: 2px;
-  background: linear-gradient(165deg, #402d1e, #21140df5);
-  color: #ffe8be;
+  justify-self: center;
+  box-sizing: border-box;
+  min-width: 48%;
+  max-width: 93%;
+  padding: 0.13rem 0.48rem;
+  overflow: hidden;
+  border: 1px solid #9a713c;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(0deg, #4029140d 0 1px, transparent 1px 3px),
+    linear-gradient(170deg, #ebcd91, #b8894d 50%, #d9b879);
+  box-shadow:
+    inset 0 0 0 1px #f7ddaa9c,
+    0 2px 3px #0c0805a6;
+  color: #29190d;
   font:
-    600 clamp(0.71rem, 3vw, 0.99rem) / 1.2 Georgia,
+    700 clamp(0.67rem, 2.55vw, 0.9rem) / 1.15 Georgia,
     serif;
+  letter-spacing: 0.035em;
   text-align: center;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px #f5dbaa80;
+  white-space: nowrap;
 }
 
-.betrayals-gallery__nav {
-  position: absolute;
-  z-index: 1;
-  inset: auto 10px 8px;
-  display: flex;
-  justify-content: space-between;
-  pointer-events: none;
+.betrayals-gallery:not([data-variant]) .betrayals-painting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.22rem;
+  height: auto;
+  aspect-ratio: auto;
 }
 
-:is(.round-table-room, .betrayals-conclave-dialog) .betrayals-gallery__nav button {
-  min-width: 44px;
-  padding: 0 8px;
-  background: #1d1511ed;
-  color: var(--room-gold);
-  font:
-    1.7rem / 1 Georgia,
-    serif;
-  pointer-events: auto;
+.betrayals-gallery:not([data-variant]) .betrayals-gallery__track .betrayals-painting {
+  width: min(100cqw, calc(100cqh - var(--gallery-plaque-space)));
+}
+
+.betrayals-gallery:not([data-variant]) .betrayals-painting__art {
+  width: 100%;
+  height: auto;
+}
+
+.betrayals-gallery__track::-webkit-scrollbar-button {
+  display: none;
 }
 
 .betrayals-gallery__focus {
@@ -165,9 +177,8 @@
 
 .betrayals-gallery__subject {
   position: relative;
-  width: min(60cqw, 77cqh, 365px);
-  aspect-ratio: 1;
-  margin-block-end: 26px;
+  width: min(60cqw, calc(77cqh - var(--gallery-plaque-space)), 365px);
+  margin-block-end: 42px;
   animation: gallery-refocus 440ms cubic-bezier(0.19, 0.74, 0.28, 1) both;
 }
 

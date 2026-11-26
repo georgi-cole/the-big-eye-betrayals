@@ -1,4 +1,13 @@
 import { useId, useState, type ReactNode } from 'react'
+import {
+  CLAIRVOYANT_MAX_USES,
+  INFLUENCE_ROLE_MAX_USES,
+  MAYOR_LAST_DAY,
+  MAYOR_MAX_USES,
+  CHANGE_OF_HEART_CAST,
+  DRAMA_ROLE_ODDS,
+  SECRET_BETRAYER_CAST,
+} from './castleRoles'
 import { MIN_BETRAYERS, phaseLabel } from './seasonPhases'
 import { SOCIAL_RECHARGE_ENERGY } from './socialResources'
 import './betrayalsRules.css'
@@ -104,7 +113,8 @@ const chapters: readonly HandbookChapter[] = [
       <>
         <p>
           The Public Shield protects its holder at the Round Table. Night Shields protect against
-          the Conclave. The game shows which protection you hold.
+          the Conclave. The game shows which protection you hold. A guest who gives you a Night
+          Shield won't ask you for one that evening.
         </p>
         <p>
           Social cards show what each move costs. Each morning restores some Energy. Check in for
@@ -117,9 +127,72 @@ const chapters: readonly HandbookChapter[] = [
           My Pulse keeps your accounts, commitments and votes together.
         </p>
         <p>
-          If you’re eliminated, you can watch the season play out or return to a checkpoint when
-          Rewind is offered. Eyeros you earn go to your Wallet. The season pot is shared by the
+          Enable Drama Mode in Settings before starting a season to deal three Castle Roles. You
+          have an {DRAMA_ROLE_ODDS.special}% chance of a Castle Role, a {DRAMA_ROLE_ODDS.betrayer}%
+          chance of being a regular Betrayer, and a {DRAMA_ROLE_ODDS.loyal}% chance of being a
+          regular Loyal.
+        </p>
+        <p>
+          The Doctor can protect one guest per night and can choose themselves once per season. The
+          Mayor can double their first ballot at up to {MAYOR_MAX_USES} Round Tables through Day{' '}
+          {MAYOR_LAST_DAY}. Extrasense can check one other guest for a special role each night. The
+          Doctor and Mayor powers close with seven guests remaining. All role powers expire when the
+          Final Five begins.
+        </p>
+        <p>
+          The Good Witch can stop one murder before the Conclave. The Illusionist can redirect one
+          letter to a random different guest, including a Betrayer. Immunity and shields protect the
+          final recipient. A Cursed guest joins the Betrayers at dawn if the Conclave's original
+          letter would have killed them. These three powers close with seven guests remaining.
+        </p>
+        <p>
+          Columbus can check a group of five other guests once per season and learn whether the
+          group includes a Betrayer. The Clairvoyant automatically sees the winners on the first{' '}
+          {CLAIRVOYANT_MAX_USES} hidden Shield Trial results. Public results use no charge. Shields
+          can still change hands afterward.
+        </p>
+        <p>
+          After Nightfall, the Secret Betrayer opens a private portrait gallery and chooses the
+          murder target from the Conclave's shortlist. They join the regular Conclave when{' '}
+          {SECRET_BETRAYER_CAST} guests remain. Alpha Betrayer can double an opening vote at up to{' '}
+          {INFLUENCE_ROLE_MAX_USES} Conclaves. Bad Witch plays for the Betrayers and can cast a
+          sleep spell when the Round Table opens, cancelling that ballot. The Politician can direct
+          another guest’s first ballot at up to {INFLUENCE_ROLE_MAX_USES} Round Tables. The Dark
+          Angel stops a secretly bound Betrayer from targeting them at one Conclave. Change of Heart
+          can choose to join the Betrayers at dawn once {CHANGE_OF_HEART_CAST} or fewer guests
+          remain. These active powers close when seven guests remain.
+        </p>
+        <p>
+          The Medium can speak to one murdered guest and bring them back at dawn. Last Will can
+          reveal one guest’s allegiance and Castle Role after leaving. Kamikaze can try to take a
+          guest with them when they leave. Immunity and shields protect the target. Those three
+          powers close when seven guests remain.
+        </p>
+        <p>
+          On even-numbered days, the Introvert can answer messages and vote while Social is closed.
+          The Fatigued must sit out either Immunity or the Shield Trial each day. The Diva can ask
+          one guest per day for a private, truthful answer about their shield or most recent vote.
+        </p>
+        <p>
+          When a role prompts you to act, select the portraits or ready the power with its on-screen
+          control, then confirm with Play. Tap your choice again to clear it. Press Play with no
+          choice to skip optional powers. Open the Castle Role card to see how and when your power
+          works.
+        </p>
+        <p>
+          If you hold a Loyal Castle Role in Drama Mode, choose a guest in Social and use Reveal
+          role to tell them privately. They may pass on what you tell them. Clairvoyant and Diva
+          keep their powers secret.
+        </p>
+        <p>
+          If you're eliminated and Rewind is offered, you can watch an ad to return to the
+          checkpoint or leave the castle. If advertising privacy needs setup, you can open it from
+          the rewind prompt. Eyeros you earn go to your Wallet. The season pot is shared by the
           surviving winners.
+        </p>
+        <p>
+          Open Home and choose Save for later to resume the same season. Abandon the castle ends
+          your current season. The next season starts at Day 1.
         </p>
       </>
     ),

@@ -9,6 +9,9 @@ export type ConclaveFrame =
   | 'portrait'
   | 'sealed'
 
+export const conclaveTableHold = 1400
+export const sealedVoteHold = 1800
+
 type OpeningBeat = {
   frame: ConclaveFrame
   title: string
@@ -17,6 +20,12 @@ type OpeningBeat = {
   focusId?: string
   visibleCount?: number
 }
+
+export const sealedBallotOpening: readonly OpeningBeat[] = [
+  { frame: 'latch', title: '', hold: 1080, cue: 'door' },
+  { frame: 'table', title: '', hold: 1350, cue: 'conclave_steps' },
+  { frame: 'sealed', title: 'The shortlist is waiting.', hold: 1300 },
+]
 
 export function conclaveOpeningBeats(
   cast: readonly CinematicCastMember[],
@@ -40,7 +49,6 @@ export function conclaveOpeningBeats(
       frame: 'hood',
       title: '',
       hold: 2150,
-      cue: 'conclave_cloth',
       focusId: guests[0].id,
       visibleCount: 0,
     },

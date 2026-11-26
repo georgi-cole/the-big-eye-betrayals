@@ -78,9 +78,7 @@ describe('Round Table premium interactions', () => {
     )
     expect(screen.getByRole('log', { name: 'Round Table conversation' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Take the floor' }))
-    expect(
-      screen.getByRole('button', { name: /Reality Mode at the Round Table/ })
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reality Mode/ })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Voting intel' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Present an account/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: run.seats[1].name }))
@@ -97,7 +95,7 @@ describe('Round Table premium interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Press hard/ }))
     expect(onUpgrade).toHaveBeenCalledTimes(2)
     expect(onSway).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Go to vote' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Voting' }))
     expect(onSway).toHaveBeenCalledWith(null)
   })
 
@@ -146,7 +144,7 @@ describe('Round Table premium interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Defend/ }))
     expect(props.onUpgrade).toHaveBeenCalledTimes(1)
     expect(props.onSway).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Go to vote' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Voting' }))
     expect(props.onSway).toHaveBeenCalledWith(null)
   })
 })

@@ -7,6 +7,13 @@ import { walletsAfterChallenge } from './socialResources.ts'
 import { openCastleMoment } from './castleLife.ts'
 import { recordBetrayalsChallengeRewards } from './economy.ts'
 import { NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
+import {
+  castleRoleFor,
+  eligibleCastleRole,
+  recordCastleRoleUse,
+  recordClairvoyantResults,
+} from './castleRoles.ts'
+import { shieldRoll } from './nightShields.ts'
 
 export type RankedScore = {
   contestantId: string
@@ -18,11 +25,34 @@ export type RankedScore = {
   forfeited?: boolean
 }
 
+export function chooseFatiguedSafety(run: Run): Run {
+  const card = castleRoleFor(run, run.humanId)
+  return run.phase === 'immunity' && card && eligibleCastleRole(run, run.humanId, 'fatigued')
+    ? recordCastleRoleUse(run, card, { roleId: 'fatigued', day: run.day, challenge: 'safety' })
+    : run
+}
+
+function fatiguedChallenge(run: Run, id: string) {
+  const card = castleRoleFor(run, id)
+  if (card?.roleId !== 'fatigued' || card.status === 'retired') return
+  if (card.used?.roleId === 'fatigued' && card.used.day === run.day) return card.used.challenge
+  if (!eligibleCastleRole(run, id, 'fatigued')) return
+  if (id !== run.humanId) return shieldRoll(run, id, 7853) < 0.55 ? 'safety' : 'immunity'
+  return 'immunity'
+}
+
 export function challengeContestantIds(run: Run): string[] {
   if (run.phase !== 'immunity' && run.phase !== 'safety' && run.phase !== 'final-challenge')
     return []
   return run.seats
-    .filter(({ id, exit }) => !exit && (run.phase !== 'safety' || run.immunityId !== id))
+    .filter(({ id, exit }) => {
+      const available = fatiguedChallenge(run, id)
+      return (
+        !exit &&
+        (run.phase !== 'safety' || run.immunityId !== id) &&
+        (!available || run.phase === 'final-challenge' || available === run.phase)
+      )
+    })
     .map(({ id }) => id)
 }
 
@@ -84,7 +114,7 @@ export function resolveChallenge(
   )
   const pot = run.pot + Math.round((cap * contribution) / standings.length)
   const revision = run.revision + 1
-  const afterChallenge = {
+  let afterChallenge: Run = {
     ...run,
     pot,
     revision,
@@ -97,6 +127,20 @@ export function resolveChallenge(
         }
       : {}),
     socialWallets: walletsAfterChallenge(run, standings),
+  }
+  const tired = run.private.castleRoles?.find(({ roleId }) => roleId === 'fatigued')
+  if (
+    run.phase !== 'final-challenge' &&
+    tired &&
+    eligibleCastleRole(run, tired.guestId, 'fatigued') &&
+    standings.some(({ contestantId }) => contestantId === tired.guestId)
+  ) {
+    const challenge = run.phase === 'immunity' ? 'immunity' : 'safety'
+    afterChallenge = recordCastleRoleUse(afterChallenge, tired, {
+      roleId: 'fatigued',
+      day: run.day,
+      challenge,
+    })
   }
   if (run.phase === 'immunity') {
     const next: Run = {
@@ -114,12 +158,12 @@ export function resolveChallenge(
     const nightShieldIds = standings
       .slice(0, NIGHT_SHIELD_COUNT)
       .map(({ contestantId }) => contestantId)
-    const next = openCastleMoment(
-      openShieldDeals({
+    const awarded = recordClairvoyantResults(
+      {
         ...afterChallenge,
         phase: 'shield-deals',
         private: {
-          ...run.private,
+          ...afterChallenge.private,
           nightShieldIds,
           nightShieldAwardIds: undefined,
           safetyStandings: {
@@ -132,9 +176,11 @@ export function resolveChallenge(
             })),
           },
         },
-      }),
-      'supper'
+      },
+      nightShieldIds,
+      publicResults
     )
+    const next = openCastleMoment(openShieldDeals(awarded), 'supper')
     return recordBetrayalsChallengeRewards(run, next, standings)
   }
   return recordBetrayalsChallengeRewards(
@@ -150,11 +196,21 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
   const view = viewFor(run, actorId)
   const activeViewer = view.seats.some(({ id, exit }) => id === actorId && !exit)
   const names = new Map(view.seats.map(({ id, name }) => [id, name]))
+  const reading = castleRoleFor(run, actorId)?.used
+  const privatelyKnown =
+    activeViewer &&
+    castleRoleFor(run, actorId)?.clairvoyantUses &&
+    reading?.roleId === 'clairvoyant' &&
+    reading.day === run.day
+      ? new Set(reading.shieldIds)
+      : new Set<string>()
   return standings.rows.map(({ contestantId, score, forfeited }, index) => {
     const own = activeViewer && contestantId === actorId
     const shield = index < NIGHT_SHIELD_COUNT
     const revealName =
-      standings.publicResults || own || (shield && view.teammateIds.includes(contestantId))
+      standings.publicResults ||
+      own ||
+      (shield && (view.teammateIds.includes(contestantId) || privatelyKnown.has(contestantId)))
     return {
       name: revealName ? (names.get(contestantId) ?? null) : null,
       own,
@@ -162,6 +218,7 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
       place: index + 1,
       forfeited: Boolean(forfeited),
       shield,
+      ...(shield && privatelyKnown.has(contestantId) && { clairvoyant: true }),
     }
   })
 }

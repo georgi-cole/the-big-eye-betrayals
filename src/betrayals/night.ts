@@ -1,16 +1,30 @@
 import { mulberry32, seededPick } from '../store/rng.ts'
-import { isCurrentCommand, knownTeammateIds } from './run.ts'
+import { commandToken, hashId, isCurrentCommand, knownTeammateIds, viewFor } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
-import { nightShieldReads, shieldRoll } from './nightShields.ts'
+import { nightExposure, nightShieldReads, shieldRoll } from './nightShields.ts'
 import type { ShieldRead } from './nightShields.ts'
 import { getSocialPersonality } from '../social/socialPersonalityBank.ts'
 import { getSocialView, rapport } from './social.ts'
-import { chooseTarget, resolutionPerspective } from './strategy.ts'
+import { chooseTarget, rankedTargets, resolutionPerspective } from './strategy.ts'
 import type { Ballot } from './table.ts'
 import { deliverNightDecision } from './dayFlow.ts'
 import { hasPaidNightShield, pendingPaidNightShieldPurchase } from './economy.ts'
 import { requiredRecruiterId, resolveRecruitment } from './recruitment.ts'
+import {
+  castleRoleFor,
+  COLUMBUS_GROUP_SIZE,
+  doctorSelfWardUsed,
+  eligibleCastleRole,
+  isConcealedSecretBetrayer,
+  passCastleRole,
+  recordCastleRoleUse,
+  spendCastleRole,
+  turnCursedGuest,
+  type NightPower,
+} from './castleRoles.ts'
 import { FINALE_CAST_SIZE } from './seasonPhases.ts'
+import { settleRun } from './settlement.ts'
+import { afterCastleDeparture, unsealSecretBetrayer } from './castleRoleEvents.ts'
 import { composeConclaveConversation } from './conclaveConversation.ts'
 import type { CinematicCastMember } from './CinematicScene'
 
@@ -34,6 +48,9 @@ export type ConclaveView = {
   shieldBriefing?: ConclaveLine[]
   runoff?: string
   ownArgument?: string
+  alphaAvailable?: boolean
+  nominationBlocked?: boolean
+  sealed?: boolean
 }
 
 type ShieldBriefing = {
@@ -49,12 +66,246 @@ function isActiveBetrayer(run: Run, actorId: string) {
   )
 }
 
+function mayAttendConclave(run: Run, actorId: string) {
+  return isActiveBetrayer(run, actorId) && !isConcealedSecretBetrayer(run, actorId)
+}
+
+function activeSecretBetrayer(run: Run) {
+  return run.private.betrayers.find(
+    (id) => isConcealedSecretBetrayer(run, id) && isActiveBetrayer(run, id)
+  )
+}
+
+type NightRolePrompt =
+  | { roleId: 'doctor' | 'extrasense' | 'columbus'; targetIds: string[] }
+  | { roleId: NightPower; targetIds?: never }
+
+function nightRoleFor(run: Run, actorId: string): NightRolePrompt | undefined {
+  // The player's options must not disclose that recruitment is scheduled.
+  if (run.phase !== 'night' || run.private.conclaveVote || run.private.humanRecruitmentOffered)
+    return
+  const card = castleRoleFor(run, actorId)
+  if (!card || card.passedDay === run.day || !eligibleCastleRole(run, actorId, card.roleId)) return
+  if (card.roleId === 'good-witch' || card.roleId === 'illusionist') return { roleId: card.roleId }
+  if (card.roleId !== 'doctor' && card.roleId !== 'extrasense' && card.roleId !== 'columbus') return
+  return {
+    roleId: card.roleId,
+    targetIds: run.seats
+      .filter(
+        ({ id, exit }) =>
+          !exit && (id !== actorId || (card.roleId === 'doctor' && !doctorSelfWardUsed(card)))
+      )
+      .map(({ id }) => id),
+  }
+}
+
+export function nightCastleRoleFor(run: Run, actorId: string | null) {
+  return actorId === run.humanId ? nightRoleFor(run, actorId) : undefined
+}
+
+export function resolveNightCastleRole(
+  run: Run,
+  token: CommandToken,
+  choice?: string | readonly string[] | true
+): Run {
+  if (
+    !isCurrentCommand(run, token) ||
+    run.presentation?.length ||
+    pendingPaidNightShieldPurchase(run)
+  )
+    return run
+  const prompt = nightCastleRoleFor(run, run.humanId)
+  if (!prompt) return run
+  if (choice === undefined) return passCastleRole(run, run.humanId)
+  if (prompt.roleId === 'columbus') {
+    return Array.isArray(choice)
+      ? spendCastleRole(run, run.humanId, { roleId: prompt.roleId, guestIds: choice })
+      : run
+  }
+  if (prompt.roleId === 'doctor' || prompt.roleId === 'extrasense') {
+    return typeof choice === 'string' && prompt.targetIds.includes(choice)
+      ? spendCastleRole(run, run.humanId, { roleId: prompt.roleId, targetId: choice })
+      : run
+  }
+  if (choice !== true) return run
+  // A recruitment night has no murder ballot. Keep the charge and handle any invitation normally.
+  if (requiredRecruiterId(run)) {
+    const passed = passCastleRole(run, run.humanId)
+    return resolveConclave(passed, commandToken(passed))
+  }
+  return resolveConclaveBallot(run, token, undefined, prompt.roleId)
+}
+
+function doctorTarget(run: Run, actorId: string, targetIds: string[]) {
+  const knownShields = new Set(viewFor(run, actorId).knownNightShieldIds)
+  const conversations = getSocialView(run, actorId)
+  const reads = nightShieldReads(run, actorId)
+  const choices = targetIds
+    .filter((id) => id !== run.immunityId && !knownShields.has(id))
+    .map((id) => ({
+      id,
+      score:
+        nightExposure(run, id) +
+        (id === actorId ? 0.12 : rapport(conversations, actorId, id) * 0.25) -
+        (reads.get(id)?.protected ?? 0) * 0.4 +
+        shieldRoll(run, actorId + ':' + id, 33413) * 0.2,
+    }))
+  choices.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
+  return choices[0]?.id
+}
+
+function spendAiNightRoles(run: Run) {
+  if (!run.private.castleRoles?.length) return run
+  let next = run
+  for (const { id } of run.seats) {
+    if (id === run.humanId || (run.day < 3 && shieldRoll(run, id, 11369) >= 0.25)) continue
+    const prompt = nightRoleFor(next, id)
+    if (!prompt?.targetIds) continue
+    if (prompt.roleId === 'columbus') {
+      const perspective = resolutionPerspective(next, id, prompt.targetIds)
+      // Check the strongest lead alongside less suspicious guests, so either result is useful.
+      const [lead, ...otherGuests] = rankedTargets(perspective, 'case')
+      if (lead)
+        next = spendCastleRole(next, id, {
+          roleId: 'columbus',
+          guestIds: [lead, ...otherGuests.slice(-(COLUMBUS_GROUP_SIZE - 1))],
+        })
+      continue
+    }
+    const targetId =
+      prompt.roleId === 'doctor'
+        ? doctorTarget(next, id, prompt.targetIds)
+        : chooseTarget(resolutionPerspective(next, id, prompt.targetIds), 'case')
+    if (targetId) next = spendCastleRole(next, id, { roleId: prompt.roleId, targetId })
+  }
+  // The Night command commits these private preparations in the same revision.
+  return next === run ? run : { ...next, revision: run.revision }
+}
+
+function activeDoctorWard(run: Run, targetId: string) {
+  return run.private.castleRoles?.some(
+    ({ used }) => used?.roleId === 'doctor' && used.day === run.day && used.targetId === targetId
+  )
+}
+
+function hasNightShield(run: Run, targetId: string) {
+  return run.private.nightShieldIds.includes(targetId) || hasPaidNightShield(run, targetId)
+}
+
+function aiNightPower(run: Run, roleId: NightPower) {
+  const card = run.private.castleRoles?.find((card) => card.roleId === roleId)
+  if (!card || card.guestId === run.humanId || !eligibleCastleRole(run, card.guestId, roleId))
+    return
+  const living = run.seats.filter(({ exit }) => !exit).length
+  const view = viewFor(run, card.guestId)
+  const exposure =
+    view.hasNightShield || run.immunityId === card.guestId ? 0 : nightExposure(run, card.guestId)
+  const risk = getSocialPersonality(card.guestId).riskTolerance
+  const alliesAtRisk =
+    roleId === 'good-witch'
+      ? Math.max(
+          0,
+          ...run.seats.flatMap(({ id, exit }) =>
+            exit ||
+            id === card.guestId ||
+            id === run.immunityId ||
+            view.knownNightShieldIds.includes(id)
+              ? []
+              : [rapport(run.social, card.guestId, id) * nightExposure(run, id)]
+          )
+        )
+      : 0
+  const chance = Math.min(
+    0.85,
+    (living <= 11 ? 0.52 : run.day <= 2 ? 0.07 : 0.2) +
+      exposure * (roleId === 'good-witch' ? 0.23 : 0.1) +
+      risk * 0.08 +
+      alliesAtRisk * 0.18
+  )
+  if (shieldRoll(run, card.guestId, roleId === 'good-witch' ? 19391 : 21529) < chance)
+    return card.guestId
+}
+
+function hasMurderConclave(run: Run) {
+  return (
+    !run.private.conclaveVote &&
+    run.private.betrayers.some((id) => isActiveBetrayer(run, id)) &&
+    run.seats.some(
+      ({ id, exit }) => !exit && id !== run.immunityId && !run.private.betrayers.includes(id)
+    )
+  )
+}
+
+export function aiGoodWitch(run: Run) {
+  const witch = aiNightPower(run, 'good-witch')
+  return witch && hasMurderConclave(run) ? witch : undefined
+}
+
+function cancelMurder(run: Run, witch: string): Run {
+  const spent = spendCastleRole(run, witch, { roleId: 'good-witch' })
+  if (spent === run) return run
+  return {
+    ...spent,
+    phase: 'night-resolved',
+    private: {
+      ...spent.private,
+      pendingNight: { targetId: null, blocked: false, castleEffect: { kind: 'good-witch' } },
+    },
+  }
+}
+
 export function nightTargets(run: Run, actorId: string): string[] {
-  if (run.phase !== 'night' || !isActiveBetrayer(run, actorId) || requiredRecruiterId(run))
+  if (run.phase !== 'night' || !mayAttendConclave(run, actorId) || requiredRecruiterId(run))
     return []
+  const ward = darkAngelWard(run, actorId)
   return run.seats
-    .filter(({ id, exit }) => !exit && id !== run.immunityId && !run.private.betrayers.includes(id))
+    .filter(
+      ({ id, exit }) =>
+        !exit &&
+        id !== run.immunityId &&
+        id !== ward &&
+        (!run.private.betrayers.includes(id) || isConcealedSecretBetrayer(run, id))
+    )
     .map(({ id }) => id)
+}
+
+function darkAngelWard(run: Run, voterId: string) {
+  return run.private.castleRoles?.find(
+    ({ used }) => used?.roleId === 'dark-angel' && used.day === run.day && used.targetId === voterId
+  )?.guestId
+}
+
+function protectDarkAngel(run: Run, ballots: readonly Ballot[]): Run {
+  const angel = run.private.castleRoles?.find(({ roleId }) => roleId === 'dark-angel')
+  if (
+    !angel?.boundBetrayerId ||
+    !eligibleCastleRole(run, angel.guestId, 'dark-angel') ||
+    !ballots.some(
+      ({ voterId, targetId }) => voterId === angel.boundBetrayerId && targetId === angel.guestId
+    )
+  )
+    return run
+  return recordCastleRoleUse(run, angel, {
+    roleId: 'dark-angel',
+    day: run.day,
+    targetId: angel.boundBetrayerId,
+  })
+}
+
+function alphaNominations(run: Run, nominations: Ballot[], humanDouble: boolean) {
+  const alpha = run.private.castleRoles?.find(({ roleId }) => roleId === 'alpha-betrayer')
+  const ballot = nominations.find(({ voterId }) => voterId === alpha?.guestId)
+  if (!alpha || !ballot || !eligibleCastleRole(run, alpha.guestId, 'alpha-betrayer'))
+    return { run, nominations }
+  const base = countVotes(nominations)
+  const support = base.get(ballot.targetId) ?? 0
+  const useful =
+    !majorityTarget(base, nominations.length) && support >= Math.max(...base.values()) - 1
+  if (alpha.guestId === run.humanId ? !humanDouble : !useful) return { run, nominations }
+  return {
+    run: recordCastleRoleUse(run, alpha, { roleId: 'alpha-betrayer', day: run.day }),
+    nominations: nominations.map((row): Ballot => (row === ballot ? { ...row, weight: 2 } : row)),
+  }
 }
 
 function tallyNightBallots(run: Run, choices: readonly Ballot[]) {
@@ -66,10 +317,17 @@ function tallyNightBallots(run: Run, choices: readonly Ballot[]) {
   if (choices.length !== electorate.size) return
 
   const tally = new Map<string, number>()
-  for (const { voterId, targetId } of choices) {
+  for (const { voterId, targetId, weight } of choices) {
     if (!electorate.get(voterId)?.includes(targetId)) return
+    if (
+      weight !== undefined &&
+      (weight !== 2 ||
+        castleRoleFor(run, voterId)?.used?.roleId !== 'alpha-betrayer' ||
+        castleRoleFor(run, voterId)?.used?.day !== run.day)
+    )
+      return
     electorate.delete(voterId)
-    tally.set(targetId, (tally.get(targetId) ?? 0) + 1)
+    tally.set(targetId, (tally.get(targetId) ?? 0) + (weight ?? 1))
   }
   return tally
 }
@@ -85,7 +343,8 @@ function leadingTargets(tally: ReadonlyMap<string, number>) {
 
 function countVotes(ballots: readonly Ballot[]) {
   const tally = new Map<string, number>()
-  for (const { targetId } of ballots) tally.set(targetId, (tally.get(targetId) ?? 0) + 1)
+  for (const { targetId, weight } of ballots)
+    tally.set(targetId, (tally.get(targetId) ?? 0) + (weight ?? 1))
   return tally
 }
 
@@ -103,10 +362,10 @@ function runoffTargets(nominations: readonly Ballot[]) {
 }
 
 export function conclaveGuests(run: Run, actorId: string | null) {
-  if (!actorId || !isActiveBetrayer(run, actorId)) return []
+  if (!actorId || !mayAttendConclave(run, actorId)) return []
   const known = new Set([actorId, ...knownTeammateIds(run, actorId)])
   return run.seats
-    .filter(({ id }) => run.private.betrayers.includes(id))
+    .filter(({ id }) => run.private.betrayers.includes(id) && !isConcealedSecretBetrayer(run, id))
     .flatMap<CinematicCastMember>(({ id, name, portrait, exit }, conclaveSeat) => {
       if (exit) return []
       return known.has(id)
@@ -122,29 +381,107 @@ export function resolveNight(
   nominations: readonly Ballot[] = choices
 ): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
-  if (pendingPaidNightShieldPurchase(run) || requiredRecruiterId(run)) return run
+  if (
+    run.private.departurePower ||
+    pendingPaidNightShieldPurchase(run) ||
+    requiredRecruiterId(run) ||
+    nightCastleRoleFor(run, run.humanId)
+  )
+    return run
+  if (choices.some(({ weight }) => weight !== undefined) || !tallyNightBallots(run, choices))
+    return run
+  const secretId = activeSecretBetrayer(run)
+  if (secretId === run.humanId) return run
+  const witch = aiGoodWitch(run)
+  if (witch) return cancelMurder(run, witch)
+  const warded = protectDarkAngel(run, choices)
+  if (warded === run)
+    return secretId
+      ? resolveSealedVote(run, secretId, choices)
+      : resolveNightBallot(run, choices, nominations)
+  const updated = choices.flatMap(({ voterId, targetId }) => {
+    const targets = nightTargets(warded, voterId)
+    const eligible = targets.includes(targetId)
+      ? targetId
+      : chooseNominee(warded, voterId, targets, [])
+    return eligible ? [{ voterId, targetId: eligible }] : []
+  })
+  return secretId
+    ? resolveSealedVote(warded, secretId, updated)
+    : resolveNightBallot(warded, updated, updated)
+}
+
+function resolveNightBallot(
+  run: Run,
+  choices: readonly Ballot[],
+  nominations: readonly Ballot[],
+  power?: NightPower
+): Run {
   const tally = tallyNightBallots(run, choices)
   const nominated = choices === nominations ? tally : tallyNightBallots(run, nominations)
   if (!tally || !nominated || [...tally.keys()].some((id) => !nominated.has(id))) return run
+  const witch = aiGoodWitch(run)
+  if (witch) return cancelMurder(run, witch)
 
   const leaders = leadingTargets(tally)
   const byDraw = leaders.length > 1
-  const targetId = byDraw
+  const originalTargetId = byDraw
     ? seededPick(mulberry32(run.publicSeed ^ Math.imul(run.day, 1229)), leaders.sort())
     : (leaders[0] ?? null)
+  return resolveNightTarget(run, originalTargetId, byDraw, power)
+}
+
+function resolveNightTarget(
+  run: Run,
+  originalTargetId: string | null,
+  byDraw: boolean,
+  power?: NightPower,
+  sealedBallot?: NonNullable<Run['private']['pendingNight']>['sealedBallot']
+): Run {
+  let prepared = spendAiNightRoles(run)
+  let targetId = originalTargetId
+  let castleEffect: NonNullable<Run['private']['pendingNight']>['castleEffect']
+  const illusionist = power === 'illusionist' ? run.humanId : aiNightPower(run, 'illusionist')
+  if (originalTargetId && illusionist) {
+    const candidates = run.seats.filter(({ id, exit }) => !exit && id !== originalTargetId)
+    const spent = candidates.length
+      ? spendCastleRole(prepared, illusionist, { roleId: 'illusionist' })
+      : prepared
+    if (spent !== prepared) {
+      const random = mulberry32(
+        (run.private.recruitmentSeed ?? hashId(run.id)) ^ Math.imul(run.day, 16217)
+      )
+      targetId = seededPick(random, candidates).id
+      prepared = spent
+      castleEffect = { kind: 'illusionist', originalTargetId }
+    }
+  }
+  const protectedTarget = Boolean(
+    targetId &&
+    (targetId === run.immunityId ||
+      hasNightShield(prepared, targetId) ||
+      activeDoctorWard(prepared, targetId) ||
+      isConcealedSecretBetrayer(prepared, targetId))
+  )
+  if (
+    targetId &&
+    !castleEffect &&
+    !protectedTarget &&
+    eligibleCastleRole(prepared, targetId, 'cursed')
+  )
+    castleEffect = { kind: 'cursed' }
   return {
-    ...run,
+    ...prepared,
     revision: run.revision + 1,
     phase: 'night-resolved',
     private: {
-      ...run.private,
+      ...prepared.private,
       pendingNight: {
         targetId,
-        blocked: Boolean(
-          targetId &&
-          (run.private.nightShieldIds.includes(targetId) || hasPaidNightShield(run, targetId))
-        ),
+        blocked: protectedTarget || castleEffect?.kind === 'cursed',
         byDraw,
+        ...(sealedBallot && { sealedBallot }),
+        ...(castleEffect && { castleEffect }),
       },
     },
   }
@@ -155,7 +492,7 @@ function discussShields(run: Run): ShieldBriefing[] {
     run.seats.filter(({ id, exit }) => !exit && id !== run.immunityId).map(({ id }) => id)
   )
   return run.seats.flatMap(({ id: speakerId }) => {
-    if (speakerId === run.humanId || !isActiveBetrayer(run, speakerId)) return []
+    if (speakerId === run.humanId || !mayAttendConclave(run, speakerId)) return []
     const teammates = knownTeammateIds(run, speakerId)
     const ranked = [...nightShieldReads(run, speakerId)]
       .filter(
@@ -291,9 +628,65 @@ function caseFor(run: Run, voterId: string, targetId: string) {
 }
 
 function projectedTargets(run: Run, actorId: string, known: ReadonlySet<string>) {
+  const ward = darkAngelWard(run, actorId)
   return run.seats
-    .filter(({ id, exit }) => !exit && id !== actorId && id !== run.immunityId && !known.has(id))
+    .filter(
+      ({ id, exit }) =>
+        !exit && id !== actorId && id !== run.immunityId && id !== ward && !known.has(id)
+    )
     .map(({ id }) => id)
+}
+
+function sealedShortlist(run: Run, secretId: string, nominations: readonly Ballot[]) {
+  const ward = darkAngelWard(run, secretId)
+  const targets = run.seats.flatMap(({ id, exit }) =>
+    !exit && id !== run.immunityId && id !== ward && !run.private.betrayers.includes(id) ? [id] : []
+  )
+  // Shared nominations narrow the slate. A split Conclave sends an extra reserve name.
+  const preferred = [...countVotes(nominations)]
+    .sort((a, b) => b[1] - a[1])
+    .flatMap(([id]) => (targets.includes(id) ? [id] : []))
+  const limit = Math.max(
+    2,
+    Math.min(4, preferred.length === nominations.length ? preferred.length + 1 : preferred.length)
+  )
+  const reserve = targets.filter((id) => !preferred.includes(id))
+  while (preferred.length < limit && reserve.length) {
+    const backup = chooseNominee(run, nominations[0]?.voterId ?? secretId, reserve, [])
+    if (!backup) break
+    preferred.push(backup)
+    reserve.splice(reserve.indexOf(backup), 1)
+  }
+  return preferred.slice(0, limit)
+}
+
+function resolveSealedVote(
+  run: Run,
+  secretId: string,
+  nominations: readonly Ballot[],
+  humanTargetId?: string,
+  power?: NightPower
+) {
+  const shortlist = sealedShortlist(run, secretId, nominations)
+  if (
+    secretId === run.humanId &&
+    (humanTargetId ? !shortlist.includes(humanTargetId) : shortlist.length > 0)
+  )
+    return run
+  const targetId =
+    (secretId === run.humanId ? humanTargetId : chooseNominee(run, secretId, shortlist, [])) ?? null
+  const warded = targetId ? protectDarkAngel(run, [{ voterId: secretId, targetId }]) : run
+  if (warded !== run) {
+    if (secretId === run.humanId) return { ...warded, revision: run.revision + 1 }
+    return resolveSealedVote(warded, secretId, nominations, undefined, power)
+  }
+  return resolveNightTarget(
+    run,
+    targetId,
+    false,
+    power,
+    targetId ? { voterId: secretId, targetId, shortlist } : undefined
+  )
 }
 
 export function getConclaveView(
@@ -305,14 +698,28 @@ export function getConclaveView(
     run.phase !== 'night' ||
     !actorId ||
     !isActiveBetrayer(run, actorId) ||
-    requiredRecruiterId(run)
+    requiredRecruiterId(run) ||
+    aiGoodWitch(run)
   )
     return null
+
+  if (isConcealedSecretBetrayer(run, actorId)) {
+    return {
+      sealed: true,
+      targetIds: sealedShortlist(run, actorId, nominate(run, discussShields(run))),
+      proposals: [],
+      discussion: [],
+      ...(darkAngelWard(run, actorId) && { nominationBlocked: true }),
+    }
+  }
 
   const known = new Set(knownTeammateIds(run, actorId))
   const seats = new Map(run.seats.map((seat) => [seat.id, seat]))
   const vote = run.private.conclaveVote
-  const targetIds = vote ? runoffTargets(vote.nominations) : projectedTargets(run, actorId, known)
+  const ward = darkAngelWard(run, actorId)
+  const targetIds = vote
+    ? runoffTargets(vote.nominations).filter((id) => id !== ward)
+    : projectedTargets(run, actorId, known)
   if (vote) {
     const unchanged = (id: string) => vote.nominations.find((ballot) => ballot.voterId === id)
     return {
@@ -320,14 +727,13 @@ export function getConclaveView(
       proposals: [],
       discussion: [],
       runoff: ballotLine(run, vote.nominations),
+      ...(ward && { nominationBlocked: true }),
       ownArgument:
         selectedId === unchanged(actorId)?.targetId ? 'You are keeping your vote.' : undefined,
     }
   }
   const guests = conclaveGuests(run, actorId)
-  const participants = run.seats.filter(
-    ({ id, exit }) => !exit && run.private.betrayers.includes(id)
-  )
+  const participants = run.seats.filter(({ id }) => mayAttendConclave(run, id))
   const speakerIdFor = (id: string) => guests[participants.findIndex((seat) => seat.id === id)].id
   const briefing = discussShields(run)
   const proposals = nominate(run, briefing).flatMap(({ voterId, targetId }) => {
@@ -375,13 +781,31 @@ export function getConclaveView(
     ]
   })
   const discussion = composeConclaveConversation(proposals, shieldBriefing)
-  return { targetIds, proposals, discussion, ownArgument, shieldBriefing }
+  return {
+    targetIds,
+    proposals,
+    discussion,
+    ownArgument,
+    shieldBriefing,
+    ...(ward && { nominationBlocked: true }),
+    ...(eligibleCastleRole(run, actorId, 'alpha-betrayer') && { alphaAvailable: true }),
+  }
 }
 
 export function getConclaveVerdict(run: Run, actorId: string | null) {
   if (run.phase !== 'night-resolved' || !actorId || !isActiveBetrayer(run, actorId)) return null
   const pending = run.private.pendingNight
-  return pending ? { targetId: pending.targetId, byDraw: pending.byDraw } : null
+  if (isConcealedSecretBetrayer(run, actorId) && !pending?.recruitedId && !pending?.sealedBallot)
+    return null
+  return pending
+    ? {
+        targetId:
+          pending.castleEffect?.kind === 'illusionist'
+            ? pending.castleEffect.originalTargetId
+            : pending.targetId,
+        byDraw: pending.byDraw,
+      }
+    : null
 }
 
 export function describeConclaveVerdict(run: Run, actorId: string | null) {
@@ -401,6 +825,11 @@ export function describeConclaveVerdict(run: Run, actorId: string | null) {
   }
   if (!verdict.targetId) return 'The Conclave chose no one.'
   const name = run.seats.find(({ id }) => id === verdict.targetId)?.name ?? 'A guest'
+  const sealedBallot = run.private.pendingNight?.sealedBallot
+  if (sealedBallot)
+    return sealedBallot.voterId === actorId
+      ? `You chose ${name} from the sealed shortlist.`
+      : `${name} was chosen.`
   const vote = run.private.conclaveVote
   const finalBallots = vote?.runoff ?? vote?.nominations
   const tally =
@@ -417,7 +846,12 @@ export function describeConclaveVerdict(run: Run, actorId: string | null) {
         : changes === 1
           ? 'One vote changed.'
           : `${changes} votes changed.`
-  const majority = finalBallots && majorityTarget(countVotes(finalBallots), finalBallots.length)
+  const majority =
+    finalBallots &&
+    majorityTarget(
+      countVotes(finalBallots),
+      finalBallots.reduce((sum, { weight }) => sum + (weight ?? 1), 0)
+    )
   const decision = verdict.byDraw
     ? `${name} was chosen by draw.`
     : majority === verdict.targetId
@@ -426,17 +860,52 @@ export function describeConclaveVerdict(run: Run, actorId: string | null) {
   return [tally, changeLine, decision].filter(Boolean).join(' ')
 }
 
-export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: string): Run {
+export function resolveConclave(
+  run: Run,
+  token: CommandToken,
+  humanTargetId?: string,
+  humanDouble = false
+): Run {
   if (run.phase !== 'night' || !isCurrentCommand(run, token)) return run
+  if (run.private.departurePower) return run
   if (pendingPaidNightShieldPurchase(run)) return run
-  if (requiredRecruiterId(run)) return resolveRecruitment(run, token, humanTargetId)
-  const humanIsBetrayer = isActiveBetrayer(run, run.humanId)
+  if (nightCastleRoleFor(run, run.humanId)) return run
+  return resolveConclaveBallot(run, token, humanTargetId, undefined, humanDouble)
+}
+
+function resolveConclaveBallot(
+  run: Run,
+  token: CommandToken,
+  humanTargetId?: string,
+  power?: NightPower,
+  humanDouble = false
+): Run {
+  if (requiredRecruiterId(run)) {
+    const prepared = spendAiNightRoles(run)
+    const recruited = resolveRecruitment(prepared, token, humanTargetId)
+    return recruited === prepared ? run : recruited
+  }
+  const witch = power === 'good-witch' && hasMurderConclave(run) ? run.humanId : aiGoodWitch(run)
+  if (witch) {
+    const cancelled = cancelMurder(run, witch)
+    if (cancelled !== run) return cancelled
+  }
+  const humanIsBetrayer = mayAttendConclave(run, run.humanId)
   const pending = run.private.conclaveVote
   const briefing = discussShields(run)
+  const secretId = activeSecretBetrayer(run)
+  if (secretId === run.humanId)
+    return resolveSealedVote(run, secretId, nominate(run, briefing), humanTargetId, power)
   if (pending) {
     const targets = runoffTargets(pending.nominations)
-    if (humanIsBetrayer && (!humanTargetId || !targets.includes(humanTargetId))) return run
-    return resolveConclaveRunoff(run, token, pending.nominations, targets, briefing, humanTargetId)
+    const humanTargets = targets.filter((id) => id !== darkAngelWard(run, run.humanId))
+    if (
+      humanIsBetrayer &&
+      humanTargets.length &&
+      (!humanTargetId || !humanTargets.includes(humanTargetId))
+    )
+      return run
+    return resolveConclaveRunoff(run, pending.nominations, targets, briefing, humanTargetId, power)
   }
   if (humanIsBetrayer) {
     const known = new Set(knownTeammateIds(run, run.humanId))
@@ -445,38 +914,69 @@ export function resolveConclave(run: Run, token: CommandToken, humanTargetId?: s
   }
 
   // An unknown Betrayer can appear to be a viable target. The private votes move to a backup.
-  const nominations = nominate(run, briefing, humanIsBetrayer ? humanTargetId : undefined)
+  const proposed = nominate(run, briefing, humanIsBetrayer ? humanTargetId : undefined)
+  const warded = protectDarkAngel(run, proposed)
+  if (warded !== run && humanTargetId && darkAngelWard(warded, run.humanId) === humanTargetId)
+    return { ...warded, revision: run.revision + 1 }
+  const preparedBallot = alphaNominations(
+    warded,
+    warded === run
+      ? proposed
+      : nominate(warded, briefing, humanIsBetrayer ? humanTargetId : undefined),
+    humanDouble
+  )
+  const { nominations } = preparedBallot
+  run = preparedBallot.run
   const tally = tallyNightBallots(run, nominations)
   if (!tally) return run
-  if (!nominations.length || majorityTarget(tally, nominations.length)) {
-    const resolved = resolveNight(run, token, nominations)
-    return { ...resolved, private: { ...resolved.private, conclaveVote: { nominations } } }
+  if (secretId) return resolveSealedVote(run, secretId, nominations, undefined, power)
+  if (
+    !nominations.length ||
+    majorityTarget(
+      tally,
+      nominations.reduce((sum, { weight }) => sum + (weight ?? 1), 0)
+    )
+  ) {
+    const resolved = resolveNightBallot(run, nominations, nominations, power)
+    return resolved === run
+      ? run
+      : { ...resolved, private: { ...resolved.private, conclaveVote: { nominations } } }
   }
   if (humanIsBetrayer) {
+    const prepared = spendAiNightRoles(run)
     return {
-      ...run,
+      ...prepared,
       revision: run.revision + 1,
-      private: { ...run.private, conclaveVote: { nominations } },
+      private: { ...prepared.private, conclaveVote: { nominations } },
     }
   }
-  return resolveConclaveRunoff(run, token, nominations, runoffTargets(nominations), briefing)
+  return resolveConclaveRunoff(
+    run,
+    nominations,
+    runoffTargets(nominations),
+    briefing,
+    undefined,
+    power
+  )
 }
 
 function resolveConclaveRunoff(
   run: Run,
-  token: CommandToken,
   nominations: Ballot[],
   targets: string[],
   briefing: readonly ShieldBriefing[],
-  humanTargetId?: string
+  humanTargetId?: string,
+  power?: NightPower
 ) {
   const tally = countVotes(nominations)
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 4261))
-  const runoff = nominations.map((nomination) => {
-    if (nomination.voterId === run.humanId && humanTargetId)
-      return { ...nomination, targetId: humanTargetId }
-    const alternatives = targets.filter((id) => id !== nomination.targetId)
-    const preferred = chooseNominee(run, nomination.voterId, alternatives, briefing, humanTargetId)
+  const runoff = nominations.map(({ voterId, targetId }) => {
+    const nomination = { voterId, targetId }
+    if (voterId === run.humanId && humanTargetId) return { voterId, targetId: humanTargetId }
+    const alternatives = targets.filter(
+      (id) => id !== targetId && id !== darkAngelWard(run, voterId)
+    )
+    const preferred = chooseNominee(run, voterId, alternatives, briefing, humanTargetId)
     if (!preferred) return nomination
 
     // The closer a proposal is to passing, the easier it is to compromise on it.
@@ -486,7 +986,18 @@ function resolveConclaveRunoff(
       ? { ...nomination, targetId: preferred }
       : nomination
   })
-  const resolved = resolveNight(run, token, runoff, nominations)
+  const warded = protectDarkAngel(run, runoff)
+  if (warded !== run) {
+    if (humanTargetId && darkAngelWard(warded, run.humanId) === humanTargetId)
+      return { ...warded, revision: run.revision + 1 }
+    return resolveConclaveRunoff(warded, nominations, targets, briefing, humanTargetId, power)
+  }
+  const secretId = activeSecretBetrayer(run)
+  if (secretId) {
+    const prepared = { ...run, private: { ...run.private, conclaveVote: undefined } }
+    return resolveSealedVote(prepared, secretId, runoff, undefined, power)
+  }
+  const resolved = resolveNightBallot(run, runoff, nominations, power)
   return resolved === run
     ? run
     : { ...resolved, private: { ...resolved.private, conclaveVote: { nominations, runoff } } }
@@ -501,13 +1012,17 @@ export function revealDawn(run: Run, token: CommandToken): Run {
     !night
   )
     return run
+  const turned =
+    night.castleEffect?.kind === 'cursed' && night.targetId
+      ? turnCursedGuest(run, night.targetId)
+      : run
   const eliminatedId = night.blocked ? null : night.targetId
   const seats = run.seats.map((seat) =>
     seat.id === eliminatedId ? { ...seat, exit: { cause: 'night' as const, day: run.day } } : seat
   )
   const day = run.day + 1
-  return deliverNightDecision(run, {
-    ...run,
+  const dawn = deliverNightDecision(run, {
+    ...turned,
     seats,
     day,
     lastDawn: { day, eliminatedId },
@@ -517,12 +1032,20 @@ export function revealDawn(run: Run, token: CommandToken): Run {
     immunityId: undefined,
     votePlans: undefined,
     private: {
-      ...run.private,
+      ...turned.private,
       nightShieldIds: [],
       nightShieldAwardIds: undefined,
-      lastShieldSave: night.blocked && night.targetId ? { day, id: night.targetId } : undefined,
+      lastShieldSave:
+        night.blocked && night.targetId && hasNightShield(run, night.targetId)
+          ? { day, id: night.targetId }
+          : undefined,
       conclaveVote: undefined,
       pendingNight: undefined,
     },
   })
+  return eliminatedId &&
+    run.private.betrayers.includes(eliminatedId) &&
+    !seats.some(({ id, exit }) => !exit && turned.private.betrayers.includes(id))
+    ? settleRun(dawn, 'last-betrayer')
+    : unsealSecretBetrayer(eliminatedId ? afterCastleDeparture(run, dawn, eliminatedId) : dawn)
 }

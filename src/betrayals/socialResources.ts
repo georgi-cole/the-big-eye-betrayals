@@ -76,6 +76,8 @@ const actionEconomy: Record<
   'broker-shield': { cost: { energy: 0, influence: 0, info: 0 } },
   'arrange-breakfast': { cost: { energy: 0, influence: 0, info: 0 } },
   'leave-account': { cost: { energy: 0, influence: 0, info: 0 } },
+  'reveal-castle-role': { cost: { energy: 0, influence: 0, info: 0 } },
+  'castle-role-rumor': { cost: { energy: 0, influence: 0, info: 0 } },
   'group-chat': { cost: { energy: 2, influence: 0, info: 0 } },
   'lay-low': { cost: { energy: 0, influence: 0, info: 0 } },
   'explore-castle': { cost: { energy: 1, influence: 0, info: 0 } },

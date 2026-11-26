@@ -3,7 +3,11 @@ import { Capacitor } from '@capacitor/core'
 import StoreProductIcon from '../components/StoreProductModal/StoreProductIcon'
 import { formatEyeoleans } from '../economy/eyeoleans'
 import type { EyeoleanTransaction } from '../store/profilesSlice'
-import { getBetrayalsProduct, type BetrayalsProductKey } from './commerce/catalog'
+import {
+  getBetrayalsProduct,
+  type BetrayalsPermanentProductKey,
+  type BetrayalsProductKey,
+} from './commerce/catalog'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
 import { betrayalsStoreSectionForProduct, type BetrayalsStoreSection } from './betrayalsNavigation'
 import BetrayalsWallet from './BetrayalsWallet'
@@ -40,6 +44,13 @@ const STORE_TABS = [
   { section: 'features', label: 'Feature unlocks', icon: 'dramaMode', tone: 'features' },
   { section: 'items', label: 'Season items', icon: 'survivalMode', tone: 'season' },
 ] as const
+
+const featureMarks = {
+  myPulse: { tone: 'pulse', icon: 'publicMode' },
+  realityMode: { tone: 'reality', icon: 'dramaMode' },
+  dramaMode: { tone: 'reality', icon: 'dramaMode' },
+  noAds: { tone: 'noAds', icon: 'noAds' },
+} as const
 
 type MarketMarkTone =
   | 'featured'
@@ -171,7 +182,7 @@ export default function BetrayalsStore({
     )
   }
 
-  function buyButton(key: 'vip' | 'myPulse' | 'realityMode' | 'noAds') {
+  function buyButton(key: BetrayalsPermanentProductKey) {
     const product = getBetrayalsProduct(key)
     const owned = commerce[key]
     return (
@@ -346,7 +357,7 @@ export default function BetrayalsStore({
               <h3 id="betrayals-market-unlocks">Feature unlocks</h3>
               <p>Permanent features, available individually or together with VIP.</p>
             </div>
-            {(['myPulse', 'realityMode', 'noAds'] as const).map((key) => {
+            {(Object.keys(featureMarks) as (keyof typeof featureMarks)[]).map((key) => {
               const product = getBetrayalsProduct(key)
               return (
                 <article
@@ -355,18 +366,10 @@ export default function BetrayalsStore({
                   key={key}
                 >
                   <MarketMark
-                    tone={key === 'myPulse' ? 'pulse' : key === 'realityMode' ? 'reality' : 'noAds'}
+                    tone={featureMarks[key].tone}
                     className="betrayals-market__product-mark"
                   >
-                    <StoreProductIcon
-                      name={
-                        key === 'myPulse'
-                          ? 'publicMode'
-                          : key === 'realityMode'
-                            ? 'dramaMode'
-                            : 'noAds'
-                      }
-                    />
+                    <StoreProductIcon name={featureMarks[key].icon} />
                   </MarketMark>
                   <div>
                     <h4>{product.title}</h4>

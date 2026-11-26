@@ -1,5 +1,5 @@
 import type { CinematicSceneData } from './CinematicScene'
-import { conclaveGuests, describeConclaveVerdict } from './night'
+import { aiGoodWitch, conclaveGuests, describeConclaveVerdict } from './night'
 import type { PresentationCue, Run } from './run'
 
 export function presentationAfter(
@@ -10,6 +10,7 @@ export function presentationAfter(
   if (before.id !== after.id || before.phase === after.phase) return []
 
   if (after.phase === 'settled') {
+    if (before.phase === 'night-resolved' && playNightFilm) return ['castle-wakes', 'finale']
     return before.phase === 'table-reveal' ? ['departure', 'finale'] : ['finale']
   }
 
@@ -24,23 +25,30 @@ export function presentationAfter(
       return after.day === 1 ? ['round-table'] : []
     case 'final-challenge':
       return ['round-table']
+    case 'round-table':
+      if (after.phase !== 'night' || !playNightFilm) return []
+      return !aiGoodWitch(after) && conclaveGuests(after, after.humanId).length
+        ? ['nightfall', 'conclave-arrival']
+        : ['nightfall']
     case 'table-reveal':
-      return after.phase === 'night' &&
-        playNightFilm &&
-        after.private.betrayers.includes(after.humanId) &&
-        after.seats.some(({ id, exit }) => id === after.humanId && !exit)
-        ? ['departure', 'conclave-arrival']
-        : ['departure']
+      if (after.phase !== 'night' || !playNightFilm) return ['departure']
+      return !aiGoodWitch(after) && conclaveGuests(after, after.humanId).length
+        ? ['departure', 'nightfall', 'conclave-arrival']
+        : ['departure', 'nightfall']
     case 'cocktail':
-      return playNightFilm && conclaveGuests(after, after.humanId).length
-        ? ['conclave-arrival']
-        : []
+      if (after.phase !== 'night' || !playNightFilm) return []
+      return !aiGoodWitch(after) && conclaveGuests(after, after.humanId).length
+        ? ['nightfall', 'conclave-arrival']
+        : ['nightfall']
     case 'night': {
       const decision = after.private.pendingNight
+      if (decision?.castleEffect?.kind === 'good-witch') return []
       if (after.dayFlow?.castleDay) {
-        const cue: PresentationCue = conclaveGuests(after, after.humanId).length
-          ? 'conclave-seal'
-          : 'conclave-shadow'
+        const cue: PresentationCue =
+          decision?.sealedBallot?.voterId === after.humanId ||
+          conclaveGuests(after, after.humanId).length
+            ? 'conclave-seal'
+            : 'conclave-shadow'
         const cues: PresentationCue[] = playNightFilm ? [cue] : []
         if (decision?.targetId && !decision.blocked) cues.push('death-letter')
         return cues
@@ -54,10 +62,10 @@ export function presentationAfter(
     }
     case 'night-resolved': {
       const victim = after.lastDawn?.eliminatedId
-      if (!victim || before.private.pendingNight?.filmPlayed) return []
-      return playNightFilm && victim !== after.humanId
-        ? ['death-letter', 'awakening']
-        : ['awakening']
+      const morning: PresentationCue[] = playNightFilm ? ['castle-wakes'] : []
+      if (!victim || before.private.pendingNight?.filmPlayed) return morning
+      if (playNightFilm && victim !== after.humanId) morning.unshift('death-letter')
+      return [...morning, 'awakening']
     }
     default:
       return []
@@ -66,6 +74,12 @@ export function presentationAfter(
 
 const weather = ['clear', 'mist', 'rain', 'snow'] as const
 export type CastleWeather = (typeof weather)[number]
+const castleNightShots = ['courtyard', 'west-tower', 'east-wing'] as const
+export type CastleNightShot = (typeof castleNightShots)[number]
+
+function castleNightShot(run: Run, night: number): CastleNightShot {
+  return castleNightShots[((run.publicSeed >>> 0) + night - 1) % castleNightShots.length]
+}
 
 const nightSkies = ['crescent', 'quarter', 'gibbous', 'full', 'waning', 'storm'] as const
 export type NightRoom = {
@@ -120,6 +134,19 @@ export function cinematicFor(
   const guests = (members: typeof run.seats) =>
     members.map((member) => ({ ...member, human: member.id === run.humanId }))
   switch (cue) {
+    case 'nightfall':
+      return {
+        ...scene,
+        weather: castleWeather(run),
+        castleNightShot: castleNightShot(run, run.day),
+      }
+    case 'castle-wakes':
+      return {
+        ...scene,
+        weather: castleWeather(run),
+        nightWeather: castleWeather(run, Math.max(1, run.day - 1)),
+        castleNightShot: castleNightShot(run, Math.max(1, run.day - 1)),
+      }
     case 'conclave-shadow':
       return { ...scene, subtitle: 'Whispers drift through the dark.' }
     case 'conclave-arrival': {
@@ -164,6 +191,7 @@ export function cinematicFor(
       return {
         ...scene,
         subject: subject ? guests([subject])[0] : undefined,
+        weather: castleWeather(run, night),
         openingTitle: beforeDawn ? undefined : 'What happened during the night…',
         // The same night always gets the same view, independent of the victim.
         nightRoom: {

@@ -1,0 +1,232 @@
+.betrayals-nightfall {
+  --night-brightness: 1;
+  --night-saturation: 1;
+  --night-warmth: 0;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #0c1626;
+}
+
+.betrayals-nightfall__plane {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: max(106cqw, 60cqh);
+  height: max(100cqh, 150cqw);
+  translate: -53% -50%;
+  filter: brightness(var(--night-brightness)) saturate(var(--night-saturation));
+}
+
+.betrayals-nightfall[data-shot='west-tower'] .betrayals-nightfall__plane {
+  translate: -46% -49%;
+  scale: 1.12;
+}
+
+.betrayals-nightfall[data-shot='east-wing'] .betrayals-nightfall__plane {
+  translate: -58% -51%;
+  scale: 1.2;
+}
+
+.betrayals-nightfall__plane img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.betrayals-nightfall[data-weather='rain'],
+.betrayals-nightfall[data-weather='snow'] {
+  --night-brightness: 0.78;
+  --night-saturation: 0.84;
+}
+
+.betrayals-nightfall[data-shot='west-tower'] {
+  --night-saturation: 0.72;
+}
+
+.betrayals-nightfall[data-shot='east-wing'] {
+  --night-saturation: 1.2;
+}
+
+.betrayals-nightfall__windows {
+  animation: betrayals-windows-darken 320ms var(--switch-off) ease-out both;
+}
+
+/* The transparent unlit layer follows the glass. The clips select each wing. */
+.betrayals-nightfall__windows[data-wing='west'] {
+  --switch-off: 560ms;
+  clip-path: inset(54% 65.5% 36% 19%);
+}
+
+.betrayals-nightfall__windows[data-wing='east'] {
+  --switch-off: 1090ms;
+  clip-path: inset(58% 11.5% 35% 78.3%);
+}
+
+.betrayals-nightfall__windows[data-wing='keep'] {
+  --switch-off: 1620ms;
+  clip-path: inset(54% 38.9% 38% 48.5%);
+}
+
+.betrayals-nightfall[data-shot='west-tower'] [data-wing='west'],
+.betrayals-nightfall[data-shot='east-wing'] [data-wing='keep'] {
+  --switch-off: 1620ms;
+}
+
+.betrayals-nightfall[data-shot='west-tower'] [data-wing='keep'],
+.betrayals-nightfall[data-shot='east-wing'] [data-wing='east'] {
+  --switch-off: 560ms;
+}
+
+.betrayals-nightfall[data-shot='east-wing'] [data-wing='west'] {
+  --switch-off: 1090ms;
+}
+
+.betrayals-nightfall__moon {
+  position: absolute;
+  inset: 21.7% auto auto 64.5%;
+  width: 7%;
+}
+
+.betrayals-nightfall__cap {
+  position: absolute;
+  inset: auto auto -0.52cqh -41%;
+  width: 90%;
+  aspect-ratio: 1.7;
+  border-radius: 48% 73% 12% 22% / 100% 90% 13% 13%;
+  background: linear-gradient(160deg, #526780, #1d2d44 61%, #121d30);
+  box-shadow: inset 0 -0.09em #a4b5c9;
+  rotate: 6deg;
+  animation: betrayals-nightcap-settle 650ms 1750ms ease-out both;
+}
+
+.betrayals-nightfall__cap::after {
+  position: absolute;
+  inset: 39% -5% auto auto;
+  width: 19%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 34%, #d4deea, #8294aa 70%);
+  content: '';
+}
+
+.betrayals-nightfall__plane .betrayals-nightfall__sky {
+  inset: 19.4% auto auto 58.5%;
+  width: 12%;
+  height: 8.4%;
+}
+
+.betrayals-nightfall__departing-moon {
+  clip-path: ellipse(3.08% 2.05% at 64.5% 23.65%);
+  animation: betrayals-moon-depart 1650ms 500ms ease-in-out both;
+}
+
+.betrayals-nightfall[data-morning] .betrayals-nightfall__cap {
+  animation: betrayals-cap-depart 680ms 180ms ease-in both;
+}
+
+.betrayals-nightfall[data-morning] .betrayals-nightfall__windows {
+  animation: betrayals-windows-lighten 550ms calc(var(--switch-off) + 300ms) ease-out both;
+}
+
+.betrayals-nightfall[data-morning] .betrayals-nightfall__plane {
+  animation: betrayals-dawn-exposure 2700ms 430ms ease-in-out both;
+}
+
+.betrayals-nightfall[data-morning-weather='clear'] {
+  --night-warmth: 0.25;
+}
+
+.betrayals-nightfall__daybreak {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 83% 27%, #ffc89558, #c0c9dd30 35%, transparent 69%);
+  mix-blend-mode: screen;
+  animation: betrayals-morning-sky 2450ms 580ms ease-in-out both;
+}
+
+.betrayals-nightfall[data-morning-weather='mist'] .betrayals-nightfall__daybreak,
+.betrayals-nightfall[data-morning-weather='rain'] .betrayals-nightfall__daybreak,
+.betrayals-nightfall[data-morning-weather='snow'] .betrayals-nightfall__daybreak {
+  background: radial-gradient(ellipse at 81% 22%, #cdd8e056, #92a6bc24 51%, transparent 75%);
+}
+
+.betrayals-nightfall__weather-out,
+.betrayals-nightfall__weather-in {
+  position: absolute;
+  inset: 0;
+  animation: betrayals-morning-sky 1450ms 620ms ease-in-out both;
+}
+
+.betrayals-nightfall__weather-out {
+  animation-direction: reverse;
+}
+
+@keyframes betrayals-windows-darken {
+  0% {
+    opacity: 0;
+  }
+  38% {
+    opacity: 0.87;
+  }
+  55% {
+    opacity: 0.62;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes betrayals-nightcap-settle {
+  from {
+    opacity: 0;
+    translate: -6% -45%;
+    rotate: 18deg;
+  }
+  76% {
+    translate: 0 6%;
+  }
+}
+
+@keyframes betrayals-windows-lighten {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes betrayals-cap-depart {
+  to {
+    opacity: 0;
+    translate: 24% -63%;
+    rotate: 19deg;
+  }
+}
+
+@keyframes betrayals-moon-depart {
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    translate: 13% -17%;
+  }
+}
+
+@keyframes betrayals-morning-sky {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes betrayals-dawn-exposure {
+  from {
+    filter: brightness(var(--night-brightness)) saturate(var(--night-saturation)) sepia(0);
+  }
+  to {
+    filter: brightness(1.46) saturate(0.82) sepia(var(--night-warmth));
+  }
+}

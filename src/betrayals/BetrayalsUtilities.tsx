@@ -262,6 +262,13 @@ function Settings({
           checked={seasonOptions.publicMode}
           onToggle={() => updatePreferences({ seasonPublicMode: !seasonOptions.publicMode })}
         />
+        {commerce.dramaMode && (
+          <PreferenceSwitch
+            name="Drama Mode"
+            checked={seasonOptions.castleRoles === true}
+            onToggle={() => updatePreferences({ seasonDramaMode: !seasonOptions.castleRoles })}
+          />
+        )}
         <label className="betrayals-preference-select">
           <span>Reality Mode</span>
           <select

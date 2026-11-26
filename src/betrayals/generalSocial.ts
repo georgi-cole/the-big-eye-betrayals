@@ -137,7 +137,8 @@ export function applyCastleAllianceChange(
   change: AllianceChange,
   value?: string
 ): Run {
-  if (!isCurrentCommand(run, token) || !alliancePlanningOpen(run)) return run
+  if (!isCurrentCommand(run, token) || !alliancePlanningOpen(run) || introvertDay(run, run.humanId))
+    return run
   const actorId = run.humanId
   const active = new Set(run.seats.filter(({ exit }) => !exit).map(({ id }) => id))
   const groups = castleAlliances(run.social)
@@ -222,7 +223,12 @@ export function applyGeneralSocialMove(
   guestIds: readonly string[] = [],
   details: AllianceMoveDetails = {}
 ): Run {
-  if (!isGeneralSocialMove(kind) || !isCurrentCommand(run, token) || !generalSocialOpen(run))
+  if (
+    !isGeneralSocialMove(kind) ||
+    !isCurrentCommand(run, token) ||
+    !generalSocialOpen(run) ||
+    introvertDay(run, run.humanId)
+  )
     return run
   if (kind !== 'lay-low' && !alliancePlanningOpen(run)) return run
   const actorId = run.humanId
@@ -336,3 +342,4 @@ export function applyGeneralSocialMove(
     socialWallets: walletAfterSocialMove(run, entries[0], cost, guestIds.length),
   }
 }
+import { introvertDay } from './castleRoles.ts'

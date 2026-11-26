@@ -14,7 +14,7 @@ type DockAction = {
 
 type PlayAction = {
   label: string
-  faceLabel?: string
+  actionText?: string
   onClick: () => void
   disabled?: boolean
 }
@@ -66,7 +66,7 @@ function Glyph({ target }: { target: DockTarget | 'play' }) {
   )
 }
 
-export function BetrayalsPlayButton({ label, faceLabel = 'Play', onClick, disabled }: PlayAction) {
+export function BetrayalsPlayButton({ label, actionText, onClick, disabled }: PlayAction) {
   return (
     <button
       className="betrayals-dock__play"
@@ -75,13 +75,12 @@ export function BetrayalsPlayButton({ label, faceLabel = 'Play', onClick, disabl
       aria-label={label}
       title={label}
       disabled={disabled}
+      data-labeled={actionText ? true : undefined}
     >
       <span className="betrayals-dock__play-glyph">
         <Glyph target="play" />
       </span>
-      <span className="betrayals-dock__label" aria-hidden="true">
-        {faceLabel}
-      </span>
+      {actionText && <span className="betrayals-dock__play-label">{actionText}</span>}
     </button>
   )
 }
@@ -89,12 +88,10 @@ export function BetrayalsPlayButton({ label, faceLabel = 'Play', onClick, disabl
 function DockButton({
   target,
   label,
-  faceLabel = label,
   action,
 }: {
   target: DockTarget
   label: string
-  faceLabel?: string
   action: DockAction
 }) {
   const { onClick, active, disabled, count = 0, unread = 0, attentionKey } = action
@@ -105,6 +102,7 @@ function DockButton({
       type="button"
       onClick={onClick}
       aria-label={count > 0 ? `${label} (${count})` : label}
+      title={label}
       aria-description={unread > 0 ? `${unread} unread` : undefined}
       aria-expanded={active}
       aria-haspopup={target !== 'home' ? 'dialog' : undefined}
@@ -118,9 +116,6 @@ function DockButton({
       <span className="betrayals-dock__icon-frame" aria-hidden="true">
         <Glyph target={target} />
         {count > 0 && <span className="betrayals-dock__count">{Math.min(count, 99)}</span>}
-      </span>
-      <span className="betrayals-dock__label" aria-hidden="true">
-        {faceLabel}
       </span>
     </button>
   )
@@ -141,9 +136,7 @@ export function BetrayalsDock({
         {home && <DockButton target="home" label="Home" action={home} />}
         {social && <DockButton target="social" label="Social" action={social} />}
         {play && <BetrayalsPlayButton {...play} />}
-        {incoming && (
-          <DockButton target="incoming" label="Inbox" faceLabel="Inbox" action={incoming} />
-        )}
+        {incoming && <DockButton target="incoming" label="Inbox" action={incoming} />}
         {settings && <DockButton target="settings" label="Settings" action={settings} />}
       </div>
     </nav>

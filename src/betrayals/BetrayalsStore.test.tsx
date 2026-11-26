@@ -8,6 +8,7 @@ const commerce = vi.hoisted(() => ({
   vip: false,
   myPulse: false,
   realityMode: false,
+  dramaMode: false,
   noAds: false,
   premiumGames: false,
   paidLooks: false,
@@ -27,6 +28,7 @@ vi.mock('./commerce/useBetrayalsCommerce', () => ({ useBetrayalsCommerce: () => 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
 
 const prices: Record<BetrayalsProductKey, string> = {
+  dramaMode: '$4.99',
   vip: '£12.49',
   myPulse: '£2.49',
   realityMode: '£5.99',
@@ -44,6 +46,7 @@ describe('Betrayals Store journeys', () => {
       vip: false,
       myPulse: false,
       realityMode: false,
+      dramaMode: false,
       noAds: false,
       premiumGames: false,
       paidLooks: false,
@@ -93,6 +96,7 @@ describe('Betrayals Store journeys', () => {
 
     expect(screen.getByRole('button', { name: 'Betrayals VIP — £12.49' })).toBeEnabled()
     expect(screen.getByText('Every premium challenge version')).toBeVisible()
+    expect(screen.getByText('Drama Mode: Castle Roles and private role reveals')).toBeVisible()
     expect(screen.queryByRole('button', { name: /^My Pulse —/ })).not.toBeInTheDocument()
     expect(commerce.purchase).not.toHaveBeenCalled()
 
@@ -114,6 +118,14 @@ describe('Betrayals Store journeys', () => {
 
     await act(async () => fireEvent.click(pulse))
     expect(commerce.purchase).toHaveBeenCalledExactlyOnceWith('myPulse', 'profile-a')
+  })
+
+  it('offers Drama Mode as a standalone purchase', async () => {
+    render(<BetrayalsStore profileId="profile-a" focusProduct="dramaMode" />)
+    const checkout = screen.getByRole('button', { name: 'Drama Mode — $4.99' })
+    expect(checkout).toBeEnabled()
+    await act(async () => fireEvent.click(checkout))
+    expect(commerce.purchase).toHaveBeenCalledExactlyOnceWith('dramaMode', 'profile-a')
   })
 
   it.each([

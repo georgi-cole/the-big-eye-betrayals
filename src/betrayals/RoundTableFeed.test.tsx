@@ -99,8 +99,12 @@ describe('Round Table broadcast', () => {
     expect(onCountComplete).not.toHaveBeenCalled()
     fireEvent.click(reveal.getByRole('button', { name: 'Next votes' }))
     expect(reveal.getByText('6 / 10')).toBeVisible()
-    fireEvent.click(reveal.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(reveal.getByRole('button', { name: 'All Votes' }))
     const review = within(screen.getByRole('dialog', { name: 'All Round Table votes' }))
+    expect(review.getByText('10 votes cast')).toBeVisible()
+    expect(
+      review.getByRole('button', { name: 'Return to vote totals' }).closest('header')
+    ).not.toBeNull()
     expect(
       within(review.getByRole('list', { name: 'All ballots' })).getAllByRole('listitem')
     ).toHaveLength(10)
@@ -111,7 +115,7 @@ describe('Round Table broadcast', () => {
     expect(screen.getByText('Runoff', { exact: true })).toBeVisible()
     expect(onCountComplete).toHaveBeenCalledTimes(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'View all votes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All Votes' }))
     const allVotes = within(screen.getByRole('dialog', { name: 'All Round Table votes' }))
     const ranking = within(allVotes.getByRole('list', { name: 'All vote totals' }))
     expect(ranking.getAllByLabelText('1 vote')).toHaveLength(10)

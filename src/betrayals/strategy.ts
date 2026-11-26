@@ -3,6 +3,7 @@ import { mulberry32 } from '../store/rng.ts'
 import { incidentPressure } from './intel.ts'
 import { investigationPressure } from './investigationEvidence.ts'
 import { nightShieldReads } from './nightShields.ts'
+import { castleRoleFor } from './castleRoles.ts'
 import { getSocialView, hasAlliance, relationship } from './perception.ts'
 import { hashId, viewFor } from './run.ts'
 import type { Ballot, Phase, Role, Run, SocialEntry, TableArgument } from './run.ts'
@@ -42,6 +43,27 @@ export function resolutionPerspective(
   const evidence = new Map(incidentPressure(run, actorId))
   for (const [id, weight] of investigationPressure(run, actorId)) {
     evidence.set(id, (evidence.get(id) ?? 0) + weight)
+  }
+  const reading = castleRoleFor(run, actorId)?.used
+  if (reading?.roleId === 'columbus') {
+    const fade = Math.max(0, 1 - (run.day - reading.day - 1) * 0.18)
+    // A positive result implicates the group collectively. A clear group is stronger evidence.
+    const weight = (reading.hasBetrayer ? 0.09 : -0.32) * Math.min(1, fade)
+    for (const id of reading.guestIds) evidence.set(id, (evidence.get(id) ?? 0) + weight)
+  } else if (reading?.roleId === 'extrasense' && !reading.hasRole && run.day <= reading.day + 1) {
+    const claimed = run.social.some(
+      (entry) =>
+        entry.kind === 'reveal-castle-role' &&
+        entry.actorId === reading.targetId &&
+        entry.recipientId === actorId &&
+        entry.day === reading.day
+    )
+    if (claimed) evidence.set(reading.targetId, (evidence.get(reading.targetId) ?? 0) + 0.08)
+  }
+  const will = run.private.castleRoles?.find(({ used }) => used?.roleId === 'last-will')?.used
+  if (will?.roleId === 'last-will') {
+    const weight = will.allegiance === 'betrayer' ? 1.3 : -0.9
+    evidence.set(will.targetId, (evidence.get(will.targetId) ?? 0) + weight)
   }
   const finale = run.dayFlow?.finale
   const finalVote = run.phase === 'final-banishment' || run.phase === 'end-vote'
@@ -164,11 +186,19 @@ function scoreChoice(
     const confidence = read?.conflicting ? 0.5 : 1
     const shieldRisk = read ? Math.max(0, read.protected - read.exposed * 0.65) : 0
     const opportunity = read ? Math.max(0, read.exposed - read.protected) : 0
+    const roleThreat = ownConversations.reduce((weight, entry) => {
+      if (entry.recipientId !== actorId || entry.day < day - 1) return weight
+      if (entry.kind === 'reveal-castle-role' && entry.actorId === id) return Math.max(weight, 0.23)
+      if (entry.kind === 'castle-role-rumor' && entry.suspectId === id)
+        return Math.max(weight, 0.12)
+      return weight
+    }, 0)
     return (
       uncertainty -
       bond * 0.62 -
       publicHeat * 0.6 +
       threat +
+      roleThreat * personality.strategicCalculation +
       (perspective.nightPitch?.id === id ? perspective.nightPitch.weight : 0) -
       obvious +
       confidence * (opportunity * 0.22 - shieldRisk * (1.07 - personality.riskTolerance * 0.38))
@@ -205,14 +235,18 @@ function scoreChoice(
   return read + momentum + pact + selfPreservation + provisional + finale - bond * 0.22
 }
 
-export function chooseTarget(perspective: Perspective, context: TargetContext): string | undefined {
+export function rankedTargets(perspective: Perspective, context: TargetContext): string[] {
   const signals = privateSignals(perspective)
   const ranked = perspective.eligibleIds.map((id) => ({
     id,
     score: scoreChoice(perspective, id, context, signals),
   }))
   ranked.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id))
-  return ranked[0]?.id
+  return ranked.map(({ id }) => id)
+}
+
+export function chooseTarget(perspective: Perspective, context: TargetContext): string | undefined {
+  return rankedTargets(perspective, context)[0]
 }
 
 /** Finale decisions need the best case the guest can actually make. */

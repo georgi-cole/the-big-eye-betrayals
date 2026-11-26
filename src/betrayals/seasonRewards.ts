@@ -1,4 +1,9 @@
 import type { Run } from './run.ts'
+import {
+  CLAIRVOYANT_MAX_USES,
+  clairvoyantUsesRemaining,
+  doctorSelfWardUsed,
+} from './castleRoles.ts'
 
 type Checkpoint = Omit<Run, 'seasonRewards'>
 
@@ -6,6 +11,7 @@ export type SeasonRewards = {
   day?: Checkpoint
   table?: Checkpoint
   finaleRevealed?: boolean
+  rewindDeclined?: boolean
 }
 
 function isDayStart(run: Run) {
@@ -70,6 +76,7 @@ export function recordSeasonCheckpoints(previous: Run | null, next: Run): Run {
 export function validSeasonCheckpoint(candidate: Checkpoint, current: Run, type: 'day' | 'table') {
   return (
     candidate.id === current.id &&
+    candidate.seasonNumber === current.seasonNumber &&
     candidate.humanId === current.humanId &&
     candidate.day <= current.day &&
     candidate.revision <= current.revision &&
@@ -81,7 +88,7 @@ export function validSeasonCheckpoint(candidate: Checkpoint, current: Run, type:
 }
 
 export function rewindOffer(run: Run) {
-  if (run.seasonRewards?.finaleRevealed) return
+  if (run.seasonRewards?.finaleRevealed || run.seasonRewards?.rewindDeclined) return
   const loss = humanElimination(run)
   if (!loss) return
   const type = loss.cause === 'night' ? 'day' : 'table'
@@ -97,10 +104,23 @@ export function rewindSeason(run: Run): Run | undefined {
   if (!offer) return
   const { checkpoint, type } = offer
   const human = run.seats.find(({ id }) => id === run.humanId)
+  const doctor = run.private.castleRoles?.find(({ roleId }) => roleId === 'doctor')
+  const clairvoyant = run.private.castleRoles?.find(({ roleId }) => roleId === 'clairvoyant')
+  const knownReadings = clairvoyant
+    ? CLAIRVOYANT_MAX_USES - clairvoyantUsesRemaining(clairvoyant)
+    : 0
+  const castleRoles = checkpoint.private.castleRoles?.map((card) => {
+    if (card.guestId === doctor?.guestId && doctorSelfWardUsed(doctor))
+      return { ...card, selfWardUsed: true as const }
+    if (card.guestId === clairvoyant?.guestId && knownReadings > 0)
+      return { ...card, clairvoyantUses: knownReadings }
+    return card
+  })
   return {
     ...checkpoint,
     revision: run.revision + 1,
     economy: run.economy,
+    private: castleRoles ? { ...checkpoint.private, castleRoles } : checkpoint.private,
     pendingAdBreak: undefined,
     seats: human
       ? checkpoint.seats.map((seat) =>

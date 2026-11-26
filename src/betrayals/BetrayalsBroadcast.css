@@ -287,6 +287,12 @@
   margin-block: 0;
 }
 
+.betrayals-broadcast__detail > .betrayals-broadcast__role-action {
+  display: flex;
+  width: fit-content;
+  margin: 8px auto 0;
+}
+
 .betrayals-broadcast__vents {
   width: min(48px, 18%);
   height: 2px;
@@ -333,13 +339,32 @@
   }
 }
 
+.betrayals-broadcast__glass:has(.betrayals-broadcast__controls:not(:empty)) {
+  --broadcast-controls-height: clamp(1.5rem, 4dvh, 1.85rem);
+  grid-template-rows: var(--broadcast-controls-height) minmax(0, 1fr) var(
+      --broadcast-controls-height
+    );
+}
+
 .betrayals-broadcast__glass:has(.betrayals-broadcast__controls:not(:empty))
-  .betrayals-broadcast__readout {
-  block-size: calc(100% - 29px);
+  > .betrayals-broadcast__readout {
+  grid-row: 2;
 }
 
 .betrayals-broadcast__controls {
-  position: absolute;
+  display: flex;
+  grid-row: 3;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  padding-inline: 0.4rem;
   z-index: 2;
-  inset: auto 0.4rem 0.15rem auto;
+  color: #f0d5ab;
+  font:
+    650 0.66rem / 1.1 system-ui,
+    sans-serif;
+}
+
+.betrayals-broadcast__controls:empty {
+  display: none;
 }

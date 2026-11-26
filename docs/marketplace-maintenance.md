@@ -9,6 +9,8 @@ product and entitlement catalog in `src/betrayals/commerce/catalog.ts`; see
 `docs/betrayals-monetization.md` for its separate products, Eyeros economy,
 Night Shield restrictions, premium adapters and ad schedule. The original game's
 generated `MARKETPLACE_CATALOG.md` is not the Betrayals store's price authority.
+The Betrayals catalog now includes Drama Mode as a standalone permanent unlock
+and a Betrayals VIP benefit. Settings controls activation for the next season.
 
 ## What stays synchronized
 
@@ -743,3 +745,9 @@ store listings or change configured prices.
   reuse the Changing Room frame, Advertising Privacy uses the Betrayals theme,
   and hotel letter scenes use character-specific artwork for the full cast.
   Existing age checks, ad availability, prices, rewards, and entitlements apply.
+
+- 2026-11-25: Reviewed the Betrayals Inbox VIP Eye. Reply badges use the same
+  Reality Mode check as the existing action, and Intel links indicate the
+  existing My Pulse requirement. The current Store offers and prices apply.
+
+- 2026-11-26: Reviewed the isolated Betrayals QA build. It unlocks VIP in memory, simulates rewarded ads, and credits test Eyeros as a local wallet adjustment. Release builds continue to use native billing, verified ownership, and the existing ad eligibility and pricing.

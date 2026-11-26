@@ -3,6 +3,7 @@ import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
 import {
   MAX_TABLE_ROUNDS,
   eligibleBanishmentTargets,
+  hashId,
   isCurrentCommand,
   publicShieldPending,
 } from './run.ts'
@@ -30,6 +31,20 @@ import {
 import { archiveInvestigationVotes, guestName } from './investigationRecords.ts'
 import { FINALE_CAST_SIZE, FINAL_SURVIVOR_COUNT } from './seasonPhases.ts'
 import { openCastleMoment } from './castleLife.ts'
+import {
+  castleRoleFor,
+  eligibleCastleRole,
+  passCastleRole,
+  recordCastleRoleUse,
+  spendCastleRole,
+} from './castleRoles.ts'
+import {
+  afterCastleDeparture,
+  politicianOrder,
+  roleTableOpen,
+  unsealSecretBetrayer,
+} from './castleRoleEvents.ts'
+import { shieldRoll } from './nightShields.ts'
 
 export type { Ballot } from './run.ts'
 
@@ -43,7 +58,33 @@ export function canVoteAtTable(run: Run, id: string): boolean {
 }
 
 export function tableTargets(run: Run, voterId: string): string[] {
-  return canVoteAtTable(run, voterId) ? eligibleBanishmentTargets(run, voterId) : []
+  if (!canVoteAtTable(run, voterId)) return []
+  const order = politicianOrder(run, voterId)
+  return order ? [order.targetId] : eligibleBanishmentTargets(run, voterId)
+}
+
+function cancelTable(run: Run, witchId: string): Run {
+  const card = castleRoleFor(run, witchId)
+  if (!card || !roleTableOpen(run) || !eligibleCastleRole(run, witchId, 'bad-witch')) return run
+  const used = recordCastleRoleUse(finishShieldConversations(run), card, {
+    roleId: 'bad-witch',
+    day: run.day,
+  })
+  const next: Run = {
+    ...used,
+    revision: used.revision + 1,
+    phase: used.dayFlow?.castleDay ? 'cocktail' : 'night',
+    tableArguments: undefined,
+    tableSway: undefined,
+    tableRound: undefined,
+  }
+  return next.phase === 'cocktail' ? openCastleMoment(next, 'cocktail') : next
+}
+
+export function sleepRoundTable(run: Run, token: CommandToken): Run {
+  if (!isCurrentCommand(run, token) || run.presentation?.length || publicShieldPending(run))
+    return run
+  return cancelTable(run, run.humanId)
 }
 
 export function tableRoundNumber(run: Run): number {
@@ -58,6 +99,56 @@ export function tableDiscussionOpen(run: Run): boolean {
     !run.tableCount &&
     run.tableSway === undefined
   )
+}
+
+function mayorBallotOpen(run: Run): boolean {
+  return (
+    run.phase === 'round-table' &&
+    tableRoundNumber(run) === 1 &&
+    !run.tableCount &&
+    !publicShieldPending(run)
+  )
+}
+
+export function mayorChoiceFor(run: Run, actorId: string | null): boolean {
+  return Boolean(
+    actorId &&
+    actorId === run.humanId &&
+    mayorBallotOpen(run) &&
+    !tableDiscussionOpen(run) &&
+    eligibleCastleRole(run, actorId, 'mayor') &&
+    castleRoleFor(run, actorId)?.passedDay !== run.day &&
+    tableTargets(run, actorId).length
+  )
+}
+
+export function resolveMayorChoice(run: Run, token: CommandToken, use: boolean): Run {
+  if (!isCurrentCommand(run, token) || !mayorChoiceFor(run, run.humanId)) return run
+  return use
+    ? spendCastleRole(run, run.humanId, { roleId: 'mayor' })
+    : passCastleRole(run, run.humanId)
+}
+
+function prepareMayorBallot(run: Run, ballots: readonly Ballot[]): Run {
+  if (!mayorBallotOpen(run)) return run
+  const mayor = ballots.find(
+    ({ voterId }) => voterId !== run.humanId && eligibleCastleRole(run, voterId, 'mayor')
+  )
+  if (!mayor) return run
+  const { voterId, targetId } = mayor
+  const previousVotes = run.lastTable?.tally[targetId] ?? 0
+  const activeGuests = run.seats.filter(({ exit }) => !exit).length
+  const chance = activeGuests <= 11 ? 0.8 : Math.min(0.55, 0.07 + previousVotes * 0.06)
+  const roll = mulberry32(run.publicSeed ^ hashId(voterId) ^ Math.imul(run.day, 17011))()
+  return roll < chance ? spendCastleRole(run, voterId, { roleId: 'mayor' }) : run
+}
+
+function tallyBallots(ballots: readonly Ballot[]) {
+  const tallied = new Map<string, number>()
+  for (const { targetId, weight = 1 } of ballots) {
+    tallied.set(targetId, (tallied.get(targetId) ?? 0) + weight)
+  }
+  return tallied
 }
 
 function makeArgument(run: Run, speakerId: string, choice: TableSway): TableArgument {
@@ -315,8 +406,7 @@ function reviewCases(
 }
 
 export function tableLeaderboard(ballots: readonly Ballot[], limit = 5) {
-  const tallied = new Map<string, number>()
-  for (const { targetId } of ballots) tallied.set(targetId, (tallied.get(targetId) ?? 0) + 1)
+  const tallied = tallyBallots(ballots)
   const ranked = [...tallied].sort(
     ([leftId, left], [rightId, right]) => right - left || leftId.localeCompare(rightId)
   )
@@ -337,6 +427,7 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
   if (
     !isCurrentCommand(run, token) ||
     run.tableCount ||
+    mayorChoiceFor(run, run.humanId) ||
     (run.dayFlow &&
       run.phase === 'round-table' &&
       run.tableSway === undefined &&
@@ -348,24 +439,40 @@ export function resolveTable(run: Run, token: CommandToken, ballots: readonly Ba
     run.seats.map(({ id }) => [id, tableTargets(run, id)] as const).filter(([, ids]) => ids.length)
   )
   if (eligible.size !== ballots.length) return run
-  const tallied = new Map<string, number>()
   for (const { voterId, targetId } of ballots) {
     if (!eligible.get(voterId)?.includes(targetId)) return run
     eligible.delete(voterId)
-    tallied.set(targetId, (tallied.get(targetId) ?? 0) + 1)
   }
+  const witch = run.private.castleRoles?.find(({ roleId }) => roleId === 'bad-witch')
+  if (
+    witch &&
+    witch.guestId !== run.humanId &&
+    shieldRoll(run, witch.guestId, 5249) <
+      Math.min(0.8, 0.08 + (run.lastTable?.tally[witch.guestId] ?? 0) * 0.18)
+  ) {
+    const cancelled = cancelTable(run, witch.guestId)
+    if (cancelled !== run) return cancelled
+  }
+  const votingRun = prepareMayorBallot(run, ballots)
+  const countedBallots = ballots.map(({ voterId, targetId }): Ballot => {
+    const use = mayorBallotOpen(votingRun) ? castleRoleFor(votingRun, voterId)?.used : undefined
+    return use?.roleId === 'mayor' && use.day === run.day
+      ? { voterId, targetId, weight: 2 }
+      : { voterId, targetId }
+  })
+  const tallied = tallyBallots(countedBallots)
   const topCount = Math.max(0, ...tallied.values())
   const tied = [...tallied.keys()].filter((id) => tallied.get(id) === topCount).sort()
   if (tied.length === 0) return run
 
   const tableArguments = argumentsAtTable(run)
-  const withShieldTalk = finishShieldConversations(run)
+  const withShieldTalk = finishShieldConversations(votingRun)
   const revision = withShieldTalk.revision + 1
   const random = mulberry32(run.publicSeed ^ Math.imul(run.day, 547) ^ revision)
   const round = tableRoundNumber(run)
   const tableCount = {
     round,
-    ballots: seededPickN(random, ballots, ballots.length).map((ballot) => ({ ...ballot })),
+    ballots: seededPickN(random, countedBallots, countedBallots.length),
     tiedIds: tied.length > 1 ? tied : [],
   }
   if (tied.length > 1 && round < MAX_TABLE_ROUNDS) {
@@ -492,5 +599,6 @@ export function revealTable(run: Run, token: CommandToken): Run {
   if (lastBetrayer) return settleRun(revealed, 'last-betrayer')
   if (outcome.blind && active.length === FINAL_SURVIVOR_COUNT)
     return settleRun(revealed, 'final-two')
-  return phase === 'cocktail' ? openCastleMoment(revealed, 'cocktail') : revealed
+  const next = phase === 'cocktail' ? openCastleMoment(revealed, 'cocktail') : revealed
+  return unsealSecretBetrayer(afterCastleDeparture(run, next, outcome.banishedId))
 }

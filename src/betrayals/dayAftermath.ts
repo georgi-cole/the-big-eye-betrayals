@@ -1,6 +1,7 @@
 import { isCurrentCommand, publicShieldPending } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { hasRequiredIncoming } from './incoming.ts'
+import { canAskPlayerForNightShield } from './nightShields.ts'
 import { finishShieldConversations, prepareShieldConversations } from './shieldSocial.ts'
 import { hasAlliance, rapport } from './perception.ts'
 import { resolveSafetyPledge } from './dayFlow.ts'
@@ -8,6 +9,7 @@ import { settleDayWitnesses } from './investigation.ts'
 import { prepareVotePlans, settleUnansweredVoteOffers } from './votePlans.ts'
 import { openAfternoonInvestigation } from './castleIncidents.ts'
 import { closeCastleMoment, openCastleMoment } from './castleLife.ts'
+import { preparePolitician } from './castleRoleEvents.ts'
 
 export function openShieldDeals(run: Run): Run {
   const next = prepareShieldConversations(run)
@@ -17,11 +19,7 @@ export function openShieldDeals(run: Run): Run {
   const requestId = next.seats
     .filter(
       ({ id, exit }) =>
-        !exit &&
-        id !== next.humanId &&
-        id !== next.immunityId &&
-        !next.private.nightShieldIds.includes(id) &&
-        hasAlliance(next.social, id, next.humanId)
+        !exit && canAskPlayerForNightShield(next, id) && hasAlliance(next.social, id, next.humanId)
     )
     .sort(
       (first, second) =>
@@ -34,7 +32,12 @@ export function openShieldDeals(run: Run): Run {
 }
 
 export function advanceDayAftermath(run: Run, token: CommandToken): Run {
-  if (!isCurrentCommand(run, token) || run.presentation?.length || hasRequiredIncoming(run))
+  if (
+    !isCurrentCommand(run, token) ||
+    run.presentation?.length ||
+    run.private.departurePower ||
+    hasRequiredIncoming(run)
+  )
     return run
   if (run.phase === 'cocktail') {
     const next = closeCastleMoment(run)
@@ -55,7 +58,7 @@ export function advanceDayAftermath(run: Run, token: CommandToken): Run {
       resolveSafetyPledge(finishShieldConversations(closeCastleMoment(run)))
     )
     const standings = next.private.safetyStandings
-    return {
+    return preparePolitician({
       ...next,
       revision: run.revision + 1,
       phase: 'round-table',
@@ -63,7 +66,7 @@ export function advanceDayAftermath(run: Run, token: CommandToken): Run {
         ...next.private,
         safetyStandings: standings && { ...standings, dealsClosed: true },
       },
-    }
+    })
   }
 
   return run

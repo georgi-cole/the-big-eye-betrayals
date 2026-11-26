@@ -112,6 +112,40 @@ describe('Betrayals native commerce', () => {
     native.addListener.mockResolvedValue({ remove: vi.fn() })
   })
 
+  it('loads older VIP receipts and restores standalone Drama Mode independently', async () => {
+    const existing = new Map([
+      [
+        ledgerKey,
+        JSON.stringify({
+          version: 1,
+          ownership: { vip: true, myPulse: false, realityMode: false, noAds: false },
+          verifiedAt: '2026-11-23T12:00:00Z',
+          intents: {},
+          receipts: {},
+        }),
+      ],
+    ])
+    const { service } = await setup(existing)
+    native.isBillingSupported.mockRejectedValueOnce(new Error('Store unavailable'))
+    await service.refreshBetrayalsCommerce({ force: true })
+    expect(service.getBetrayalsCommerceSnapshot()).toMatchObject({ vip: true, dramaMode: true })
+
+    native.getPurchases.mockResolvedValue({
+      purchases: [
+        transaction('drama', {
+          productIdentifier: 'com.georgicole.thebigeye.betrayals.dramamode',
+          isAcknowledged: true,
+        }),
+      ],
+    })
+    await service.refreshBetrayalsCommerce({ force: true })
+    expect(service.getBetrayalsCommerceSnapshot()).toMatchObject({
+      vip: false,
+      dramaMode: true,
+      realityMode: false,
+    })
+  })
+
   it('saves the same profile wallet and receipt before consuming, even after a profile switch', async () => {
     const { service, existing, getProfiles, switchProfile } = await setup()
     native.purchaseProduct.mockImplementation(async () => {
@@ -194,6 +228,7 @@ describe('Betrayals native commerce', () => {
       vip: true,
       myPulse: true,
       realityMode: true,
+      dramaMode: true,
       noAds: true,
       paidLooks: true,
       premiumGames: true,

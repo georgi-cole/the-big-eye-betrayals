@@ -124,6 +124,12 @@ describe('Betrayals incoming inbox', () => {
     expect(reply.getByRole('img', { name: '1 Energy' })).toHaveTextContent('⚡ 1')
     expect(reply.getByRole('img', { name: '2 Influence' })).toHaveTextContent('🗣️ 2')
     expect(reply.queryByText('Requires 2 Influence.')).toBeNull()
+    expect(reply.getByTitle('Unlock Reality Mode')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('button', { name: 'Pass' })).queryByTitle('Unlock Reality Mode')
+    ).not.toBeInTheDocument()
+    rerender(<BetrayalsIncomingInteractions interactions={[moment]} hasRealityMode {...props} />)
+    expect(screen.queryByTitle('Unlock Reality Mode')).not.toBeInTheDocument()
     rerender(
       <BetrayalsIncomingInteractions
         interactions={[
@@ -143,6 +149,7 @@ describe('Betrayals incoming inbox', () => {
     )
     fireEvent.click(screen.getByText('History · 1'))
     const intel = screen.getByRole('button', { name: 'Open in Intel' })
+    expect(within(intel).getByTitle('Unlock My Pulse')).toBeInTheDocument()
     expect(intel.parentElement?.parentElement).toHaveTextContent('Your sighting is in Intel.')
     fireEvent.click(intel)
     expect(onOpenIntel).toHaveBeenCalledWith('opal')

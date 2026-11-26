@@ -10,7 +10,7 @@ it('opens Home and exposes the Inbox with its request count', () => {
     <BetrayalsDock
       home={{ onClick: openHome }}
       social={{ onClick: vi.fn() }}
-      play={{ label: 'Continue to dawn', faceLabel: 'Dawn', onClick: advance }}
+      play={{ label: 'Continue to dawn', onClick: advance }}
       incoming={{ onClick: openIncoming, count: 2, active: false }}
     />
   )
@@ -23,7 +23,12 @@ it('opens Home and exposes the Inbox with its request count', () => {
   expect(openHome).toHaveBeenCalledOnce()
   expect(openIncoming).toHaveBeenCalledOnce()
   expect(advance).toHaveBeenCalledOnce()
+  expect(dock.queryByText('Home')).not.toBeInTheDocument()
+  expect(dock.getByRole('button', { name: 'Continue to dawn' }).textContent).toBe('')
   expect(dock.queryByRole('button', { name: 'Music' })).not.toBeInTheDocument()
+
+  rerender(<BetrayalsDock play={{ label: 'Lock vote', actionText: 'Vote', onClick: advance }} />)
+  expect(within(dock.getByRole('button', { name: 'Lock vote' })).getByText('Vote')).toBeVisible()
 
   rerender(<BetrayalsDock social={{ onClick: vi.fn() }} incoming={{ onClick: openIncoming }} />)
   const social = dock.getByRole('button', { name: 'Social' })

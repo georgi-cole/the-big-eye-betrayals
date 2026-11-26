@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { challengeContestantIds, resolveChallenge } from '../src/betrayals/challenges.ts'
 import { castleGlance, castleSocialMoment, playCastleChoice } from '../src/betrayals/castleLife.ts'
 import { CASTLE_SCENES } from '../src/betrayals/castleLifeBank.ts'
-import { advanceDayAftermath } from '../src/betrayals/dayAftermath.ts'
+import { advanceDayAftermath, openShieldDeals } from '../src/betrayals/dayAftermath.ts'
 import { openDayFlow } from '../src/betrayals/dayFlow.ts'
 import { advanceDayBeat } from '../src/betrayals/daySocial.ts'
 import { getIncomingInteractions, respondToIncomingInteraction } from '../src/betrayals/incoming.ts'
@@ -401,4 +401,78 @@ test('an invalidated vote pact and a direct shield request pause the correspondi
   )
   assert(kept.private.nightShieldIds.includes('me'))
   assert.equal(advanceDayAftermath(kept, commandToken(kept)).phase, 'round-table')
+})
+
+test('a guest who gifted the player a Night Shield cannot ask for one back that evening', () => {
+  const deals = getToShields(getToVotePlans(seed()))
+  const donor = 'pax'
+  const otherAlly = 'guest-1'
+  const allied = {
+    ...deals,
+    private: { ...deals.private, nightShieldIds: [donor, deals.humanId] },
+    social: [
+      ...deals.social,
+      {
+        day: deals.day,
+        actorId: donor,
+        recipientId: deals.humanId,
+        kind: 'alliance',
+        accepted: true,
+      },
+    ],
+  }
+  const gifted = applySocialMove(allied, commandToken(allied), {
+    kind: 'shield-gift',
+    actorId: donor,
+    recipientId: deals.humanId,
+  })
+  assert.notStrictEqual(gifted, allied)
+  assert.deepEqual(gifted.private.nightShieldIds, [deals.humanId, deals.humanId])
+
+  const fresh = openShieldDeals(gifted)
+  const shieldRequest = ({ kind }) => kind === 'shield-request'
+  assert.equal(fresh.private.safetyStandings.requestId, undefined)
+  assert.equal(getIncomingInteractions(fresh).find(shieldRequest), undefined)
+  assert(
+    getIncomingInteractions(fresh).some(
+      ({ kind, speaker }) => kind === 'shield-gift' && speaker.id === donor
+    )
+  )
+
+  const stale = restore({
+    ...fresh,
+    private: {
+      ...fresh.private,
+      safetyStandings: { ...fresh.private.safetyStandings, requestId: donor },
+    },
+  })
+  assert.equal(getIncomingInteractions(stale).find(shieldRequest), undefined)
+  assert.strictEqual(
+    respondToIncomingInteraction(
+      stale,
+      commandToken(stale),
+      `${stale.day}:shield-request`,
+      'engage'
+    ),
+    stale
+  )
+  assert.equal(advanceDayAftermath(stale, commandToken(stale)).phase, 'round-table')
+
+  const anotherAlly = openShieldDeals({
+    ...gifted,
+    social: [
+      ...gifted.social,
+      {
+        day: gifted.day,
+        actorId: otherAlly,
+        recipientId: gifted.humanId,
+        kind: 'alliance',
+        accepted: true,
+      },
+    ],
+  })
+  assert.equal(getIncomingInteractions(anotherAlly).find(shieldRequest)?.speaker.id, otherAlly)
+  const alreadyProtected = move(anotherAlly, 'shield-gift', otherAlly)
+  assert(alreadyProtected.private.nightShieldIds.includes(deals.humanId))
+  assert.equal(getIncomingInteractions(alreadyProtected).find(shieldRequest), undefined)
 })

@@ -37,6 +37,15 @@ export function gaveNightShieldToday(
   )
 }
 
+export function canAskPlayerForNightShield(run: Run, guestId: string): boolean {
+  return (
+    guestId !== run.humanId &&
+    guestId !== run.immunityId &&
+    !run.private.nightShieldIds.includes(guestId) &&
+    !gaveNightShieldToday(run.social, guestId, run.humanId, run.day)
+  )
+}
+
 export function shieldTalkBlockedAfterGift(
   entries: readonly SocialEntry[],
   move: Pick<SocialEntry, 'actorId' | 'recipientId' | 'kind'>,
@@ -175,7 +184,10 @@ export function nightShieldReads(run: Run, observerId: string): Map<string, Shie
     read.conflicting ||= read.protected > 0 && read.exposed > 0
     reads.set(id, read)
   }
-  for (const id of publicNightShieldWinners(run)) {
+  const vision = castleRoleFor(run, observerId)?.used
+  const observedAwards =
+    vision?.roleId === 'clairvoyant' && vision.day === run.day ? vision.shieldIds : []
+  for (const id of new Set([...publicNightShieldWinners(run), ...observedAwards])) {
     if (id === observerId || reads.has(id)) continue
     // Everyone saw the award. Only the recipient could have seen this private handoff.
     reads.set(id, {
@@ -230,3 +242,4 @@ export function shieldReplyFor(
   }
   return 'private'
 }
+import { castleRoleFor } from './castleRoles.ts'

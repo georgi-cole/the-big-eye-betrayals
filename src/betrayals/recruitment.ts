@@ -4,6 +4,7 @@ import { getSocialView, relationship } from './perception.ts'
 import { hashId, isCurrentCommand } from './run.ts'
 import type { CommandToken, Run } from './run.ts'
 import { FINALE_CAST_SIZE } from './seasonPhases.ts'
+import { isConcealedSecretBetrayer, retireCastleRole } from './castleRoles.ts'
 
 export const RECRUITMENT_END_DAY = 5
 
@@ -69,14 +70,17 @@ function completeRecruitment(
   recruitedId: string,
   declined = false
 ): Run {
+  const recruited = retireCastleRole(run, recruitedId)
   return {
-    ...run,
+    ...recruited,
     phase: 'night-resolved',
     revision: run.revision + 1,
     private: {
-      ...run.private,
+      ...recruited.private,
       betrayers: [...run.private.betrayers, recruitedId],
-      hiddenBetrayerIds: run.private.hiddenBetrayerIds?.filter((id) => id !== recruiterId),
+      hiddenBetrayerIds: isConcealedSecretBetrayer(run, recruiterId)
+        ? run.private.hiddenBetrayerIds
+        : run.private.hiddenBetrayerIds?.filter((id) => id !== recruiterId),
       conclaveVote: undefined,
       humanRecruitmentOffered: undefined,
       pendingNight: {

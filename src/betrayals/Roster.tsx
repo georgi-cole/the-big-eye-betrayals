@@ -9,6 +9,7 @@ type CastView = ReturnType<typeof viewFor>
 type Props = {
   view: CastView
   selectedId?: string
+  selectedIds?: readonly string[]
   humanId: string
   sleeping?: boolean
   selectableIds?: readonly string[]
@@ -22,6 +23,7 @@ type Props = {
 export function Roster({
   view,
   selectedId,
+  selectedIds,
   humanId,
   sleeping,
   selectableIds,
@@ -69,7 +71,7 @@ export function Roster({
               type="button"
               className="betrayals-roster__seat"
               aria-label={label}
-              aria-pressed={seat.id === selectedId}
+              aria-pressed={selectedIds ? selectedIds.includes(seat.id) : seat.id === selectedId}
               aria-disabled={!selectable || undefined}
               data-seat-id={seat.id}
               data-you={seat.id === humanId || undefined}

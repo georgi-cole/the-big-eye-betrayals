@@ -81,7 +81,7 @@
 
 .betrayals-layout--game {
   display: grid;
-  grid-template-rows: auto minmax(96px, 0.36fr) auto minmax(255px, 1fr) auto;
+  grid-template-rows: auto minmax(104px, 0.39fr) auto minmax(255px, 1fr) auto;
   block-size: 100dvh;
   min-block-size: 0;
   gap: clamp(5px, 0.9dvh, 9px);
@@ -112,7 +112,17 @@
 
 .betrayals-wordmark {
   gap: 0.32rem;
-  color: #f5dab7;
+}
+
+.betrayals-wordmark__copy {
+  position: relative;
+  display: block;
+}
+
+.betrayals-wordmark__season {
+  position: absolute;
+  inset: -0.2rem -0.28rem auto auto;
+  white-space: nowrap;
 }
 
 .betrayals-layout .betrayals-home__identity h1,
@@ -124,15 +134,12 @@
 }
 
 .betrayals-wordmark__signature {
-  font-size: clamp(1.18rem, 5.1vw, 1.52rem);
+  display: block;
+  font-size: clamp(1.02rem, 4.55vw, 1.34rem);
   line-height: 1.1;
   text-shadow:
     0 1px #442921,
     0 0 0.9rem #c78f5357;
-}
-
-.betrayals-wordmark__signature::first-letter {
-  color: #f6be81;
 }
 
 .betrayals-home__identity h1::first-letter,
@@ -200,19 +207,24 @@
   background: radial-gradient(ellipse, #d09a5430, #d09a5414 47%, transparent 75%);
 }
 
-.betrayals-phase-strip__group {
+.betrayals-phase-strip__group,
+.betrayals-wordmark__season {
   color: #e4bf87;
   font:
-    650 0.56rem/1.1 system-ui,
+    650 0.52rem/1.1 system-ui,
     sans-serif;
   letter-spacing: 0.17em;
   text-transform: uppercase;
 }
 
-.betrayals-phase-strip__subphase {
+.betrayals-phase-strip__subphase,
+.betrayals-wordmark__signature {
   color: #eee6da;
+}
+
+.betrayals-phase-strip__subphase {
   font:
-    500 clamp(0.83rem, 3.3vw, 1rem)/1.08 Georgia,
+    500 clamp(0.77rem, 3vw, 0.91rem)/1.08 Georgia,
     serif;
   text-wrap: balance;
 }
@@ -250,6 +262,12 @@
   block-size: 2.18rem;
   border-radius: 0.4rem;
   background: transparent;
+}
+
+.betrayals-phase-strip__qa {
+  font:
+    700 0.68rem/1 system-ui,
+    sans-serif;
 }
 
 .betrayals-phase-strip__tools button:is(:hover, [aria-expanded='true']) {
@@ -431,7 +449,7 @@
   min-block-size: 0;
 }
 
-.betrayals-cast::before {
+.betrayals-cast:has(.betrayals-cast__caption)::before {
   content: '';
   flex: 0 0 var(--caption-space);
 }
@@ -495,6 +513,38 @@
   color: #f4d2aa;
   font: inherit;
   cursor: pointer;
+}
+
+.betrayals-leave p {
+  margin: 0 0 1rem;
+  font:
+    0.95rem/1.5 system-ui,
+    sans-serif;
+}
+
+.betrayals-leave [role='alert'] {
+  color: #ffc1a5;
+}
+
+.betrayals-leave__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.betrayals-leave__actions--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.betrayals-leave__actions :disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.betrayals-leave__actions .betrayals-inline-action {
+  border-color: #9b6254;
+  background: #311d20;
+  color: #f5c1b4;
 }
 
 .betrayals-layout--challenge {
@@ -640,4 +690,12 @@
 
 .betrayals-witness-lead button span {
   opacity: 0.8;
+}
+.betrayals-layout[data-conclave-cover='true']::after {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  background: #08090e;
+  content: '';
+  pointer-events: none;
 }

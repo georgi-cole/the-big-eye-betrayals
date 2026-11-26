@@ -46,6 +46,9 @@ export function SafetyResults({
             ? 'These standings show who won the Night Shields. Players can pass them on privately before the first vote.'
             : 'Night Shields can be passed on in Social before the first vote.'}
         </p>
+        {!publicResults && rows.some((row) => row.clairvoyant) && (
+          <p>Your Clairvoyant reading privately reveals the shield winners.</p>
+        )}
       </header>
       <div
         className="betrayals-safety-results__scores"

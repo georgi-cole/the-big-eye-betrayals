@@ -1,8 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 import { NativePurchases, PURCHASE_TYPE, type Transaction } from '@capgo/native-purchases'
 import { IS_MOBILE_DEV_BUILD } from '../../config/buildTarget'
+import { IS_BETRAYALS_QA_BUILD } from '../qaBuild'
 import { assertAdultServicesAllowed } from '../../safety/playerSafety'
-import { initializeDurablePersistence } from '../../store/durablePersistence'
+import {
+  flushDurablePersistence,
+  initializeDurablePersistence,
+} from '../../store/durablePersistence'
 import { saveProfilesStateChecked, type ProfilesState } from '../../store/profilesSlice'
 import { withNativeBilling } from '../../vip/nativeBillingQueue'
 import { configureNativePurchaseLifecycle } from '../../vip/nativePurchaseLifecycle'
@@ -47,12 +51,17 @@ export interface BetrayalsPurchaseCredit {
 export interface BetrayalsWalletBridge {
   getProfiles: () => ProfilesState
   grant: (credit: BetrayalsPurchaseCredit) => void
+  grantQa?: (profileId: string, amount: number) => boolean
 }
 
 let wallet: BetrayalsWalletBridge | null = null
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function effectiveAccess(ownership: Partial<BetrayalsOwnership>) {
+  return getBetrayalsAccess(IS_BETRAYALS_QA_BUILD ? { vip: true } : ownership)
+}
+
 let snapshot: BetrayalsCommerceSnapshot = {
-  ...getBetrayalsAccess(emptyBetrayalsOwnership()),
+  ...effectiveAccess(emptyBetrayalsOwnership()),
   ready: false,
   billingAvailable: false,
   products: {},
@@ -93,7 +102,7 @@ function message(error: unknown): string {
 }
 
 function platform(): 'ios' | 'android' | null {
-  if (IS_MOBILE_DEV_BUILD || !Capacitor.isNativePlatform()) return null
+  if (IS_BETRAYALS_QA_BUILD || IS_MOBILE_DEV_BUILD || !Capacitor.isNativePlatform()) return null
   const current = Capacitor.getPlatform()
   return current === 'ios' || current === 'android' ? current : null
 }
@@ -125,7 +134,7 @@ export function isCompletedBetrayalsTransaction(
 }
 
 function publishOwnership(): void {
-  publish({ ...getBetrayalsAccess(readBetrayalsCommerceLedger().ownership), ready: true })
+  publish({ ...effectiveAccess(readBetrayalsCommerceLedger().ownership), ready: true })
 }
 
 async function refreshProductPrices(ownership: BetrayalsOwnership): Promise<void> {
@@ -449,6 +458,15 @@ export async function purchaseBetrayalsProduct(
   let intentWritten = false
   const product = getBetrayalsProduct(key)
   try {
+    if (IS_BETRAYALS_QA_BUILD) {
+      if (product.kind === 'permanent') return true
+      if (!profileId || !product.eyeros || !wallet?.grantQa?.(profileId, product.eyeros))
+        throw new Error('Choose a saved test profile before adding Eyeros.')
+      if (!saveProfilesStateChecked(wallet.getProfiles()) || !(await flushDurablePersistence()))
+        throw new Error('The test balance changed, but the wallet save could not be confirmed.')
+      publish({ notice: `QA Eyeros top-up: ${product.title} added.` })
+      return true
+    }
     if (product.kind === 'consumable') {
       try {
         assertAdultServicesAllowed()
