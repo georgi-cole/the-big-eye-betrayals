@@ -13,8 +13,9 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { Provider } from 'react-redux'
 import { RouterProvider } from 'react-router/dom'
 import { store } from './store/store'
-import { creditBetrayalsPurchase } from './store/profilesSlice'
+import { creditBetrayalsPurchase, debugGrantEyeoleans } from './store/profilesSlice'
 import { configureBetrayalsCommerceWallet } from './betrayals/commerce/purchaseService'
+import { IS_BETRAYALS_QA_BUILD } from './betrayals/qaBuild'
 import { router } from './routes'
 import { setupRouteAnalytics } from './services/backend/routeAnalytics'
 import { SoundManager } from './services/sound/SoundManager'
@@ -52,6 +53,13 @@ if (IS_BETRAYALS) {
     grant: (credit) => {
       store.dispatch(creditBetrayalsPurchase(credit))
     },
+    ...(IS_BETRAYALS_QA_BUILD && {
+      grantQa: (profileId: string, amount: number) => {
+        if (store.getState().profiles.activeProfileId !== profileId) return false
+        store.dispatch(debugGrantEyeoleans({ grantId: crypto.randomUUID(), amount }))
+        return true
+      },
+    }),
   })
 }
 
@@ -77,7 +85,7 @@ export default function App() {
   )
 
   useEffect(() => {
-    if (!IS_PUBLIC_QA_BUILD) return undefined
+    if (!IS_PUBLIC_QA_BUILD && !IS_BETRAYALS_QA_BUILD) return undefined
     const meta = document.createElement('meta')
     meta.name = 'robots'
     meta.content = 'noindex, nofollow, noarchive'

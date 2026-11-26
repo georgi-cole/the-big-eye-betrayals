@@ -3,3 +3,5 @@ https://kenney.nl/assets/impact-sounds
 Sources: footstep_concrete_000..004.ogg, impactWood_heavy_002.ogg,
 impactMetal_heavy_004.ogg. Mixed with filters, distance attenuation and room decay.
 The premixed stereo PCM file is used for consistent web/iOS/Android playback.
+The Betrayals footsteps, chair, seal, door, impact, reveal, and shield cues
+reuse trimmed excerpts of departureFoley.wav from the same CC0 source.

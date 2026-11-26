@@ -16,6 +16,7 @@ import { castleAlliances, socialEntryVisibleTo } from './allianceRecords'
 import { hasPersonalAlliance } from './perception'
 import { BetrayalsAllianceGroup } from './BetrayalsAllianceGroup'
 import { BetrayalsGuestProfile } from './BetrayalsGuestProfile'
+import { CASTLE_ROLE_CATALOG } from './castleRoles'
 import {
   BetrayalsInvestigationOptions,
   BetrayalsInvestigationResult,
@@ -69,6 +70,13 @@ import '../components/SocialPanelV2/RecentActivity.css'
 import './betrayals-social.css'
 
 const actions = [
+  {
+    id: 'reveal-castle-role',
+    title: 'Reveal role',
+    category: 'strategic',
+    description: 'Tell this guest your Castle Role in private. They may pass it on.',
+    icon: '✧',
+  },
   {
     id: 'rapport',
     title: 'Build trust',
@@ -307,6 +315,7 @@ type Props = {
   intel?: React.ReactNode
   investigation?: InvestigationControls
   hasRealityMode?: boolean
+  hasDramaMode?: boolean
   hasMyPulse?: boolean
   onUpgrade?: (product: 'realityMode' | 'myPulse') => void
   energyRecharge?: {
@@ -337,6 +346,12 @@ function exchangeText(entry: SocialEntry, actorId: string, label: NameLookup) {
   const person = label(outgoing ? entry.recipientId : entry.actorId)
   const subject = label(entry.suspectId)
   switch (entry.kind) {
+    case 'reveal-castle-role': {
+      const role = entry.disclosedRole && CASTLE_ROLE_CATALOG[entry.disclosedRole].title
+      return outgoing
+        ? `You told ${person} your Castle Role is ${role}.`
+        : `${person} revealed their Castle Role.`
+    }
     case 'end-pact':
       return outgoing
         ? `You ended your pact with ${person}.`
@@ -650,6 +665,7 @@ export function BetrayalsSocialPanel({
   intel,
   investigation,
   hasRealityMode = false,
+  hasDramaMode = false,
   hasMyPulse = false,
   onUpgrade,
   energyRecharge,
@@ -704,6 +720,7 @@ export function BetrayalsSocialPanel({
   const planningOpen = alliancePlanningOpen({ phase }) && moveKinds.includes('alliance')
   const ordinaryActions = actions
     .filter(({ id }) => moveKinds.includes(id))
+    .filter(({ id }) => id !== 'reveal-castle-role' || hasDramaMode)
     .filter(({ id }) => id !== 'end-pact' || personalPact)
     .filter(({ id }) => id !== 'broker-shield' || donor)
     .filter(
@@ -792,6 +809,16 @@ export function BetrayalsSocialPanel({
 
   function unavailable(kind: SocialEntry['kind']) {
     if (!peer) return 'Choose a guest first.'
+    if (kind === 'reveal-castle-role') {
+      if (
+        notes.some(
+          (entry) =>
+            entry.kind === kind && entry.actorId === actorId && entry.recipientId === peer.id
+        )
+      )
+        return 'You already told this guest your role.'
+      return
+    }
     if (
       (kind === 'promise-shield' || kind === 'ask-to-cover') &&
       peer.id === dayContext?.immunityId
@@ -837,7 +864,7 @@ export function BetrayalsSocialPanel({
       : Boolean(
           peer &&
           socialMove &&
-          canUseBetrayalsAction(socialMove, hasRealityMode) &&
+          canUseBetrayalsAction(socialMove, hasRealityMode, hasDramaMode) &&
           moveKinds.includes(socialMove) &&
           !unavailable(socialMove) &&
           (!targetKind || availableTargets.some(({ id }) => id === target))
@@ -1172,7 +1199,11 @@ export function BetrayalsSocialPanel({
                     disabled={!canExecute}
                     onClick={execute}
                   >
-                    {selectedAction === 'shield-gift' ? 'Give shield' : 'Execute'}
+                    {selectedAction === 'shield-gift'
+                      ? 'Give shield'
+                      : selectedAction === 'reveal-castle-role'
+                        ? 'Tell guest'
+                        : 'Execute'}
                   </button>
                 </div>
                 {nightShieldCount > 0 && moveKinds.includes('shield-gift') && (
@@ -1295,7 +1326,10 @@ export function BetrayalsSocialPanel({
                         action={{ ...action, baseCost: cost.energy }}
                         costs={cost}
                         selected={id === selectedAction}
-                        premiumLocked={!hasRealityMode && (intel || isPremiumBetrayalsAction(id))}
+                        premiumLocked={
+                          !hasRealityMode &&
+                          (intel || (id !== 'reveal-castle-role' && isPremiumBetrayalsAction(id)))
+                        }
                         onPremiumLockedClick={() => onUpgrade?.('realityMode')}
                         disabled={Boolean(reason)}
                         disabledMessage={reason}

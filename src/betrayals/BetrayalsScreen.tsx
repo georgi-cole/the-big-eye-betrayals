@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { QaAdvance } from './castleQa'
+import { IS_BETRAYALS_QA_BUILD } from './qaBuild'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
 import type { BetrayalsProductKey } from './commerce/catalog'
 import type { BetrayalsStoreProps, BetrayalsStoreSection } from './BetrayalsStore'
@@ -8,6 +10,7 @@ import {
   canUseBetrayalsAction,
   canUseBetrayalsTableSway,
   investigationProductFor,
+  isPremiumCastleChoice,
 } from './premiumAccess'
 import {
   betrayalsRewardEvents,
@@ -35,14 +38,33 @@ import { castleGlance } from './castleLife'
 import { CASTLE_CHOICES } from './castleLifeBank'
 import { waitingShieldWitnesses } from './investigationRecords'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
+import { preloadImage } from '../utils/preload'
 import { BETRAYALS_SOCIAL_RECHARGE_PLACEMENT } from '../services/ads/adsService'
 import { getAdAvailabilityMessage } from '../services/ads/adAvailability'
 import { useRewardedAd } from '../services/ads/useRewardedAd'
 import { BetrayalsBroadcast } from './BetrayalsBroadcast'
+import { CastleRoleCard, CastleRoleDialog, CastleRoleResult } from './BetrayalsCastleRole'
+import {
+  dayCastleRole,
+  politicianOrder,
+  resolveDayCastleRole,
+  resolveDeparturePower,
+  resolvePolitician,
+  roleTableOpen,
+} from './castleRoleEvents'
+import {
+  CASTLE_ROLE_CATALOG,
+  COLUMBUS_GROUP_SIZE,
+  castleRoleFor,
+  eligibleCastleRole,
+  introvertDay,
+} from './castleRoles'
+import { revealableCastleRole, revealCastleRole } from './roleDisclosure'
 import { BetrayalsChallengeStage } from './BetrayalsChallengeStage'
 import { BetrayalsConclave, ConclaveDiscussion } from './BetrayalsConclave'
-import { BetrayalsDock } from './BetrayalsDock'
-import { BetrayalsHome } from './BetrayalsHome'
+import { BetrayalsDock, type BetrayalsDockProps } from './BetrayalsDock'
+import { BetrayalsHome, type CastleRolesPreview } from './BetrayalsHome'
+import { BetrayalsLeaveDialog } from './BetrayalsLeaveDialog'
 import { BetrayalsRewardActions, type SeasonReward } from './BetrayalsRewardActions'
 import { BetrayalsPulse, type PulseLocation } from './BetrayalsPulse'
 import { gameLogFor, recordGameActivity } from './gameLog'
@@ -66,7 +88,13 @@ import {
   viewFor,
 } from './run'
 import { BETRAYALS_AI_POOL } from './cast'
-import { challengeContestantIds, resolveChallenge, safetyResultsFor } from './challenges'
+import { clearMoonSky, nightfallArt, nightfallWindows } from './CastleNightfall'
+import {
+  challengeContestantIds,
+  chooseFatiguedSafety,
+  resolveChallenge,
+  safetyResultsFor,
+} from './challenges'
 import { challengeGame, scoreField } from './challengeRotation'
 import type { ReactMinigameCompletion } from '../minigames/competitionResult'
 import { BriefRosterExit, CinematicScene, type CinematicCompletion } from './CinematicScene'
@@ -75,7 +103,9 @@ import {
   conclaveGuests,
   describeConclaveVerdict,
   getConclaveView,
+  nightCastleRoleFor,
   resolveConclave,
+  resolveNightCastleRole,
   revealDawn,
 } from './night'
 import {
@@ -104,8 +134,11 @@ import { WitnessLeadCard } from './WitnessLeadCard'
 import {
   advanceTableRound,
   buildTableBallots,
+  mayorChoiceFor,
   recordTableSway,
+  resolveMayorChoice,
   resolveTable,
+  sleepRoundTable,
   revealTable,
   tableDiscussionOpen,
   tableRoundNumber,
@@ -119,17 +152,26 @@ import { resolveBetrayalsSoundtrackScene, useBetrayalsSoundtrack } from './betra
 import { intendsToEnd, resolveEndVote } from './settlement'
 import { applySocialMove, getSocialView, socialMoveKinds } from './social'
 import { canRechargeSocialEnergy, rechargeSocialEnergy, socialWalletFor } from './socialResources'
-import { restoreRun, saveRun } from './persistence'
+import { abandonRun, restoreRun, saveRun } from './persistence'
 import { Roster } from './Roster'
 import {
   FINAL_SURVIVOR_COUNT,
   NIGHT_SHIELD_COUNT,
   phaseGroupLabel,
   phaseLabel,
+  phaseSubphaseLabel,
 } from './seasonPhases'
 import './season.css'
 
 const ChallengeGame = lazy(() => import('./BetrayalsChallengeGame'))
+const CastleQaDialog =
+  import.meta.env.DEV || import.meta.env.MODE === 'betrayals-qa'
+    ? lazy(() =>
+        import('./BetrayalsQaDialog').then(({ BetrayalsQaDialog }) => ({
+          default: BetrayalsQaDialog,
+        }))
+      )
+    : null
 const legacySave = 'edition-local'
 const legacyClaim = 'big-eye:betrayals:season:legacy-claimed'
 const artBase = import.meta.env.BASE_URL + 'assets/betrayals/'
@@ -162,15 +204,25 @@ function begin(
   name: string,
   publicMode: boolean,
   realityMode: RealityPreset,
-  portrait?: string
+  portrait?: string,
+  dramaMode = false,
+  castleRolesPreview: CastleRolesPreview = 'off'
 ): Run {
   const [roleSeed, publicSeed] = crypto.getRandomValues(new Uint32Array(2))
+  const rolePreview =
+    (IS_BETRAYALS_QA_BUILD || (import.meta.env.DEV && !dramaMode)) && castleRolesPreview !== 'off'
+  const castleRoles =
+    castleRolesPreview === 'standard' && rolePreview ? false : dramaMode || rolePreview
+  const previewCastleRole =
+    rolePreview && castleRolesPreview !== 'standard' && castleRolesPreview !== 'random'
+      ? castleRolesPreview
+      : undefined
   return openDayFlow(
     startRun(
       { id: 'human', name: name.trim() || 'You', portrait },
       BETRAYALS_AI_POOL,
-      { publicMode, realityMode },
-      { id: crypto.randomUUID(), roleSeed, publicSeed }
+      { publicMode, realityMode, ...(castleRoles ? { castleRoles: true } : {}) },
+      { id: crypto.randomUUID(), roleSeed, publicSeed, previewCastleRole }
     )
   )
 }
@@ -214,11 +266,19 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const [incomingOpen, setIncomingOpen] = useState(false)
   const [pulse, setPulse] = useState<PulseLocation>()
   const [homeOpen, setHomeOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [castleRolesPreview, setCastleRolesPreview] = useState<CastleRolesPreview>('off')
+  const [castleRoleOpen, setCastleRoleOpen] = useState(false)
+  const [qaOpen, setQaOpen] = useState(false)
+  const [armedNightPower, setArmedNightPower] = useState<string>()
+  const [directedVoter, setDirectedVoter] = useState<{ key: string; voterId: string }>()
+  const [columbusPick, setColumbusPick] = useState<{ key: string; ids: string[] }>()
   const [playing, setPlaying] = useState(false)
   const [countReady, setCountReady] = useState<string>()
   const [voteActionsTarget, setVoteActionsTarget] = useState<HTMLDivElement | null>(null)
   const [closedDiscussion, setClosedDiscussion] = useState<string>()
   const [conclaveProgress, setConclaveProgress] = useState<{ key: string; step: number }>()
+  const [seenSealedIntro, setSeenSealedIntro] = useState<string>()
   const [saveIssue, setSaveIssue] = useState(false)
   const [storeFocus, setStoreFocus] = useState<BetrayalsProductKey>()
   const [storeSection, setStoreSection] = useState<BetrayalsStoreSection>('home')
@@ -259,6 +319,14 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const utilities = useBetrayalsUtilities(homeOpen ? undefined : run?.phase, playing, run?.options)
   const systemReducedMotion = usePresentationReducedMotion()
   const playNightFilm = !utilities.preferences.reducedMotion && !systemReducedMotion
+  const prepareNightfall =
+    playNightFilm && (run?.phase === 'table-reveal' || run?.phase === 'cocktail')
+  useEffect(() => {
+    if (!prepareNightfall) return
+    void preloadImage(nightfallArt)
+    void preloadImage(nightfallWindows)
+    void preloadImage(clearMoonSky)
+  }, [prepareNightfall])
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = profiles ? player?.portrait : getBetrayalsPortrait(utilities.preferences.lookId)
   const needsLook = Boolean(profiles && !portrait)
@@ -341,6 +409,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     )
       setSelected(undefined)
     if (phaseChanged) {
+      setCastleRoleOpen(false)
       if (
         next.phase !== 'settled' &&
         (before?.phase === 'table-reveal' || before?.phase === 'night-resolved')
@@ -348,14 +417,93 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         utilities.playEffect('tv:ceremony_reveal', 0.72)
       } else if (next.phase === 'table-reveal' || next.phase === 'night-resolved') {
         if (!cues.includes('conclave-seal')) utilities.playEffect('tv:ceremony_impact', 0.57)
-      } else if (next.phase !== 'settled') {
-        utilities.playEffect('tv:ceremony_transition', 0.4)
       }
       setSocialOpen(false)
       setIncomingOpen(false)
     }
     setPlaying(false)
     return saved
+  }
+
+  function startSeason(name: string, realityMode: RealityPreset) {
+    const active = current.current
+    if (
+      active !== run ||
+      financialBusy.current ||
+      (active && pendingPaidNightShieldPurchase(active))
+    )
+      return
+    const saved = active ? undefined : restoreRun(saveStorage, saveId)
+    const lastSeasonNumber = active
+      ? (active.seasonNumber ?? 1)
+      : saved?.status === 'empty'
+        ? (saved.lastSeasonNumber ?? 0)
+        : 0
+    void commit({
+      ...begin(
+        name,
+        utilities.seasonOptions.publicMode,
+        realityMode,
+        portrait,
+        commerce.dramaMode && utilities.seasonOptions.castleRoles === true,
+        castleRolesPreview
+      ),
+      seasonNumber: lastSeasonNumber + 1,
+    })
+  }
+
+  async function leaveSeason(abandon: boolean, declineRewind = false) {
+    const active = current.current
+    if (!active || active !== run || financialBusy.current || recharging.current)
+      return 'Wait for the current action to finish, then try again.'
+    if (abandon && pendingPaidNightShieldPurchase(active))
+      return 'Finish the pending Night Shield purchase in the Store first.'
+
+    // Block delayed gameplay commands while the save or abandonment becomes durable.
+    current.current = null
+    const next = abandon
+      ? null
+      : declineRewind
+        ? { ...active, seasonRewards: { ...active.seasonRewards, rewindDeclined: true } }
+        : active
+    let abandoned = false
+    try {
+      if (!next) {
+        const rewards = betrayalsRewardEvents(active)
+        if (rewards.length && profiles?.wallet && !(await profiles.wallet.claimRewards(rewards)))
+          throw new Error('Wallet rewards could not be saved.')
+        abandonRun(saveStorage, saveId, active)
+        abandoned = true
+      } else {
+        saveRun(saveStorage, saveId, next)
+      }
+      if (!(await flushDurablePersistence())) throw new Error('Save was unavailable.')
+    } catch {
+      current.current = active
+      // Replace an abandonment queued behind a failed storage write.
+      if (abandoned) {
+        try {
+          saveRun(saveStorage, saveId, active)
+        } catch {
+          setSaveIssue(true)
+        }
+      }
+      return abandon
+        ? 'The castle could not end this season. Please try again.'
+        : 'Your season could not be saved. Please try again.'
+    }
+
+    current.current = next
+    if (mounted.current) {
+      setRun(next)
+      setSelected(undefined)
+      setSocialOpen(false)
+      setIncomingOpen(false)
+      setPulse(undefined)
+      setLeaveOpen(false)
+      setSaveIssue(false)
+      setHomeOpen(true)
+    }
   }
 
   async function completeShieldPurchase(active: Run) {
@@ -558,20 +706,29 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   }
 
   const firstCue = run?.presentation?.[0]
-  const omitConclaveFilm =
-    !playNightFilm && (firstCue === 'conclave-arrival' || firstCue === 'conclave-seal')
-  const dismissConclaveFilm = useEffectEvent(() => {
+  const omitNightFilm =
+    !playNightFilm &&
+    (firstCue === 'nightfall' ||
+      firstCue === 'castle-wakes' ||
+      firstCue === 'conclave-arrival' ||
+      firstCue === 'conclave-shadow' ||
+      firstCue === 'conclave-seal')
+  const dismissNightFilm = useEffectEvent(() => {
     if (!run?.presentation || current.current !== run) return
     const rest = run.presentation.slice(1)
     void commit({ ...run, presentation: rest.length ? rest : undefined })
   })
   useEffect(() => {
-    if (omitConclaveFilm) dismissConclaveFilm()
-  }, [omitConclaveFilm, firstCue])
+    if (omitNightFilm) dismissNightFilm()
+  }, [omitNightFilm, firstCue])
 
   if (!run || homeOpen || needsLook) {
+    const saved =
+      player?.portrait && !run && !getDurableItem(legacyClaim)
+        ? restoreRun(saveStorage, saveId)
+        : undefined
     const previous =
-      player?.portrait && !run && !getDurableItem(legacyClaim) ? restore(legacySave) : null
+      saved?.status === 'empty' && !saved.lastSeasonNumber ? restore(legacySave) : null
     const resumeLegacy =
       previous && player && previous.phase !== 'settled'
         ? () =>
@@ -599,6 +756,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         onUpgrade={openUpgrade}
         name={name}
         onNameChange={setName}
+        castleRolesPreview={
+          IS_BETRAYALS_QA_BUILD ||
+          (import.meta.env.DEV && !(commerce.dramaMode && utilities.seasonOptions.castleRoles))
+            ? { value: castleRolesPreview, onChange: setCastleRolesPreview }
+            : undefined
+        }
         milestones={
           run
             ? {
@@ -610,21 +773,12 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             : undefined
         }
         seasonState={run ? (run.phase === 'settled' ? 'settled' : 'active') : undefined}
-        onPlaySeason={() => {
-          if (
-            current.current &&
-            (pendingPaidNightShieldPurchase(current.current) || financialBusy.current)
+        onPlaySeason={() =>
+          startSeason(
+            player?.name ?? name,
+            commerce.realityMode ? utilities.seasonOptions.realityMode : 'off'
           )
-            return
-          void commit(
-            begin(
-              player?.name ?? name,
-              utilities.seasonOptions.publicMode,
-              commerce.realityMode ? utilities.seasonOptions.realityMode : 'off',
-              portrait
-            )
-          )
-        }}
+        }
         onReturnToSeason={() => setHomeOpen(false)}
         onResumeLegacy={resumeLegacy}
       />
@@ -639,6 +793,23 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const labels = new Map(run.seats.map(({ id, name }) => [id, name]))
   const label = (id: string) => labels.get(id) ?? 'Contestant'
   const stage = run.phase
+  const cue = run.presentation?.[0]
+  const castleRole = castleRoleFor(run, viewerId ?? run.private.departurePower?.guestId ?? null)
+  const roleCard = castleRole && {
+    role: castleRole,
+    eligible: eligibleCastleRole(run, castleRole.guestId, castleRole.roleId),
+    label,
+    day: run.day,
+  }
+  const nightRole = !cue && viewerId ? nightCastleRoleFor(run, viewerId) : undefined
+  const doctorChoice = nightRole?.roleId === 'doctor'
+  const nightPower = nightRole && !nightRole.targetIds ? nightRole.roleId : undefined
+  const nightPowerKey = `${run.id}:${run.day}:${nightPower}`
+  const nightPowerArmed = Boolean(nightPower && armedNightPower === nightPowerKey)
+  const columbusChoice = nightRole?.roleId === 'columbus'
+  const columbusKey = `${run.id}:${run.day}`
+  const columbusIds = columbusPick?.key === columbusKey ? columbusPick.ids : []
+  const mayorChoice = !cue && viewerId ? mayorChoiceFor(run, viewerId) : false
   const castleDay = run.dayFlow?.castleDay
   const glance = castleGlance(run)
   const stageTitle = titleFor(run)
@@ -647,6 +818,30 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const audiencePending = publicShieldPending(run)
   const discussion = !audiencePending && tableDiscussionOpen(run)
   const counting = Boolean(run.tableCount)
+  const dayPower = !cue && viewerId ? dayCastleRole(run, viewerId) : undefined
+  const tablePower =
+    !cue &&
+    viewerId &&
+    !audiencePending &&
+    !discussion &&
+    roleTableOpen(run) &&
+    (eligibleCastleRole(run, viewerId, 'politician')
+      ? 'politician'
+      : eligibleCastleRole(run, viewerId, 'bad-witch')
+        ? 'bad-witch'
+        : undefined)
+  const sleepyTable = Boolean(
+    viewerId &&
+    !cue &&
+    !audiencePending &&
+    roleTableOpen(run) &&
+    eligibleCastleRole(run, viewerId, 'bad-witch')
+  )
+  const departure = run.private.departurePower
+  const quietDay = Boolean(viewerId && introvertDay(run, viewerId))
+  const roleActionKey = `${run.id}:${run.day}:${stage}:${dayPower?.roleId ?? tablePower}`
+  const actionArmed = armedNightPower === roleActionKey
+  const voterId = directedVoter?.key === roleActionKey ? directedVoter.voterId : undefined
   const conclave = getConclaveView(run, viewerId, selected)
   const recruitment = recruitmentFor(run, viewerId)
   const recruitmentTargets = recruitment?.kind === 'choose' ? recruitment.targetIds : undefined
@@ -656,13 +851,42 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const conclaveKey = `${run.id}:${run.day}`
   const conclaveStep = conclaveProgress?.key === conclaveKey ? conclaveProgress.step : 0
   const conclaveLine = conclaveLines[conclaveStep]
+  let subphase = phaseSubphaseLabel[stage]
+  if (stage === 'night') {
+    if (nightPower === 'good-witch') subphase = 'The Lullaby'
+    else if (nightPower === 'illusionist') subphase = 'The False Letter'
+    else if (columbusChoice) subphase = 'The Circle'
+    else if (nightRole) subphase = doctorChoice ? 'The Ward' : 'Beyond the Veil'
+    else if (recruitmentOffer || recruitmentTargets) subphase = 'A Quiet Knock'
+    else if (conclave)
+      subphase = conclave.sealed
+        ? 'The Sealed Ballot'
+        : conclaveLine
+          ? 'Under the Hoods'
+          : conclave.runoff
+            ? 'The Last Name'
+            : 'Ink & Ash'
+  }
   const moveConclave = (step: number) => setConclaveProgress({ key: conclaveKey, step })
   const targets =
-    votePhase && !audiencePending && !discussion && !counting
+    (departure ? run.seats.filter(({ exit }) => !exit).map(({ id }) => id) : undefined) ??
+    (actionArmed && dayPower?.targets.length ? dayPower.targets : undefined) ??
+    (tablePower === 'politician' && actionArmed
+      ? voterId
+        ? eligibleBanishmentTargets(run, voterId)
+        : run.seats
+            .filter(
+              ({ id, exit }) =>
+                !exit && id !== run.humanId && eligibleBanishmentTargets(run, id).length
+            )
+            .map(({ id }) => id)
+      : undefined) ??
+    nightRole?.targetIds ??
+    (votePhase && !audiencePending && !discussion && !counting
       ? tableTargets(run, run.humanId)
       : conclaveLine
         ? []
-        : (recruitmentTargets ?? conclave?.targetIds ?? [])
+        : (recruitmentTargets ?? conclave?.targetIds ?? []))
   const field = challengeContestantIds(run)
   const canPlay = field.includes(run.humanId)
   const game = challengeGame(run)
@@ -695,35 +919,72 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const recent = conversation
     .filter((entry) => entry.day === run.day && entry.actorId === run.humanId)
     .at(-1)
-  const moveKinds = socialMoveKinds(run)
-  const canSocialize = participating && moveKinds.length > 0
+  const ordinaryMoves = socialMoveKinds(run)
+  const moveKinds =
+    commerce.dramaMode && revealableCastleRole(run)
+      ? [...ordinaryMoves, 'reveal-castle-role' as const]
+      : ordinaryMoves
+  const canSocialize = participating && !quietDay && moveKinds.length > 0
   const socialResources = socialWalletFor(run, run.humanId)
   const incoming = getIncomingInteractions(run)
   const pendingIncoming = incoming.filter(({ response }) => !response)
   const requiredReply = pendingIncoming.some(({ required }) => required)
   const readIncoming = new Set(inboxReads?.runId === run.id ? inboxReads.ids : [])
   const unreadIncoming = pendingIncoming.filter(({ id }) => !readIncoming.has(id))
-  const cue = run.presentation?.[0]
-  const rewindTarget = cue ? undefined : rewindOffer(run)?.type
+  const rewindTarget =
+    qaOpen ||
+    cue ||
+    run.pendingAdBreak ||
+    adBreak.active ||
+    departure ||
+    (stage === 'night-resolved' &&
+      run.private.pendingNight?.targetId === run.humanId &&
+      !run.private.pendingNight.blocked &&
+      castleRole &&
+      (castleRole.roleId === 'last-will' || castleRole.roleId === 'kamikaze') &&
+      eligibleCastleRole(run, castleRole.guestId, castleRole.roleId))
+      ? undefined
+      : rewindOffer(run)?.type
   const showRevealReward =
     !cue && stage === 'settled' && !!run.result && !run.seasonRewards?.finaleRevealed
-  const openingConclave =
-    cue === 'conclave-arrival' && conclaveChoice ? (run.day === 1 ? 'first' : 'return') : undefined
+  const showSealedBallot = Boolean(
+    conclave?.sealed &&
+    !cue &&
+    !requiredReply &&
+    !run.pendingAdBreak &&
+    !adBreak.active &&
+    !pendingPaidNightShieldPurchase(run)
+  )
+  const sealedIntro = showSealedBallot && playNightFilm && seenSealedIntro !== conclaveKey
+  const sealedVerdict =
+    cue === 'conclave-seal' && run.private.pendingNight?.sealedBallot?.voterId === viewerId
+  const openingConclave = sealedIntro
+    ? 'sealed'
+    : cue === 'conclave-arrival' && conclaveChoice
+      ? run.day === 1
+        ? 'first'
+        : 'return'
+      : undefined
   const conclaveVerdict =
     cue === 'conclave-seal' ? describeConclaveVerdict(run, viewerId) : undefined
-  const showConclaveDialog = Boolean(
-    (recruitmentTargets && !cue) ||
-    (playNightFilm && ((conclaveChoice && (!cue || openingConclave)) || conclaveVerdict))
-  )
+  const showConclaveDialog =
+    !qaOpen &&
+    !departure &&
+    Boolean(
+      showSealedBallot ||
+      (recruitmentTargets && !cue) ||
+      (playNightFilm &&
+        ((conclaveChoice && !conclave?.sealed && (!cue || openingConclave)) || conclaveVerdict))
+    )
   const bypassHotel =
-    cue === 'death-letter' && run.presentation?.[1] === 'awakening' && !playNightFilm
+    cue === 'death-letter' && !playNightFilm && run.presentation?.includes('awakening')
   const shownCue = bypassHotel ? 'awakening' : cue
   const discussionKey = run.id + ':' + run.day
-  const discussionVisible = discussion && !cue && closedDiscussion !== discussionKey
+  const discussionVisible = discussion && !cue && !qaOpen && closedDiscussion !== discussionKey
   const cinematic =
     shownCue &&
     !showConclaveDialog &&
-    !omitConclaveFilm &&
+    !omitNightFilm &&
     shownCue !== 'safety-results' &&
     shownCue !== 'sunrise'
       ? cinematicFor(run, shownCue, viewerId, castleExterior)
@@ -734,14 +995,27 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       (!playNightFilm && shownCue === 'death-letter' && castleDay)) &&
     (shownCue === 'departure' || shownCue === 'death-letter' || shownCue === 'elimination')
   const pendingNight = run.private.pendingNight
+  const nightEffect = pendingNight?.castleEffect?.kind
+  const cursedArrival =
+    viewerId &&
+    stage === 'dawn' &&
+    run.private.castleRoles?.find(
+      ({ guestId, used }) =>
+        used?.roleId === 'cursed' &&
+        used.day === run.day - 1 &&
+        (guestId === viewerId || view.teammateIds.includes(guestId))
+    )
   const mourning =
     (stage === 'dawn' || stage === 'final-challenge') &&
     run.lastDawn?.day === run.day &&
     !!run.lastDawn.eliminatedId
   const openWeather = shownCue === 'sunrise' || (stage === 'night-resolved' && !cue && !castleDay)
   const announcedNightId =
-    stage === 'night-resolved' && pendingNight?.targetId === run.humanId && !pendingNight.blocked
-      ? run.humanId
+    stage === 'night-resolved' &&
+    pendingNight &&
+    !pendingNight.blocked &&
+    (pendingNight.filmPlayed || pendingNight.targetId === run.humanId)
+      ? (pendingNight.targetId ?? undefined)
       : undefined
 
   function getRosterSeat(id: string) {
@@ -760,8 +1034,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       cue === 'death-letter' &&
       active.phase === 'night-resolved' &&
       (playedHotel || active.dayFlow?.castleDay)
-    const skipRollCall = playedHotel && active.presentation[1] === 'awakening'
-    const rest = active.presentation.slice(bypassHotel || skipRollCall ? 2 : 1)
+    const queued = active.presentation.slice(1)
+    const rest = bypassHotel || playedHotel ? queued.filter((beat) => beat !== 'awakening') : queued
     const night = active.private.pendingNight
     const privateState =
       showedNightOutcome && night
@@ -784,6 +1058,33 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     }
     const next = transform(active)
     if (next !== active) return commit(next)
+  }
+
+  async function simulateQa(advance: QaAdvance) {
+    const active = current.current
+    if (
+      (import.meta.env.MODE !== 'betrayals-qa' && !import.meta.env.DEV) ||
+      !active ||
+      active !== run ||
+      financialBusy.current ||
+      recharging.current
+    )
+      return 'Wait for the current action to finish, then try again.'
+    if (pendingPaidNightShieldPurchase(active))
+      return 'Finish the pending Night Shield purchase first.'
+    try {
+      const { simulateCastleQa } = await import('./castleQa')
+      if (current.current !== active || financialBusy.current || recharging.current)
+        return 'The season changed. Try again.'
+      const next = simulateCastleQa(active, advance, currentAudienceApproval)
+      if (!next) return 'Simulation could not advance this position.'
+      const saved = await commit(next, false, true, active)
+      setArmedNightPower(undefined)
+      setDirectedVoter(undefined)
+      return saved ? 'Simulation saved.' : 'Simulation finished. The save could not be confirmed.'
+    } catch {
+      return 'Simulation could not finish.'
+    }
   }
 
   async function watchEnergyRecharge() {
@@ -824,12 +1125,27 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     }
   }
 
-  function advanceConclave() {
+  function confirmNightRole() {
+    void apply((active) => {
+      if (nightPowerArmed) return resolveNightCastleRole(active, token, true)
+      if (columbusChoice && columbusIds.length)
+        return resolveNightCastleRole(active, token, columbusIds)
+      const targetId = isTarget ? selected : undefined
+      const answered = resolveNightCastleRole(active, token, targetId)
+      if (answered === active || (targetId && !doctorChoice)) return answered
+      return resolveConclave(answered, commandToken(answered))
+    })
+    if (nightPowerArmed) setArmedNightPower(undefined)
+    if (columbusChoice) setColumbusPick(undefined)
+    setSelected(undefined)
+  }
+
+  function advanceConclave(doubleVote = false) {
     if (conclaveLine) {
       moveConclave(conclaveStep + 1)
       return
     }
-    apply((active) => resolveConclave(active, token, selected))
+    apply((active) => resolveConclave(active, token, selected, doubleVote))
   }
 
   function end(continueVoting: boolean) {
@@ -878,6 +1194,21 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     )
   }
 
+  function saveEnergyForSafety() {
+    if (!game) return
+    apply((active) => {
+      const prepared = chooseFatiguedSafety(active)
+      if (prepared === active) return active
+      return resolveChallenge(
+        prepared,
+        commandToken(prepared),
+        scoreField(prepared, game),
+        game.key,
+        game.publicResults
+      )
+    })
+  }
+
   if (playing && canPlay && game) {
     return (
       <BetrayalsChallengeStage
@@ -902,7 +1233,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
 
   let message: ReactNode = null
   let detail: ReactNode = null
-  let play: { label: string; onClick: () => void; disabled?: boolean; faceLabel?: string }
+  let play: NonNullable<BetrayalsDockProps['play']>
   const outcome = run.lastTable
   const tableExit = outcome
     ? view.seats.find(({ id }) => id === outcome.banishedId)?.exit
@@ -930,6 +1261,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   switch (stage) {
     case 'role-reveal':
       message = view.role === 'betrayer' ? 'You are a Betrayer.' : 'You are a Loyal.'
+      if (roleCard) detail = <CastleRoleCard {...roleCard} />
+      else if (run.options.castleRoles) detail = 'Three guests hold Castle Roles.'
       play = {
         label: 'Play: open Day 1',
         onClick: () => apply((active) => acknowledgeRole(active, token)),
@@ -954,7 +1287,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       if (!detail && glance && participating) detail = 'Guests are checking in through the Inbox.'
       play = {
         label: castleDay ? 'Go to Immunity Challenge' : 'Play: enter Social',
-        faceLabel: castleDay ? 'Immunity' : undefined,
+
         onClick: () => apply(advanceDayBeat),
       }
       break
@@ -970,7 +1303,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       }
       play = {
         label: castleDay ? 'Go to Safety Challenge' : 'Play: begin Immunity Challenge',
-        faceLabel: castleDay ? 'Safety' : undefined,
+
         onClick: () => apply(advanceDayBeat),
       }
       break
@@ -985,10 +1318,10 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               ? 'Check your Inbox for private vote plans.'
               : 'Guests can make private vote promises here.'))
       play = audiencePending
-        ? { label: 'Reveal Public Shield', faceLabel: 'Reveal', onClick: revealPublicShield }
+        ? { label: 'Reveal Public Shield', actionText: 'Reveal', onClick: revealPublicShield }
         : {
             label: castleDay ? 'Enter the castle afternoon' : 'Continue to Safety',
-            faceLabel: castleDay ? 'Afternoon' : 'Safety',
+
             onClick: () => apply((active) => advanceDayAftermath(active, token)),
           }
       break
@@ -1004,7 +1337,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             : 'Opening the Table locks Night Shields.'
       play = {
         label: 'Continue to Round Table',
-        faceLabel: 'Table',
+
         onClick: () => apply((active) => advanceDayAftermath(active, token)),
       }
       break
@@ -1020,10 +1353,11 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               ' adds to the pot. In the finale, banished roles stay sealed until the season ends.'
             : 'The winner is safe at the Round Table and at Night.'
       play = canPlay
-        ? { label: 'Play ' + challengeName, onClick: () => setPlaying(true) }
+        ? { label: 'Play ' + challengeName, actionText: 'Play', onClick: () => setPlaying(true) }
         : {
             label: 'See results',
-            faceLabel: 'Results',
+            actionText: 'Results',
+
             onClick: () => finishChallenge(),
           }
       break
@@ -1031,16 +1365,15 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     case 'final-banishment':
       if (audiencePending) {
         message = 'The audience has chosen a shield.'
-        play = { label: 'Reveal Public Shield', faceLabel: 'Reveal', onClick: revealPublicShield }
+        play = { label: 'Reveal Public Shield', actionText: 'Reveal', onClick: revealPublicShield }
       } else if (discussion) {
         message = publicShieldId
           ? label(publicShieldId) + ' has the Public Shield. The floor is open.'
           : 'The floor is open.'
         play = {
           label: 'Enter Round Table',
-          faceLabel: 'Enter',
+
           onClick: () => {
-            utilities.playEffect('tv:ceremony_transition', 0.45)
             setClosedDiscussion(undefined)
           },
         }
@@ -1048,7 +1381,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         detail = tableFeed
         play = {
           label: 'Open runoff ballot',
-          faceLabel: 'Runoff',
+          actionText: 'Runoff',
+
           disabled: countReady !== countKey,
           onClick: () => apply((active) => advanceTableRound(active, token)),
         }
@@ -1076,7 +1410,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                 : undefined)
         play = {
           label: targets.length > 0 ? 'Lock vote' : 'View votes',
-          faceLabel: targets.length > 0 ? 'Vote' : 'View votes',
+          actionText: targets.length > 0 ? 'Vote' : 'View votes',
+
           disabled: targets.length > 0 && !isTarget,
           onClick: () =>
             apply((active) => resolveTable(active, token, buildTableBallots(active, selected))),
@@ -1088,7 +1423,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       detail = tableFeed
       play = {
         label: 'Reveal result',
-        faceLabel: 'Reveal',
+        actionText: 'Reveal',
+
         disabled: counting && countReady !== countKey,
         onClick: () => apply((active) => revealTable(active, token)),
       }
@@ -1103,7 +1439,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       )
       play = {
         label: 'Continue to Night',
-        faceLabel: 'Night',
+
         onClick: () => apply((active) => advanceDayAftermath(active, token)),
       }
       break
@@ -1115,7 +1451,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           : 'The Conclave asks you to join. If you decline, you leave the castle.'
         play = {
           label: 'Join the Betrayers',
-          faceLabel: 'Accept',
+          actionText: 'Join',
+
           onClick: () => apply((active) => answerRecruitment(active, token, true)),
         }
         break
@@ -1124,54 +1461,65 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         message = 'Choose a Loyal to recruit.'
         play = {
           label: 'Send invitation',
-          faceLabel: 'Invite',
+          actionText: 'Invite',
+
           disabled: !isTarget,
-          onClick: advanceConclave,
+          onClick: () => advanceConclave(),
         }
         break
       }
-      message = conclave ? undefined : (!castleDay && banishment) || nightBroadcast(run)
-      detail = conclave
-        ? !playNightFilm && (
-            <BetrayalsConclave
-              line={conclaveLine}
-              vote={conclave}
-              selectedName={isTarget && selected ? label(selected) : undefined}
-            />
-          )
-        : !castleDay && banishment
-          ? nightBroadcast(run)
-          : undefined
-      play = {
-        label: conclaveLine
-          ? 'Play: next Conclave speaker'
-          : conclave?.runoff
-            ? 'Lock runoff vote'
-            : targets.length
-              ? 'Lock Night choice'
-              : run.dayFlow && participating
-                ? 'Go to sleep'
-                : 'Play: follow the Night',
-        faceLabel: conclaveLine
+      message = conclave?.sealed
+        ? 'The Sealed Ballot'
+        : conclave
           ? undefined
-          : conclave?.runoff
-            ? 'Vote'
-            : targets.length
-              ? 'Lock choice'
-              : run.dayFlow && participating
-                ? 'Sleep'
-                : undefined,
+          : (!castleDay && banishment) || nightBroadcast(run)
+      detail = conclave?.sealed
+        ? requiredReply
+          ? 'Reply in the Inbox to open the shortlist.'
+          : conclave.nominationBlocked
+            ? 'A ward blocked your choice. Choose another guest from the shortlist.'
+            : 'The shortlist is ready. Choose who receives the murder letter.'
+        : conclave
+          ? !playNightFilm && (
+              <BetrayalsConclave
+                line={conclaveLine}
+                vote={conclave}
+                selectedName={isTarget && selected ? label(selected) : undefined}
+              />
+            )
+          : !castleDay && banishment
+            ? nightBroadcast(run)
+            : undefined
+      play = {
+        label: conclave?.sealed
+          ? 'Cast sealed murder vote'
+          : conclaveLine
+            ? 'Play: next Conclave speaker'
+            : conclave?.runoff
+              ? 'Lock runoff vote'
+              : targets.length
+                ? 'Lock Night choice'
+                : run.dayFlow && participating
+                  ? 'Go to sleep'
+                  : 'Play: follow the Night',
+        actionText: !conclaveLine && (conclave?.runoff || targets.length) ? 'Vote' : undefined,
         disabled: !conclaveLine && targets.length > 0 && !isTarget,
-        onClick: advanceConclave,
+        onClick: () =>
+          advanceConclave(Boolean(conclave?.alphaAvailable && armedNightPower === conclaveKey)),
       }
       break
     case 'night-resolved':
       message =
-        ((!playNightFilm || pendingNight?.recruitedId) && describeConclaveVerdict(run, viewerId)) ||
-        nightBroadcast(run)
+        nightEffect === 'good-witch'
+          ? 'The castle stayed quiet through the night.'
+          : ((!playNightFilm ||
+              pendingNight?.recruitedId ||
+              pendingNight?.sealedBallot?.voterId === viewerId) &&
+              describeConclaveVerdict(run, viewerId)) ||
+            nightBroadcast(run)
       play = {
         label: 'Open Dawn',
-        faceLabel: 'Dawn',
+
         onClick: () => apply((active) => revealDawn(active, token)),
       }
       break
@@ -1188,7 +1536,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       )
       play = {
         label: participating ? 'End Season' : 'View decision',
-        faceLabel: participating ? 'End' : undefined,
+        actionText: participating ? 'End season' : 'View decision',
+
         onClick: () => end(false),
       }
       break
@@ -1221,17 +1570,9 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       )
       play = {
         label: 'New season',
-        faceLabel: 'New season',
-        onClick: () => {
-          void commit(
-            begin(
-              human?.name ?? 'You',
-              utilities.seasonOptions.publicMode,
-              utilities.seasonOptions.realityMode,
-              portrait
-            )
-          )
-        },
+        actionText: 'New season',
+
+        onClick: () => startSeason(human?.name ?? 'You', utilities.seasonOptions.realityMode),
       }
       break
   }
@@ -1286,10 +1627,346 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           ? `You left ${label(order.guestId)} a sealed account.`
           : detail
   }
+  const tableSpell = run.private.castleRoles?.some(
+    ({ used }) => used?.roleId === 'bad-witch' && used.day === run.day
+  )
+  const publicRoleResult = run.private.castleRoles?.find(
+    ({ used }) =>
+      (used?.roleId === 'last-will' || used?.roleId === 'kamikaze' || used?.roleId === 'medium') &&
+      used.day === run.day
+  )?.used
+  if (tableSpell && (stage === 'cocktail' || (stage === 'night' && !conclaveChoice))) {
+    message = 'The Round Table fell asleep.'
+    detail = 'The ballot was cancelled. Nobody was banished.'
+  }
+  if (
+    publicRoleResult &&
+    (stage === 'dawn' || stage === 'cocktail' || (stage === 'night' && !conclaveChoice))
+  ) {
+    if (publicRoleResult.roleId === 'last-will') {
+      detail = `Last Will revealed ${label(publicRoleResult.targetId)} as ${publicRoleResult.allegiance === 'betrayer' ? 'a Betrayer' : 'a Loyal'}${publicRoleResult.revealedRole ? ` with the ${CASTLE_ROLE_CATALOG[publicRoleResult.revealedRole].title} role` : ''}.`
+    } else if (publicRoleResult.roleId === 'kamikaze') {
+      detail = publicRoleResult.blocked
+        ? `${label(publicRoleResult.targetId)} was protected from the Kamikaze.`
+        : `${label(publicRoleResult.targetId)} was taken out by the Kamikaze.`
+    } else if (publicRoleResult.roleId === 'medium') {
+      message = `${label(publicRoleResult.targetId)} returned to the castle.`
+      if (castleRole?.used?.roleId === 'medium')
+        detail = <CastleRoleResult role={castleRole} label={label} />
+    }
+  }
+  if (quietDay && stage === 'social')
+    detail = 'The Introvert is taking a quiet day. Your Inbox is still open.'
+  const unsealed = run.private.castleRoles?.find(
+    ({ used }) => used?.roleId === 'secret-betrayer' && used.day === run.day
+  )
+  if (
+    (stage === 'dawn' || stage === 'cocktail' || (stage === 'night' && !conclaveChoice)) &&
+    viewerId &&
+    unsealed &&
+    (unsealed.guestId === viewerId || view.teammateIds.includes(unsealed.guestId))
+  )
+    detail =
+      unsealed.guestId === viewerId
+        ? 'You can now join the Conclave and see your teammates.'
+        : `${label(unsealed.guestId)} is your new Conclave teammate.`
+  const order = stage === 'round-table' && !discussion && politicianOrder(run, run.humanId)
+  if (order)
+    detail = `The Politician directed your first ballot to ${label(order.targetId)}. Runoff votes are yours.`
+
+  function armRole(text: string) {
+    return (
+      <button
+        type="button"
+        className="betrayals-ceremony-action--compact betrayals-broadcast__role-action"
+        aria-pressed={actionArmed}
+        onClick={() => {
+          setArmedNightPower(actionArmed ? undefined : roleActionKey)
+          setSelected(undefined)
+          setDirectedVoter(undefined)
+        }}
+      >
+        {text}
+      </button>
+    )
+  }
+  if (nightPower) {
+    const witch = nightPower === 'good-witch'
+    message = CASTLE_ROLE_CATALOG[nightPower].title
+    detail = (
+      <>
+        <p>
+          {nightPowerArmed
+            ? witch
+              ? 'Press Play to stop the Conclave.'
+              : 'Press Play to send the letter to a random guest.'
+            : witch
+              ? 'Stop the Conclave before it can choose a victim. One use per season.'
+              : 'Send the letter to a random different guest. Shields still apply. One use per season.'}
+        </p>
+        <button
+          type="button"
+          className="betrayals-ceremony-action--compact betrayals-broadcast__role-action"
+          aria-pressed={nightPowerArmed}
+          disabled={requiredReply || Boolean(pendingPaidNightShieldPurchase(run))}
+          onClick={() => setArmedNightPower(nightPowerArmed ? undefined : nightPowerKey)}
+        >
+          {witch ? 'Arm the spell' : 'Ready the decoy'}
+        </button>
+      </>
+    )
+    play = {
+      label: nightPowerArmed
+        ? witch
+          ? 'Cast sleep spell'
+          : 'Redirect the letter'
+        : 'Skip power and advance',
+      actionText: nightPowerArmed ? (witch ? 'Cast spell' : 'Redirect') : 'Skip',
+      onClick: confirmNightRole,
+    }
+  } else if (columbusChoice) {
+    message = CASTLE_ROLE_CATALOG.columbus.title
+    detail = `Choose ${COLUMBUS_GROUP_SIZE} guests to learn if at least one is a Betrayer. ${columbusIds.length}/${COLUMBUS_GROUP_SIZE} selected.`
+    play = {
+      label: columbusIds.length ? 'Check the Columbus group' : 'Skip Columbus and advance',
+      actionText: columbusIds.length ? 'Check group' : 'Skip',
+      disabled: columbusIds.length > 0 && columbusIds.length !== COLUMBUS_GROUP_SIZE,
+      onClick: confirmNightRole,
+    }
+  } else if (nightRole) {
+    message = CASTLE_ROLE_CATALOG[nightRole.roleId].title
+    const action = doctorChoice ? 'protect' : 'check'
+    detail = (
+      <p>
+        {isTarget && selected
+          ? `Press Play to ${action} ${label(selected)} tonight.`
+          : `Select a guest to ${action}${doctorChoice ? '' : ' for a Castle Role'}, or press Play to skip.`}
+      </p>
+    )
+    play = {
+      label: isTarget
+        ? doctorChoice
+          ? 'Confirm protection and advance'
+          : 'Check for a Castle Role'
+        : doctorChoice
+          ? 'Skip protection and advance'
+          : 'Skip Extrasense and advance',
+      actionText: isTarget ? (doctorChoice ? 'Protect' : 'Check') : 'Skip',
+      onClick: confirmNightRole,
+    }
+  } else if (departure && !cue) {
+    const will = departure.roleId === 'last-will'
+    message = CASTLE_ROLE_CATALOG[departure.roleId].title
+    detail = will
+      ? 'Select one guest to reveal their allegiance and Castle Role, or press Play to pass.'
+      : 'Select a guest to take with you, or press Play to pass. Immunity and Night Shields still apply.'
+    play = {
+      label: isTarget
+        ? will
+          ? 'Reveal selected guest'
+          : 'Take selected guest'
+        : 'Pass departure power',
+      actionText: isTarget ? (will ? 'Reveal' : 'Take with you') : 'Pass',
+      onClick: () =>
+        apply((active) => resolveDeparturePower(active, token, isTarget ? selected : undefined)),
+    }
+  } else if (tablePower === 'bad-witch') {
+    detail = (
+      <>
+        {detail}
+        {armRole('Ready the sleep spell')}
+      </>
+    )
+    if (actionArmed)
+      play = {
+        label: 'Put the Round Table to sleep',
+        actionText: 'Cast spell',
+        onClick: () => apply((active) => sleepRoundTable(active, token)),
+      }
+  } else if (tablePower === 'politician') {
+    if (actionArmed) {
+      message = 'The Politician'
+      detail = voterId
+        ? `Choose who ${label(voterId)} must vote for.`
+        : 'Choose the guest whose first ballot you want to direct.'
+      play = {
+        label: voterId ? 'Confirm voting instruction' : 'Choose the voter',
+        actionText: voterId ? 'Direct vote' : 'Choose voter',
+        disabled: !isTarget,
+        onClick: () => {
+          if (!selected) return
+          if (voterId) {
+            apply((active) => resolvePolitician(active, token, voterId, selected))
+            setArmedNightPower(undefined)
+            setDirectedVoter(undefined)
+          } else setDirectedVoter({ key: roleActionKey, voterId: selected })
+          setSelected(undefined)
+        },
+      }
+    }
+    detail = (
+      <>
+        {detail}
+        {armRole('Direct a vote')}
+      </>
+    )
+  } else if (dayPower) {
+    const { roleId } = dayPower
+    message = actionArmed ? CASTLE_ROLE_CATALOG[roleId].title : message
+    const needsTarget = roleId !== 'change-of-heart'
+    const action =
+      roleId === 'medium' ? 'Revive' : roleId === 'diva' ? 'Ask privately' : 'Join the Betrayers'
+    if (actionArmed)
+      play = {
+        label: action,
+        actionText: action,
+        disabled: needsTarget && !isTarget,
+        onClick: () => {
+          apply((active) => resolveDayCastleRole(active, token, roleId, selected))
+          setArmedNightPower(undefined)
+          setSelected(undefined)
+        },
+      }
+    detail = (
+      <>
+        {actionArmed && needsTarget
+          ? roleId === 'medium'
+            ? 'Select a murdered guest to bring back.'
+            : 'Select a guest to ask for a truthful answer.'
+          : actionArmed
+            ? 'Press Play to accept. Your former allegiance changes permanently.'
+            : detail}
+        {armRole(
+          roleId === 'medium'
+            ? 'Contact the dead'
+            : roleId === 'diva'
+              ? 'Ask for the truth'
+              : 'Consider joining the Betrayers'
+        )}
+      </>
+    )
+  } else if (stage === 'immunity' && viewerId && eligibleCastleRole(run, viewerId, 'fatigued')) {
+    detail = (
+      <>
+        <p>
+          You must sit out one challenge today. Play Immunity or save your energy for the Shield
+          Trial.
+        </p>
+        <button
+          type="button"
+          className="betrayals-ceremony-action--compact betrayals-broadcast__role-action"
+          onClick={saveEnergyForSafety}
+        >
+          Save energy for shields
+        </button>
+      </>
+    )
+  } else if (
+    stage === 'safety' &&
+    participating &&
+    !canPlay &&
+    castleRole?.used?.roleId === 'fatigued' &&
+    castleRole.used.day === run.day
+  ) {
+    detail = 'You played Immunity today, so you must sit out the Shield Trial.'
+  } else if (stage === 'social' && castleRole?.used?.roleId === 'diva') {
+    detail = <CastleRoleResult role={castleRole} label={label} />
+  } else if (mayorChoice) {
+    message = CASTLE_ROLE_CATALOG.mayor.title
+    detail = (
+      <p>
+        {isTarget && selected
+          ? `Press Play to cast a double vote for ${label(selected)}. Tap their portrait again to clear.`
+          : 'Select a guest for a double vote, or press Play to open the regular ballot.'}
+      </p>
+    )
+    play = {
+      label: isTarget ? 'Lock double vote' : 'Skip Mayor power and open regular ballot',
+      actionText: isTarget ? 'Double vote' : 'Skip',
+      onClick: () =>
+        apply((active) => {
+          const answered = resolveMayorChoice(active, token, isTarget)
+          if (!isTarget || answered === active) return answered
+          const voted = resolveTable(
+            answered,
+            commandToken(answered),
+            buildTableBallots(answered, selected)
+          )
+          return voted === answered ? active : voted
+        }),
+    }
+  } else if (nightEffect === 'cursed' && pendingNight?.targetId === viewerId) {
+    message = 'The curse has awakened.'
+    detail = 'The letter was meant for you. At dawn, you’ll join the Betrayers.'
+  } else if (cursedArrival) {
+    detail = (
+      <>
+        {detail}
+        <p>
+          {cursedArrival.guestId === viewerId
+            ? 'You joined the Betrayers at dawn.'
+            : `${label(cursedArrival.guestId)} joined your side at dawn.`}
+        </p>
+      </>
+    )
+  } else if (
+    stage === 'night-resolved' &&
+    (castleRole?.used?.roleId === 'good-witch' || castleRole?.used?.roleId === 'illusionist') &&
+    castleRole.used.day === run.day
+  ) {
+    detail = <CastleRoleResult role={castleRole} label={label} />
+  } else if (
+    (stage === 'night' || (stage === 'night-resolved' && castleRole?.roleId === 'doctor')) &&
+    !recruitmentOffer &&
+    castleRole?.used?.day === run.day &&
+    (castleRole.used.roleId === 'doctor' ||
+      castleRole.used.roleId === 'extrasense' ||
+      castleRole.used.roleId === 'columbus')
+  ) {
+    detail = (
+      <>
+        {detail}
+        <CastleRoleResult role={castleRole} label={label} />
+      </>
+    )
+  } else if (
+    castleRole?.used?.roleId === 'mayor' &&
+    castleRole.used.day === run.day &&
+    stage === 'round-table' &&
+    !counting &&
+    !run.runoffIds
+  ) {
+    detail = (
+      <>
+        {detail}
+        <p>Your first ballot counts twice.</p>
+      </>
+    )
+  }
   if (finaleDiscussion) {
     const { kept, broke, againstYou } = finaleMemory(run, selectedSeat.id)
     if (kept || broke || againstYou)
       detail = `${kept} promises kept · ${broke} broken · ${againstYou} public votes against you`
+  }
+  const alphaArmed = Boolean(conclave?.alphaAvailable && armedNightPower === conclaveKey)
+  const alphaControl = conclave?.alphaAvailable && !conclaveLine && (
+    <button
+      type="button"
+      className="betrayals-ceremony-action--compact betrayals-broadcast__role-action"
+      aria-pressed={alphaArmed}
+      onClick={() => setArmedNightPower(alphaArmed ? undefined : conclaveKey)}
+    >
+      Double this nomination
+    </button>
+  )
+  if (alphaControl && !showConclaveDialog) {
+    detail = (
+      <>
+        {detail}
+        {alphaControl}
+      </>
+    )
+    if (alphaArmed) play = { ...play, label: 'Lock double nomination', actionText: 'Double vote' }
   }
 
   const council =
@@ -1312,19 +1989,18 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               : stage === 'dawn'
                 ? 'daybreak'
                 : 'default'
-  const selectedRole = selectedSeat?.finaleRole ?? selectedSeat?.exit?.revealedRole
-  const selectedState = selectedSeat?.exit
-    ? selectedSeat.exit.cause === 'night'
-      ? 'Lost at Night'
-      : 'Banished'
-    : undefined
-
   return (
     <>
       <main
         className="betrayals-layout betrayals-layout--game"
         data-phase={stage}
         data-scene={scene}
+        data-conclave-cover={
+          showConclaveDialog ||
+          (cue === 'nightfall' &&
+            (conclave?.sealed || run.presentation?.includes('conclave-arrival'))) ||
+          undefined
+        }
         data-betrayals-motion={motion}
         data-round-table-view={
           stage === 'round-table'
@@ -1358,19 +2034,38 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           <div className="betrayals-brand-row">
             <div className="betrayals-wordmark">
               <span className="betrayals-eye" aria-hidden="true" />
-              <span className="betrayals-wordmark__signature">Betrayals</span>
+              <div className="betrayals-wordmark__copy">
+                <span className="betrayals-wordmark__signature">Betrayals</span>
+                <sup className="betrayals-wordmark__season">Season {run.seasonNumber ?? 1}</sup>
+              </div>
             </div>
           </div>
           <div className="betrayals-phase-strip">
             <div className="betrayals-phase-strip__copy" aria-live="polite">
               <span className="betrayals-phase-strip__group">{stageGroup}</span>
-              <span className="betrayals-phase-strip__subphase">{stageTitle}</span>
+              <span className="betrayals-phase-strip__subphase">{subphase}</span>
             </div>
             <div
               className="betrayals-phase-strip__tools"
               role="group"
               aria-label="Season shortcuts"
             >
+              {roleCard && stage !== 'role-reveal' && (
+                <button
+                  className="betrayals-phase-strip__log"
+                  type="button"
+                  aria-label="View your Castle Role"
+                  aria-haspopup="dialog"
+                  aria-expanded={castleRoleOpen}
+                  title="Your Castle Role"
+                  onClick={() => setCastleRoleOpen(true)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="5" y="3" width="14" height="18" rx="2" />
+                    <path d="m12 7 3.5 5-3.5 5-3.5-5z" />
+                  </svg>
+                </button>
+              )}
               <button
                 className="betrayals-phase-strip__log"
                 type="button"
@@ -1399,15 +2094,30 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                   <path d="M9 12v1m6-1v1" />
                 </svg>
               </button>
+              {(import.meta.env.DEV || import.meta.env.MODE === 'betrayals-qa') && (
+                <button
+                  className="betrayals-phase-strip__log betrayals-phase-strip__qa"
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-label="Open Castle QA"
+                  onClick={() => setQaOpen(true)}
+                >
+                  QA
+                </button>
+              )}
             </div>
           </div>
         </header>
 
         <BetrayalsBroadcast
-          title={conclaveChoice ? 'The Conclave' : stageTitle}
+          title={
+            conclave?.sealed ? 'The Sealed Ballot' : conclaveChoice ? 'The Conclave' : stageTitle
+          }
           message={message}
           detail={detail}
-          interactive={Boolean(tableFeed)}
+          interactive={Boolean(
+            tableFeed || nightPower || dayPower || tablePower || conclave?.alphaAvailable
+          )}
           controlsRef={
             !cue && (counting || stage === 'cocktail') ? setVoteActionsTarget : undefined
           }
@@ -1455,31 +2165,36 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           <Roster
             view={view}
             selectedId={selected}
+            selectedIds={columbusChoice ? columbusIds : undefined}
             humanId={run.humanId}
             sleeping={
-              (stage === 'night' && !conclaveChoice) ||
+              (stage === 'night' && (!conclaveChoice || conclave?.sealed || Boolean(cue))) ||
               stage === 'night-resolved' ||
               shownCue === 'awakening'
             }
-            selectableIds={targets.length ? targets : undefined}
+            selectableIds={
+              columbusChoice && columbusIds.length === COLUMBUS_GROUP_SIZE
+                ? columbusIds
+                : targets.length
+                  ? targets
+                  : undefined
+            }
             runoffIds={votePhase ? run.runoffIds : undefined}
             announcedNightId={announcedNightId}
             compactExitId={compactExit ? cinematic.subject?.id : undefined}
             mourning={mourning}
-            onSelect={setSelected}
+            onSelect={(id) => {
+              if (columbusChoice) {
+                const ids = columbusIds.includes(id)
+                  ? columbusIds.filter((guestId) => guestId !== id)
+                  : [...columbusIds, id]
+                setColumbusPick({ key: columbusKey, ids })
+              } else setSelected((nightRole || mayorChoice) && selected === id ? undefined : id)
+            }}
           />
-          <div className="betrayals-cast__caption">
-            {selectedSeat ? (
-              <>
-                <strong>{selectedSeat.name}</strong>
-                {selectedState || selectedRole
-                  ? ' · ' + [selectedState, selectedRole].filter(Boolean).join(' · ')
-                  : ''}
-              </>
-            ) : !participating && stage !== 'settled' ? (
-              'Spectator'
-            ) : null}
-          </div>
+          {!participating && stage !== 'settled' && (
+            <div className="betrayals-cast__caption">Spectator</div>
+          )}
         </section>
 
         {saveIssue && (
@@ -1521,15 +2236,21 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                   ...play,
                   disabled: true,
                   label: 'Reply in the Inbox to continue',
-                  faceLabel: 'Reply in Inbox',
+                  actionText: undefined,
                 }
-              : { ...play, disabled: play.disabled || Boolean(pendingPaidNightShieldPurchase(run)) }
+              : {
+                  ...play,
+                  onClick: () => {
+                    utilities.playEffect('ui:risk_wheel_click', 0.5)
+                    play.onClick()
+                  },
+                  disabled: play.disabled || Boolean(pendingPaidNightShieldPurchase(run)),
+                }
           }
           utility={
             finaleActions ||
             recruitmentOffer ||
             (stage === 'end-vote' && participating) ||
-            rewindTarget ||
             showRevealReward ? (
               <>
                 {finaleActions}
@@ -1552,13 +2273,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                     Banish Again
                   </button>
                 )}
-                {(rewindTarget || showRevealReward) && (
-                  <BetrayalsRewardActions
-                    key={run.id}
-                    rewindTarget={rewindTarget}
-                    showReveal={showRevealReward}
-                    onClaim={claimSeasonReward}
-                  />
+                {showRevealReward && (
+                  <BetrayalsRewardActions key={run.id} onClaim={claimSeasonReward} />
                 )}
               </>
             ) : undefined
@@ -1567,13 +2283,14 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             onClick: () => {
               utilities.playEffect('ui:navigate', 0.45)
               setName(human?.name ?? '')
-              setHomeOpen(true)
+              if (run.phase === 'settled') setHomeOpen(true)
+              else setLeaveOpen(true)
             },
           }}
           social={{
             onClick: () => openSocial(),
             active: socialOpen,
-            disabled: !participating,
+            disabled: !participating || quietDay,
             count: canSocialize ? socialResources.energy : undefined,
           }}
           incoming={{
@@ -1607,6 +2324,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             }}
             realityMode={run.options.realityMode}
             hasRealityMode={commerce.realityMode}
+            hasDramaMode={commerce.dramaMode}
             hasMyPulse={commerce.myPulse}
             onUpgrade={openUpgrade}
             canAct={canSocialize}
@@ -1649,6 +2367,10 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
               return apply((active) => applyCastleAllianceChange(active, token, id, change, value))
             }}
             onMove={(kind, suspectId, recipientId, options) => {
+              if (kind === 'reveal-castle-role')
+                return apply((active) =>
+                  revealCastleRole(active, token, recipientId, commerce.dramaMode)
+                )
               if (!canUseBetrayalsAction(kind, commerce.realityMode))
                 return openUpgrade('realityMode')
               return apply((active) => {
@@ -1682,6 +2404,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
         {incomingOpen && (
           <BetrayalsIncomingInteractions
             interactions={incoming}
+            hasRealityMode={commerce.realityMode}
+            hasMyPulse={commerce.myPulse}
             readIds={readIncoming}
             onRead={markIncomingRead}
             onOpenIntel={(guestId) => investigation.openPulse(guestId)}
@@ -1697,12 +2421,15 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
                 choice &&
                 incoming.some((entry) => entry.id === id && entry.kind === 'castle-moment') &&
                 !commerce.realityMode &&
-                (choice === 'ask' || choice === 'observe' || !canUseBetrayalsAction(choice, false))
+                isPremiumCastleChoice(choice)
               )
                 return openUpgrade('realityMode')
               return apply((active) => respondToIncomingInteraction(active, token, id, answer))
             }}
           />
+        )}
+        {roleCard && castleRoleOpen && (
+          <CastleRoleDialog {...roleCard} onClose={() => setCastleRoleOpen(false)} />
         )}
         <BetrayalsUtilityPanel
           utilities={utilities}
@@ -1714,7 +2441,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
       {showConclaveDialog && (
         <ConclaveDiscussion
           key={conclaveKey}
-          cast={conclaveGuests(run, viewerId)}
+          subphase={subphase}
+          cast={showSealedBallot || sealedVerdict ? [] : conclaveGuests(run, viewerId)}
           view={view}
           vote={conclave ?? undefined}
           recruitmentTargets={recruitmentTargets}
@@ -1724,13 +2452,20 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           total={conclaveLines.length}
           selectedId={selected}
           onSelect={setSelected}
-          onAdvance={advanceConclave}
+          onAdvance={() => {
+            if (showSealedBallot) utilities.playEffect('ui:risk_wheel_click', 0.5)
+            advanceConclave(alphaArmed)
+          }}
+          ballotControl={alphaControl}
+          doubleVote={alphaArmed}
           onBack={() => moveConclave(conclaveStep - 1)}
           onSkip={() => moveConclave(conclaveLines.length)}
+          onOpenQa={CastleQaDialog ? () => setQaOpen(true) : undefined}
           opening={openingConclave}
           verdict={conclaveVerdict}
+          sealedVerdict={sealedVerdict}
           playEffect={utilities.playEffect}
-          onFinishFilm={finishCue}
+          onFinishFilm={sealedIntro ? () => setSeenSealedIntro(conclaveKey) : finishCue}
         />
       )}
       {discussion && !cue && (
@@ -1749,10 +2484,16 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           investigation={investigation}
           hasRealityMode={commerce.realityMode}
           onUpgrade={() => openUpgrade('realityMode')}
+          onSleepTable={
+            sleepyTable && !requiredReply
+              ? () => apply((active) => sleepRoundTable(active, token))
+              : undefined
+          }
+          onOpenQa={CastleQaDialog ? () => setQaOpen(true) : undefined}
           onSway={(choice) => {
             if (!canUseBetrayalsTableSway(choice, commerce.realityMode))
               return openUpgrade('realityMode')
-            utilities.playEffect('tv:ceremony_transition', 0.45)
+            utilities.playEffect('ui:risk_wheel_click', 0.5)
             apply((active) => recordTableSway(active, token, choice))
           }}
         />
@@ -1776,12 +2517,37 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           autoAdvance={
             cue !== 'death-letter' && cue !== 'departure' && (run.presentation?.length ?? 0) > 1
           }
+          fadeToGame={(run.presentation?.length ?? 0) <= 1}
           playEffect={utilities.playEffect}
           getRosterSeat={getRosterSeat}
           onComplete={finishCue}
         />
       )}
+      {leaveOpen && (
+        <BetrayalsLeaveDialog
+          onClose={() => setLeaveOpen(false)}
+          onLeave={leaveSeason}
+          motion={motion}
+        />
+      )}
+      {rewindTarget && (
+        <BetrayalsRewardActions
+          key={run.id}
+          rewindTarget={rewindTarget}
+          onClaim={claimSeasonReward}
+          onLeave={() => {
+            setName(human?.name ?? '')
+            return leaveSeason(stage !== 'settled', true)
+          }}
+          motion={motion}
+        />
+      )}
       <BetrayalsAdBreak active={adBreak.active} />
+      {CastleQaDialog && qaOpen && (
+        <Suspense fallback={null}>
+          <CastleQaDialog run={run} onClose={() => setQaOpen(false)} onSimulate={simulateQa} />
+        </Suspense>
+      )}
     </>
   )
 }

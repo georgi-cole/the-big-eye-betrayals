@@ -14,6 +14,7 @@ import type { AppDispatch, RootState } from '../../store/store'
 import { recordAdShown } from '../../store/adsSlice'
 import { hasEffectiveStoreEntitlement } from '../../vip/effectiveEntitlements'
 import { IS_MOBILE_DEV_BUILD } from '../../config/buildTarget'
+import { IS_BETRAYALS_QA_BUILD } from '../../betrayals/qaBuild'
 import { setEnergyBankEntry } from '../../social/socialSlice'
 import { SOCIAL_RESOURCE_CALIBRATION } from '../../social/socialResourceCalibration'
 import { subscribePlayerSafety } from '../../safety/playerSafety'
@@ -252,8 +253,8 @@ export function showRewarded(
     }
   }
 
-  if (!window.GameAds?.showRewarded) {
-    if (!IS_MOBILE_DEV_BUILD) {
+  if (IS_BETRAYALS_QA_BUILD || !window.GameAds?.showRewarded) {
+    if (!IS_MOBILE_DEV_BUILD && !IS_BETRAYALS_QA_BUILD) {
       if (import.meta.env.DEV) {
         console.log(`[ads] ${placement} rewarded skipped: native bridge absent`)
       }
@@ -264,7 +265,9 @@ export function showRewarded(
     if (options?.onDismissed) dismissalHandlers.set(placement, options.onDismissed)
     window.setTimeout(() => {
       if (rewardHandlers.get(placement) === rewardHandler) {
-        window.onAdRewardGranted?.(placement, { source: 'mobile-dev-simulator' })
+        window.onAdRewardGranted?.(placement, {
+          source: IS_BETRAYALS_QA_BUILD ? 'betrayals-qa-simulator' : 'mobile-dev-simulator',
+        })
       }
     }, 0)
     return true

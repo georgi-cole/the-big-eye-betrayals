@@ -248,6 +248,68 @@
   border-top: 1px solid #e9b97b60;
 }
 
+.round-table-room__spell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  margin-top: 0.55rem;
+}
+
+.round-table-room__qa {
+  margin-inline-start: auto;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table'] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  min-height: 64px;
+  padding: 0.55rem 0.72rem;
+  border: 1px solid #bf935c9c;
+  border-radius: 8px;
+  background:
+    linear-gradient(100deg, #221512f5 4%, #211616de 55%, #1a1114eb 100%),
+    url('/assets/betrayals/council.jpg') center 52% / cover;
+  box-shadow:
+    inset 0 1px #f4c28b33,
+    0 3px 12px #0e08075f;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table'] > :first-child {
+  display: block;
+  width: clamp(23px, 6vw, 34px);
+  height: auto;
+  color: #f0c783;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table'] strong {
+  color: #f6dbac;
+  font:
+    700 clamp(1rem, 3.9vw, 1.26rem)/1.1 Georgia,
+    serif;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table'] small {
+  color: #dccbb4;
+  font:
+    500 0.73rem/1.2 system-ui,
+    sans-serif;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table'] > :last-child {
+  color: #efc384;
+  font:
+    700 0.72rem/1.1 system-ui,
+    sans-serif;
+}
+
+.round-table-room .betrayals-premium-button[data-variant='round-table']:is(:hover, :focus-visible) {
+  border-color: #f2c485;
+  filter: brightness(1.12);
+}
+
 .round-table-room__footer p {
   margin: 0;
   color: #e8cbb7;

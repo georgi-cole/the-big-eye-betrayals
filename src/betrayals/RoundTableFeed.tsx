@@ -7,6 +7,7 @@ import { MAX_TABLE_ROUNDS } from './run'
 import { tableLeaderboard, tableSwayResponse } from './table'
 import { RoundTableShot } from './RoundTableShot'
 import './RoundTableFeed.css'
+import './ceremonyActions.css'
 
 type RoundTableFeedProps = {
   run: Run
@@ -92,11 +93,15 @@ function CountFeed({
   }, [complete, onComplete])
 
   const reviewButton = complete && (
-    <button type="button" className="round-table-feed__utility" onClick={viewAllVotes}>
+    <button
+      type="button"
+      className="round-table-feed__utility betrayals-ceremony-action--compact"
+      onClick={viewAllVotes}
+    >
       <svg viewBox="0 0 20 20" aria-hidden="true">
         <path d="M5 3h10v14H5zM8 7h4m-4 3h4m-4 3h4" />
       </svg>
-      {recap ? 'Review the vote' : 'View all votes'}
+      All Votes
     </button>
   )
 
@@ -168,7 +173,10 @@ function CountFeed({
               <div className="round-table-ballot__frame round-table-ballot__frame--review">
                 <header className="round-table-ballot__header">
                   <span>{recap ? 'Final ballot' : `Round ${round} votes`}</span>
-                  <strong>{ballots.length} counted</strong>
+                  <GameBackButton
+                    label={recap ? 'Back to Cocktails' : 'Return to vote totals'}
+                    onClick={() => setReviewOpen(false)}
+                  />
                 </header>
                 <div className="round-table-ballot__ledger" tabIndex={0}>
                   {recap && <p className="round-table-ballot__recap">{recap}</p>}
@@ -183,21 +191,21 @@ function CountFeed({
                     ))}
                   </ul>
                   <ol className="round-table-ballot__votes" aria-label="All ballots">
-                    {ballots.map(({ voterId, targetId }) => (
+                    {ballots.map(({ voterId, targetId, weight }) => (
                       <li key={voterId}>
                         <strong>{cast.get(voterId)?.name ?? 'Contestant'}</strong>
                         <span>voted for</span>
-                        <strong>{cast.get(targetId)?.name ?? 'Contestant'}</strong>
+                        <strong>
+                          {cast.get(targetId)?.name ?? 'Contestant'}
+                          {weight === 2 && <small aria-label="double vote"> ×2</small>}
+                        </strong>
                       </li>
                     ))}
                   </ol>
                 </div>
-                <GameBackButton
-                  className="round-table-feed__utility"
-                  label={recap ? 'Back to Cocktails' : 'Return to vote totals'}
-                  showLabel
-                  onClick={() => setReviewOpen(false)}
-                />
+                <strong className="round-table-ballot__vote-count">
+                  {ballots.length} votes cast
+                </strong>
               </div>
             ) : (
               <div className="round-table-ballot__frame">
@@ -220,6 +228,7 @@ function CountFeed({
                     <div className="round-table-ballot__card" key={shot} aria-live="polite">
                       <p>
                         <strong>{voter.name}</strong> voted for <strong>{nominee.name}</strong>
+                        {ballot?.weight === 2 && <small aria-label="double vote"> ×2</small>}
                       </p>
                     </div>
                   ) : (
@@ -231,7 +240,7 @@ function CountFeed({
                       className="round-table-feed__utility"
                       onClick={viewAllVotes}
                     >
-                      View all votes
+                      All Votes
                     </button>
                     <button
                       type="button"

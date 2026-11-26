@@ -1,8 +1,16 @@
-import { mulberry32, seededPickN } from '../store/rng.ts'
+import { mulberry32, seededPick, seededPickN } from '../store/rng.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import type { SocialWallet } from './socialResources.ts'
 import { hasPaidNightShield } from './economy.ts'
 import { MAX_BETRAYERS, MIN_BETRAYERS, NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
+import {
+  CASTLE_ROLE_CATALOG,
+  CASTLE_ROLE_PLAYTEST,
+  DRAMA_ROLE_ODDS,
+  dealCastleRoles,
+  isConcealedSecretBetrayer,
+} from './castleRoles.ts'
+import type { CastleRoleCard, CastleRoleId, CastleRolePreview } from './castleRoles.ts'
 
 export const CAST_SIZE = 25
 export const MAX_TABLE_ROUNDS = 3
@@ -39,7 +47,7 @@ export type Seat = Contestant & {
   exit?: { cause: 'banished' | 'night'; day: number; revealedRole?: Role }
 }
 
-export type RunOptions = { publicMode: boolean; realityMode: RealityPreset }
+export type RunOptions = { publicMode: boolean; realityMode: RealityPreset; castleRoles?: boolean }
 export const INCOMING_ANSWERS = ['engage', 'listen', 'dismiss'] as const
 export type IncomingAnswer = (typeof INCOMING_ANSWERS)[number]
 export const NIGHT_SHIELD_MOVES = [
@@ -102,8 +110,11 @@ export type SocialEntry = {
     | 'broker-shield'
     | 'arrange-breakfast'
     | 'leave-account'
+    | 'reveal-castle-role'
+    | 'castle-role-rumor'
     | (typeof NIGHT_SHIELD_MOVES)[number]
   suspectId?: string
+  disclosedRole?: CastleRoleId
   witnessReportId?: string
   shieldReply?: NightShieldClaim | 'private'
   shieldPlan?: NightShieldPlan
@@ -130,6 +141,8 @@ export const PRESENTATION_CUES = [
   'conclave-arrival',
   'conclave-shadow',
   'conclave-seal',
+  'nightfall',
+  'castle-wakes',
   'sunrise',
   'awakening',
   'shield',
@@ -147,7 +160,7 @@ export type PresentationCue = (typeof PRESENTATION_CUES)[number]
 
 export type SafetyStanding = { contestantId: string; score: number; forfeited?: boolean }
 
-export type Ballot = { voterId: string; targetId: string }
+export type Ballot = { voterId: string; targetId: string; weight?: 2 }
 export type TableCount = { round: number; ballots: Ballot[]; tiedIds: string[] }
 export type TableSway = {
   targetId: string
@@ -173,6 +186,7 @@ export type Run = {
   edition: 'betrayals'
   version: typeof RULES_VERSION
   id: string
+  seasonNumber?: number
   revision: number
   phase: Phase
   day: number
@@ -181,6 +195,12 @@ export type Run = {
   seats: Seat[]
   private: {
     betrayers: string[]
+    castleRoles?: CastleRoleCard[]
+    departurePower?: {
+      roleId: 'last-will' | 'kamikaze'
+      guestId: string
+      protectedIds: string[]
+    }
     hiddenBetrayerIds?: string[]
     // One owner per awarded shield. Two shields may be held by the same guest.
     nightShieldIds: string[]
@@ -203,6 +223,10 @@ export type Run = {
       byDraw?: boolean
       filmPlayed?: boolean
       recruitedId?: string
+      sealedBallot?: Ballot & { shortlist: string[] }
+      castleEffect?:
+        | { kind: 'good-witch' | 'cursed' }
+        | { kind: 'illusionist'; originalTargetId: string }
     }
   }
   publicSeed: number
@@ -284,7 +308,12 @@ export function startRun(
   human: Contestant,
   aiPool: readonly Contestant[],
   options: RunOptions,
-  entropy: { id: string; roleSeed: number; publicSeed: number }
+  entropy: {
+    id: string
+    roleSeed: number
+    publicSeed: number
+    previewCastleRole?: CastleRolePreview
+  }
 ): Run {
   if (!human.id.trim() || !human.name.trim() || !entropy.id.trim()) {
     throw new Error('A run needs a valid human contestant and ID.')
@@ -306,6 +335,38 @@ export function startRun(
   const betrayerCount = privateRandom() < 0.5 ? MIN_BETRAYERS : MAX_BETRAYERS
   const seats = [human, ...roster].map(({ id, name, portrait }) => ({ id, name, portrait }))
 
+  const betrayers = seededPickN(privateRandom, seats, betrayerCount).map(({ id }) => id)
+  const recruitmentSeed = Math.floor(privateRandom() * 2 ** 32)
+  let castleRoles: CastleRoleCard[] | undefined
+  if (options.castleRoles) {
+    const roleRandom = mulberry32(entropy.roleSeed ^ 0x4c629e13)
+    const { previewCastleRole } = entropy
+    const guestIds = seats.map(({ id }) => id)
+    const { special, betrayer } = DRAMA_ROLE_ODDS
+    const roll = previewCastleRole ? 0 : roleRandom() * 100
+    const standardRole = previewCastleRole === 'loyal' || previewCastleRole === 'betrayer'
+    const roleId = standardRole
+      ? undefined
+      : (previewCastleRole ??
+        (roll < special ? seededPick(roleRandom, CASTLE_ROLE_PLAYTEST) : undefined))
+    const wantsBetrayer = standardRole
+      ? previewCastleRole === 'betrayer'
+      : roleId
+        ? CASTLE_ROLE_CATALOG[roleId].faction === 'betrayer'
+        : roll < special + betrayer
+    const humanPosition = betrayers.indexOf(human.id)
+    if (wantsBetrayer && humanPosition === -1)
+      betrayers[betrayers.indexOf(seededPick(roleRandom, betrayers))] = human.id
+    if (!wantsBetrayer && humanPosition !== -1) {
+      betrayers[humanPosition] = seededPick(
+        roleRandom,
+        guestIds.filter((id) => !betrayers.includes(id))
+      )
+    }
+    castleRoles = dealCastleRoles(roleRandom, guestIds, betrayers, { guestId: human.id, roleId })
+  }
+  const secret = castleRoles?.find(({ roleId }) => roleId === 'secret-betrayer')
+
   return {
     edition: 'betrayals',
     version: RULES_VERSION,
@@ -317,9 +378,11 @@ export function startRun(
     options: { ...options },
     seats,
     private: {
-      betrayers: seededPickN(privateRandom, seats, betrayerCount).map(({ id }) => id),
+      betrayers,
+      ...(castleRoles ? { castleRoles } : {}),
+      ...(secret && { hiddenBetrayerIds: [secret.guestId] }),
       nightShieldIds: [],
-      recruitmentSeed: Math.floor(privateRandom() * 2 ** 32),
+      recruitmentSeed,
     },
     publicSeed: entropy.publicSeed,
     pot: 0,
@@ -354,6 +417,7 @@ export function knownTeammateIds(run: Run, actorId: string | null): string[] {
   if (
     !actorId ||
     !run.private.betrayers.includes(actorId) ||
+    isConcealedSecretBetrayer(run, actorId) ||
     !run.seats.some(({ id, exit }) => id === actorId && !exit)
   )
     return []

@@ -13,8 +13,25 @@ import type { BetrayalsMilestones } from './BetrayalsAchievements'
 import { ObservatoryWindow } from './ObservatoryWindow'
 import { useObservatorySky } from './observatoryWeather'
 import type { BetrayalsProductKey } from './commerce/catalog'
+import { CASTLE_ROLE_CATALOG, CASTLE_ROLE_PLAYTEST, type CastleRolePreview } from './castleRoles'
+import { IS_BETRAYALS_QA_BUILD } from './qaBuild'
 import './betrayalsHome.css'
 import './ceremonyActions.css'
+
+export type CastleRolesPreview = 'off' | 'standard' | 'random' | CastleRolePreview
+
+const castleRolesPreviewOptions: readonly (readonly [CastleRolesPreview, string])[] = [
+  ['off', IS_BETRAYALS_QA_BUILD ? 'Use season settings' : 'Off'],
+  ...(IS_BETRAYALS_QA_BUILD
+    ? ([
+        ['standard', 'Standard season'],
+        ['loyal', 'Play as Loyal'],
+        ['betrayer', 'Play as Betrayer'],
+      ] as const)
+    : []),
+  ['random', 'Random Castle Roles deal'],
+  ...CASTLE_ROLE_PLAYTEST.map((id) => [id, `Play as ${CASTLE_ROLE_CATALOG[id].title}`] as const),
+]
 
 const observatory = import.meta.env.BASE_URL + 'assets/betrayals/observatory.jpg'
 const splashSession = 'betrayals.observatoryOpening.v1'
@@ -37,6 +54,7 @@ type HomeProps = {
   milestones?: BetrayalsMilestones
   name: string
   onNameChange: (name: string) => void
+  castleRolesPreview?: { value: CastleRolesPreview; onChange: (value: CastleRolesPreview) => void }
   seasonState?: 'active' | 'settled'
   onPlaySeason: () => void
   onReturnToSeason: () => void
@@ -52,6 +70,7 @@ export function BetrayalsHome({
   milestones,
   name,
   onNameChange,
+  castleRolesPreview,
   seasonState,
   onPlaySeason,
   onReturnToSeason,
@@ -198,6 +217,7 @@ export function BetrayalsHome({
               <p>The Big Eye</p>
             </div>
             <h1>Betrayals</h1>
+            {IS_BETRAYALS_QA_BUILD && <p>QA build</p>}
           </div>
           <form className="betrayals-home__controls" onSubmit={selectPrimaryAction}>
             {!profiles && !continuing && (
@@ -209,6 +229,26 @@ export function BetrayalsHome({
                   autoComplete="nickname"
                   onChange={(event) => onNameChange(event.target.value)}
                 />
+              </label>
+            )}
+            {castleRolesPreview && !setup && !continuing && (
+              <label className="betrayals-home__guest">
+                {IS_BETRAYALS_QA_BUILD ? 'QA starting role' : 'Castle Roles playtest'}
+                <select
+                  value={castleRolesPreview.value}
+                  onChange={(event) => {
+                    const option = castleRolesPreviewOptions.find(
+                      ([value]) => value === event.currentTarget.value
+                    )
+                    if (option) castleRolesPreview.onChange(option[0])
+                  }}
+                >
+                  {castleRolesPreviewOptions.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
               </label>
             )}
             <button type="submit" className="betrayals-ceremony-action--primary">

@@ -264,8 +264,14 @@ function responseToMove(run: Run, move: SocialMove): SocialReaction | undefined 
   }
 }
 
-export function applySocialMove(run: Run, token: CommandToken, move: SocialMove): Run {
+export function applySocialMove(
+  run: Run,
+  token: CommandToken,
+  move: SocialMove,
+  replying = false
+): Run {
   if (
+    (!replying && introvertDay(run, move.actorId)) ||
     !socialMoveKinds(run).includes(move.kind) ||
     !isCurrentCommand(run, token) ||
     run.presentation?.length
@@ -390,3 +396,4 @@ export function applySocialMove(run: Run, token: CommandToken, move: SocialMove)
     ? recordBreakfast(next, recipientId)
     : next
 }
+import { introvertDay } from './castleRoles.ts'

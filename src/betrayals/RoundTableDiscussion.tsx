@@ -17,6 +17,7 @@ import { BetrayalsPremiumButton } from './BetrayalsPremiumButton'
 import { canUseBetrayalsTableSway } from './premiumAccess'
 import './betrayals-pulse.css'
 import './RoundTableDiscussion.css'
+import './ceremonyActions.css'
 
 type Props = {
   run: Run
@@ -26,6 +27,8 @@ type Props = {
   reducedMotion?: boolean
   hasRealityMode?: boolean
   onUpgrade?: () => void
+  onSleepTable?: () => void
+  onOpenQa?: () => void
   onBack: () => void
   onAskWitness: () => void
   investigation?: Pick<InvestigationControls, 'act' | 'reason'>
@@ -50,6 +53,8 @@ export function RoundTableDiscussion({
   reducedMotion,
   hasRealityMode = false,
   onUpgrade,
+  onSleepTable,
+  onOpenQa,
   onBack,
   onAskWitness,
   investigation,
@@ -149,6 +154,16 @@ export function RoundTableDiscussion({
         <header className="round-table-room__head">
           <div className="round-table-room__topline">
             <span>Day {run.day}</span>
+            {(import.meta.env.DEV || import.meta.env.MODE === 'betrayals-qa') && onOpenQa && (
+              <button
+                className="betrayals-ceremony-action--compact round-table-room__qa"
+                type="button"
+                aria-label="Open Castle QA"
+                onClick={onOpenQa}
+              >
+                QA
+              </button>
+            )}
             <GameBackButton
               className="round-table-room__back"
               label="Back to castle"
@@ -157,6 +172,18 @@ export function RoundTableDiscussion({
           </div>
           <h2 id="round-table-room-title">Round Table</h2>
           {shieldName && <p>{shieldName} holds the Public Shield.</p>}
+          {onSleepTable && (
+            <div className="round-table-room__spell">
+              <p>Bad Witch · Cancel one Round Table before voting.</p>
+              <button
+                type="button"
+                className="betrayals-ceremony-action--compact"
+                onClick={onSleepTable}
+              >
+                Cast sleep spell
+              </button>
+            </div>
+          )}
         </header>
 
         {!caseOpen && (
@@ -225,8 +252,9 @@ export function RoundTableDiscussion({
             <div className="round-table-room__case">
               {!hasRealityMode && (
                 <BetrayalsPremiumButton
-                  title="Reality Mode at the Round Table"
-                  detail="Present accounts, call witnesses, defend a guest and press harder."
+                  variant="round-table"
+                  title="Reality Mode"
+                  detail="Bring evidence, call witnesses, and defend your allies."
                   onClick={onUpgrade}
                 />
               )}
@@ -372,7 +400,7 @@ export function RoundTableDiscussion({
           <div className="round-table-room__navigation">
             {caseOpen ? (
               <button type="button" onClick={() => setCaseOpen(false)}>
-                Review discussion
+                Discussion
               </button>
             ) : (
               <>
@@ -404,7 +432,7 @@ export function RoundTableDiscussion({
               type="button"
               onClick={() => chooseSway(null)}
             >
-              {run.dayFlow && candidates.length ? 'Hear the room and vote' : 'Go to vote'}
+              Voting
             </button>
           </div>
         </footer>

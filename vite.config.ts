@@ -34,8 +34,19 @@ const ignoredDevelopmentRoots = [
 ].map((directory) => normalizeWatchPath(resolve(process.cwd(), directory)))
 
 export default defineConfig(({ mode }) => ({
-  base: mobileModes.has(mode) ? './' : process.env.VITE_BASE_PATH || '/the-big-eye-betrayals/',
+  base:
+    mode === 'betrayals-qa'
+      ? '/'
+      : mobileModes.has(mode)
+        ? './'
+        : process.env.VITE_BASE_PATH || '/the-big-eye-betrayals/',
+  ...(mode === 'betrayals-qa' && {
+    envPrefix: [],
+    build: { outDir: 'dist-betrayals-qa' },
+    preview: { host: '127.0.0.1', port: 4392, strictPort: true },
+  }),
   define: {
+    ...(mode === 'betrayals-qa' && { 'import.meta.env.VITE_BETRAYALS_EDITION': '"true"' }),
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
     'import.meta.env.VITE_CINEMATIC_PACK_EXTERNAL': JSON.stringify(
       mobileModes.has(mode) ? 'true' : 'false'
@@ -76,6 +87,7 @@ export default defineConfig(({ mode }) => ({
   // Local device packages and report pages are not additional game entries.
   optimizeDeps: { entries: ['index.html'] },
   server: {
+    ...(mode === 'betrayals-qa' && { host: '127.0.0.1', port: 4392, strictPort: true }),
     watch: {
       // Git worktrees live inside this checkout and contain full copies of the
       // app. Watching them causes a reload storm that can prevent the real app

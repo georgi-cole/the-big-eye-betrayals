@@ -1,4 +1,4 @@
-export type BetrayalsPermanentProductKey = 'vip' | 'myPulse' | 'realityMode' | 'noAds'
+export type BetrayalsPermanentProductKey = 'vip' | 'myPulse' | 'realityMode' | 'dramaMode' | 'noAds'
 export type BetrayalsCurrencyProductKey = 'eyeros10000' | 'eyeros35000' | 'eyeros100000'
 export type BetrayalsProductKey = BetrayalsPermanentProductKey | BetrayalsCurrencyProductKey
 
@@ -6,6 +6,7 @@ export interface BetrayalsAccess {
   vip: boolean
   myPulse: boolean
   realityMode: boolean
+  dramaMode: boolean
   noAds: boolean
   premiumGames: boolean
   paidLooks: boolean
@@ -39,6 +40,7 @@ export const BETRAYALS_PRODUCTS: readonly BetrayalsProduct[] = [
     benefits: [
       'My Pulse: follow your story through the castle',
       'Reality Mode: full guest profiles and advanced social actions',
+      'Drama Mode: Castle Roles and private role reveals',
       'Every premium challenge version',
       'The full current changing-room collection',
       'No automatic advertising breaks',
@@ -71,6 +73,15 @@ export const BETRAYALS_PRODUCTS: readonly BetrayalsProduct[] = [
     ],
   },
   {
+    key: 'dramaMode',
+    productId: id('VITE_BETRAYALS_DRAMA_PRODUCT_ID', 'dramamode'),
+    title: 'Drama Mode',
+    description: 'Start a season with secret Castle Roles and decide whom to trust with yours.',
+    kind: 'permanent',
+    nominalPriceCents: 499,
+    benefits: ['Three Castle Roles per enabled season', 'Private role reveals in Social'],
+  },
+  {
     key: 'noAds',
     productId: id('VITE_BETRAYALS_NO_ADS_PRODUCT_ID', 'noads'),
     title: 'No Ads',
@@ -98,7 +109,7 @@ export const BETRAYALS_PRODUCTS: readonly BetrayalsProduct[] = [
 ]
 
 export function emptyBetrayalsOwnership(): BetrayalsOwnership {
-  return { vip: false, myPulse: false, realityMode: false, noAds: false }
+  return { vip: false, myPulse: false, realityMode: false, dramaMode: false, noAds: false }
 }
 
 export function getBetrayalsAccess(owned: Partial<BetrayalsOwnership>): BetrayalsAccess {
@@ -107,6 +118,7 @@ export function getBetrayalsAccess(owned: Partial<BetrayalsOwnership>): Betrayal
     vip,
     myPulse: vip || owned.myPulse === true,
     realityMode: vip || owned.realityMode === true,
+    dramaMode: vip || owned.dramaMode === true,
     noAds: vip || owned.noAds === true,
     premiumGames: vip,
     paidLooks: vip,

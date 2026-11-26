@@ -58,7 +58,6 @@ export function PortraitGallery({
   const swipeOnly = variant === 'conclave'
   const focus = swipeOnly ? undefined : target
   const gallery = useRef<HTMLDivElement>(null)
-  const track = useRef<HTMLUListElement>(null)
   const selectedButton = useRef<HTMLButtonElement>(null)
   const drag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null)
   const [origin, setOrigin] = useState<CSSProperties>()
@@ -110,7 +109,6 @@ export function PortraitGallery({
     >
       <ul
         className="betrayals-gallery__track"
-        ref={track}
         aria-label="Eligible contestants"
         inert={Boolean(focus)}
         onPointerDown={(event) => {
@@ -158,24 +156,6 @@ export function PortraitGallery({
           >
             Choose another guest
           </button>
-        </div>
-      ) : !swipeOnly ? (
-        <div className="betrayals-gallery__nav">
-          {[-1, 1].map((direction) => (
-            <button
-              key={direction}
-              type="button"
-              aria-label={direction < 0 ? 'Scroll portraits left' : 'Scroll portraits right'}
-              onClick={() =>
-                track.current?.scrollBy({
-                  left: direction * track.current.clientWidth * 0.68,
-                  behavior: reducedMotion ? 'instant' : 'smooth',
-                })
-              }
-            >
-              <span aria-hidden="true">{direction < 0 ? '‹' : '›'}</span>
-            </button>
-          ))}
         </div>
       ) : null}
     </div>

@@ -18,22 +18,23 @@ localized price returned by the native store and disables checkout when a native
 product or price is unavailable. A browser preview does not simulate a paid
 purchase or silently grant ownership.
 
-| Product        | ID suffix      | Type       | Setup target | Includes                                                                                                    |
-| -------------- | -------------- | ---------- | ------------ | ----------------------------------------------------------------------------------------------------------- |
-| Betrayals VIP  | `vip`          | Permanent  | €14.99       | My Pulse, Reality Mode, supported premium challenge versions, changing-room looks, removal of automatic ads |
-| My Pulse       | `mypulse`      | Permanent  | €2.99        | Personal season chronicle, relationships, turning points, pressures, saved Intel and private notes          |
-| Reality Mode   | `realitymode`  | Permanent  | €6.99        | Full guest profiles and advanced social/investigation actions                                               |
-| No Ads         | `noads`        | Permanent  | €2.99        | Removal of automatic interstitials; optional rewarded opportunities remain available                        |
-| 10,000 Eyeros  | `eyeros10000`  | Consumable | €1.99        | Currency delivered to the profile selected at checkout                                                      |
-| 35,000 Eyeros  | `eyeros35000`  | Consumable | €4.99        | Currency delivered to the profile selected at checkout                                                      |
-| 100,000 Eyeros | `eyeros100000` | Consumable | €9.99        | Currency delivered to the profile selected at checkout                                                      |
+| Product        | ID suffix      | Type       | Setup target | Includes                                                                                                                |
+| -------------- | -------------- | ---------- | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Betrayals VIP  | `vip`          | Permanent  | €14.99       | My Pulse, Reality Mode, Drama Mode, supported premium challenge versions, changing-room looks, removal of automatic ads |
+| My Pulse       | `mypulse`      | Permanent  | €2.99        | Personal season chronicle, relationships, turning points, pressures, saved Intel and private notes                      |
+| Reality Mode   | `realitymode`  | Permanent  | €6.99        | Full guest profiles and advanced social/investigation actions                                                           |
+| Drama Mode     | `dramamode`    | Permanent  | €4.99        | Castle Roles and private role reveals                                                                                   |
+| No Ads         | `noads`        | Permanent  | €2.99        | Removal of automatic interstitials; optional rewarded opportunities remain available                                    |
+| 10,000 Eyeros  | `eyeros10000`  | Consumable | €1.99        | Currency delivered to the profile selected at checkout                                                                  |
+| 35,000 Eyeros  | `eyeros35000`  | Consumable | €4.99        | Currency delivered to the profile selected at checkout                                                                  |
+| 100,000 Eyeros | `eyeros100000` | Consumable | €9.99        | Currency delivered to the profile selected at checkout                                                                  |
 
 VIP does not grant Eyeros packs or free purchased Night Shields. The original Big
 Eye VIP is not treated as a Betrayals purchase.
 
 ### Standalone-to-VIP upgrade
 
-Owned My Pulse, Reality Mode and No Ads qualify for a VIP upgrade. The catalog
+Owned My Pulse, Reality Mode, Drama Mode and No Ads qualify for a VIP upgrade. The catalog
 calculates 75% of their nominal catalog value as credit, applies a €4.99 minimum
 upgrade target, and selects the nearest configured upgrade SKU. The customer
 sees that SKU's actual localized store price. This is catalog-based pricing, not
@@ -55,6 +56,7 @@ as separate shelves of interchangeable VIP products.
 
 Product-ID overrides are supported by `VITE_BETRAYALS_VIP_PRODUCT_ID`,
 `VITE_BETRAYALS_PULSE_PRODUCT_ID`, `VITE_BETRAYALS_REALITY_PRODUCT_ID`,
+`VITE_BETRAYALS_DRAMA_PRODUCT_ID`,
 `VITE_BETRAYALS_NO_ADS_PRODUCT_ID`,
 `VITE_BETRAYALS_EYEROS10000_PRODUCT_ID`,
 `VITE_BETRAYALS_EYEROS35000_PRODUCT_ID`,
@@ -70,7 +72,7 @@ destination, keeping the overview short enough to scan on a phone.
 | Destination     | Contents                                                                    | Purchase behavior                                                      |
 | --------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | VIP             | Permanent bundle benefits, current ownership and any eligible upgrade price | Uses the existing native VIP offer                                     |
-| Feature unlocks | My Pulse, Reality Mode and No Ads                                           | Each card keeps its localized native price and ownership state         |
+| Feature unlocks | My Pulse, Reality Mode, Drama Mode and No Ads                               | Each card keeps its localized native price and ownership state         |
 | Season items    | Night Shield availability and a changing-room link                          | Uses the current season's shield eligibility and existing Eyeros debit |
 | Wallet          | Selected profile, Eyeros balance, recent activity and a top-up entry        | Viewing activity does not start a purchase                             |
 | Top up Eyeros   | The three currency packs and their delivery/storage explanation             | Uses the selected profile and existing native consumable checkout      |
@@ -78,7 +80,7 @@ destination, keeping the overview short enough to scan on a phone.
 The changing room remains directly accessible from the Store overview. Detail
 views return to the overview, and the top-up view returns to the wallet before
 leaving it. A locked feature opens its corresponding section directly: VIP opens
-the bundle, My Pulse/Reality Mode/No Ads open feature unlocks, and a currency-pack
+the bundle, My Pulse/Reality Mode/Drama Mode/No Ads open feature unlocks, and a currency-pack
 entry opens wallet top-up. Returning from a focused product does not reopen that
 product automatically.
 
@@ -106,6 +108,12 @@ Careful Round Table questioning and the normal vote remain accessible.
 Reality Mode expands the action set and full profiles. It does not reveal hidden
 roles or insert a verified "Betrayer probability" into a profile. My Pulse is a
 separate purchase; Reality Mode does not implicitly grant it. VIP grants both.
+Drama Mode is a permanent unlock (default SKU
+`com.georgicole.thebigeye.betrayals.dramamode`, nominal EUR 4.99), also included
+in Betrayals VIP. It qualifies for the same VIP upgrade credit as other
+standalone features. Owners enable it under Settings → Next season. The deal
+adds three Castle Roles and lets a holder of a Loyal Castle Role privately tell
+a guest the role in Social. The guest can pass it on.
 Unlocking a feature does not change a guest's role, replace an already drawn
 challenge, or automatically make an AI interaction succeed.
 

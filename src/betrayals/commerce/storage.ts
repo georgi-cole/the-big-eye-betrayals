@@ -60,7 +60,9 @@ export function readBetrayalsCommerceLedger(): BetrayalsCommerceLedger {
       !object(value.receipts) ||
       !object(value.intents) ||
       Object.keys(emptyBetrayalsOwnership()).some(
-        (key) => typeof value.ownership[key as keyof BetrayalsOwnership] !== 'boolean'
+        (key) =>
+          (key !== 'dramaMode' || value.ownership.dramaMode !== undefined) &&
+          typeof value.ownership[key as keyof BetrayalsOwnership] !== 'boolean'
       ) ||
       (value.verifiedAt !== null && typeof value.verifiedAt !== 'string')
     )
@@ -100,7 +102,7 @@ export function readBetrayalsCommerceLedger(): BetrayalsCommerceLedger {
       )
         throw new Error('Invalid purchase intent')
     }
-    return value
+    return { ...value, ownership: { ...emptyBetrayalsOwnership(), ...value.ownership } }
   } catch {
     throw new Error('Your purchase records could not be read. Restart before making a purchase.')
   }

@@ -5,6 +5,7 @@ import { formatEyeoleans } from '../economy/eyeoleans'
 import type { EyeoleanTransaction } from '../store/profilesSlice'
 import { BETRAYALS_PRODUCTS, type BetrayalsCurrencyProductKey } from './commerce/catalog'
 import { useBetrayalsCommerce } from './commerce/useBetrayalsCommerce'
+import { IS_BETRAYALS_QA_BUILD } from './qaBuild'
 import './BetrayalsWallet.css'
 
 export interface BetrayalsWalletProps {
@@ -103,6 +104,7 @@ export default function BetrayalsWallet({
   )
 
   function packPrice(key: BetrayalsCurrencyProductKey) {
+    if (IS_BETRAYALS_QA_BUILD) return 'Simulate top-up'
     return (
       commerce.products[key]?.price ??
       (commerce.loading
@@ -150,13 +152,14 @@ export default function BetrayalsWallet({
                 const key = product.key as BetrayalsCurrencyProductKey
                 const price = packPrice(key)
                 const available = Boolean(
-                  native &&
                   profileId &&
-                  commerce.ready &&
-                  commerce.billingAvailable &&
-                  commerce.products[key] &&
-                  !commerce.loading &&
-                  !busy
+                  !busy &&
+                  (IS_BETRAYALS_QA_BUILD ||
+                    (native &&
+                      commerce.ready &&
+                      commerce.billingAvailable &&
+                      commerce.products[key] &&
+                      !commerce.loading))
                 )
                 const label =
                   commerce.purchasing === key

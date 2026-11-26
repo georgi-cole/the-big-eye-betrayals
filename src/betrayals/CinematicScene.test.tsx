@@ -4,7 +4,7 @@ import { BETRAYALS_PORTRAITS, getBetrayalsPortrait } from './betrayalsAppearance
 import { ConclaveDiscussion } from './BetrayalsConclave'
 import { BETRAYALS_AI_POOL } from './cast'
 import { CinematicScene } from './CinematicScene'
-import { conclaveOpeningBeats, conclaveRevealed } from './conclaveDirection'
+import { conclaveOpeningBeats, conclaveRevealed, conclaveTableHold } from './conclaveDirection'
 import { cinematicFor, dawnBroadcast, presentationAfter } from './presentation'
 import { startRun, viewFor } from './run'
 
@@ -25,7 +25,7 @@ describe('Betrayals cinematic scenes', () => {
     vi.restoreAllMocks()
   })
 
-  it('reveals only known conclave participants and waits for the player to continue', () => {
+  it('reveals only known conclave participants and advances after the closing shot', () => {
     vi.useFakeTimers()
     const onComplete = vi.fn()
     const { container } = render(
@@ -59,8 +59,11 @@ describe('Betrayals cinematic scenes', () => {
     expect(container.querySelector(`[src="${hidden.portrait}"]`)).not.toBeInTheDocument()
     expect(onComplete).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(2550))
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-    expect(onComplete).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+    act(() => vi.advanceTimersByTime(conclaveTableHold - 1))
+    expect(onComplete).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(onComplete).toHaveBeenCalledExactlyOnceWith('played')
   })
 
   it('uncovers the known guests one at a time while preserving hidden identities', () => {
@@ -209,11 +212,11 @@ describe('Betrayals cinematic scenes', () => {
         seat.id === banished.id ? { ...seat, exit: { cause: 'banished' as const, day: 2 } } : seat
       ),
     }
-    expect(presentationAfter(before, night)).toEqual(['departure', 'conclave-arrival'])
+    expect(presentationAfter(before, night)).toEqual(['departure', 'nightfall', 'conclave-arrival'])
     expect(presentationAfter(before, night, false)).toEqual(['departure'])
     expect(
       presentationAfter({ ...before, humanId: loyal.id }, { ...night, humanId: loyal.id })
-    ).toEqual(['departure'])
+    ).toEqual(['departure', 'nightfall'])
     const scene = cinematicFor(night, 'conclave-arrival', night.humanId, '')
     expect(scene.conclaveOpening).toBe(false)
     expect(scene.cast?.filter(({ concealed }) => !concealed).map(({ id }) => id)).toEqual([
@@ -359,9 +362,12 @@ describe('Betrayals cinematic scenes', () => {
     expect(screen.queryByText(/I was a/)).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(2100))
     expect(screen.getByText(/I was a Betrayer/)).toBeVisible()
-    expect(container.querySelectorAll('.betrayals-cine__curtains img')).toHaveLength(2)
-    expect(playEffect).toHaveBeenCalledWith('tv:betrayer_laugh', 0.72)
-    act(() => vi.advanceTimersByTime(3099))
+    expect(container.querySelector('.betrayals-cine__curtain img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('closed-stage-curtain.jpg')
+    )
+    expect(playEffect).toHaveBeenCalledWith('minigame:risk_wheel_666', 0.72)
+    act(() => vi.advanceTimersByTime(4199))
     expect(container.querySelector('.betrayals-cine__reveal-actor img')).toBeInTheDocument()
     act(() => vi.advanceTimersByTime(1))
     const film = screen.getByRole('button', { name: 'Finish shared exit' })
@@ -394,6 +400,136 @@ describe('Betrayals cinematic scenes', () => {
     expect(container.querySelector('.betrayals-cine__loyal-light')).not.toBeInTheDocument()
   })
 
+  it('keeps the Loyal Conclave image in place and gives both titles time', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: 'shadow-conclave', kind: 'conclave-shadow', repeat: true }}
+        onComplete={onComplete}
+      />
+    )
+    const figure = container.querySelector('.betrayals-cine__shadow-hood')
+    act(() => vi.advanceTimersByTime(3000))
+    expect(screen.getByRole('heading', { name: 'Behind closed doors' })).toBeVisible()
+    act(() => vi.advanceTimersByTime(100))
+    expect(screen.getByRole('heading', { name: 'The Conclave' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+    expect(container.querySelector('.betrayals-cine__shadow-hood')).toBe(figure)
+    act(() => vi.advanceTimersByTime(2449))
+    expect(onComplete).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(onComplete).toHaveBeenCalledWith('played')
+  })
+
+  it('keeps snow inside the hotel window and reserves the nightcap for nightfall', () => {
+    vi.useFakeTimers()
+    const { container } = render(
+      <CinematicScene
+        scene={{
+          id: 'snowy-hotel',
+          kind: 'death-letter',
+          weather: 'snow',
+          nightRoom: { sky: 'full', silhouette: 'narrow' },
+        }}
+        onComplete={vi.fn()}
+      />
+    )
+    act(() => vi.advanceTimersByTime(2200))
+    expect(container.querySelector('.betrayals-nightfall__cap')).toBeNull()
+    expect(
+      container.querySelector('.betrayals-hotel__window [data-weather-particles="snow"]')
+    ).toBeInTheDocument()
+  })
+
+  it.each(['clear', 'rain'] as const)('plays the %s nightfall before advancing', (weather) => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const { container } = render(
+      <CinematicScene scene={{ id: weather, kind: 'nightfall', weather }} onComplete={onComplete} />
+    )
+    expect(container.querySelector('.betrayals-nightfall')).toHaveAttribute('data-weather', weather)
+    expect(container.querySelectorAll('.betrayals-nightfall__windows')).toHaveLength(3)
+    expect(Boolean(container.querySelector('.betrayals-nightfall__cap'))).toBe(weather === 'clear')
+    expect(container.querySelector('.betrayals-nightfall__dream')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Night falls' })).toBeVisible()
+    act(() => vi.advanceTimersByTime(3600))
+    expect(screen.getByRole('heading', { name: 'Lights out' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-fade-out', 'true')
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-fade-backdrop', 'true')
+    act(() => vi.advanceTimersByTime(1399))
+    expect(onComplete).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(onComplete).toHaveBeenCalledWith('played')
+  })
+
+  it('transitions from the moonlit castle into the morning weather', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    const { container } = render(
+      <CinematicScene
+        scene={{ id: 'dawn', kind: 'castle-wakes', nightWeather: 'clear', weather: 'mist' }}
+        fadeToGame={false}
+        onComplete={onComplete}
+      />
+    )
+    expect(container.querySelector('.betrayals-nightfall')).toHaveAttribute('data-morning')
+    expect(container.querySelector('.betrayals-nightfall__departing-moon')).toBeInTheDocument()
+    expect(container.querySelector('.betrayals-nightfall')).toHaveAttribute(
+      'data-morning-weather',
+      'mist'
+    )
+    expect(container.querySelector('.betrayals-nightfall__daybreak')?.tagName).toBe('DIV')
+    expect(container.querySelector('.betrayals-nightfall__plane > img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('castle-nightfall.jpg')
+    )
+    expect(screen.getByRole('heading', { name: 'The castle wakes' })).toBeVisible()
+    act(() => vi.advanceTimersByTime(3370))
+    expect(screen.getByRole('heading', { name: 'Dawn' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-fade-out', 'true')
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-fade-backdrop')
+    act(() => vi.advanceTimersByTime(1399))
+    expect(onComplete).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(1))
+    expect(onComplete).toHaveBeenCalledWith('played')
+  })
+
+  it('rotates the exterior framing and matches every dawn to the preceding dusk', () => {
+    const run = startRun(
+      { id: 'human', name: 'Player' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'castle-views', roleSeed: 18, publicSeed: 728 }
+    )
+    const shots = [1, 2, 3].map((day) => {
+      const dusk = cinematicFor({ ...run, day }, 'nightfall', 'human', '')
+      const dawn = cinematicFor({ ...run, day: day + 1 }, 'castle-wakes', 'human', '')
+      expect(dawn.castleNightShot).toBe(dusk.castleNightShot)
+      expect(dawn.nightWeather).toBe(dusk.weather)
+      return dusk.castleNightShot
+    })
+    expect(new Set(shots).size).toBe(3)
+  })
+
+  it('skips the castle transition without waiting when motion is reduced', () => {
+    vi.useFakeTimers()
+    const onComplete = vi.fn()
+    render(
+      <CinematicScene
+        scene={{ id: 'dawn', kind: 'castle-wakes' }}
+        reducedMotion
+        onComplete={onComplete}
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull()
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-fade-out')
+    act(() => vi.advanceTimersByTime(0))
+    expect(onComplete).toHaveBeenCalledWith('skipped')
+  })
+
   it('plays the hotel shots, opens the letter, then stamps the victim’s portrait', () => {
     vi.useFakeTimers()
     const onComplete = vi.fn()
@@ -421,6 +557,8 @@ describe('Betrayals cinematic scenes', () => {
       expect.stringContaining('hotel-night/asleep-broad-storm.webp')
     )
     expect(screen.getByRole('heading', { name: 'Asleep inside' })).toBeVisible()
+    expect(container.querySelector('[data-weather-particles="rain"]')).toBeInTheDocument()
+    expect(container.querySelector('.betrayals-nightfall__cap')).toBeNull()
     expect(screen.queryByText(/Ash/)).not.toBeInTheDocument()
     act(() => vi.advanceTimersByTime(2450))
     expect(backdrop()).toHaveAttribute('src', expect.stringContaining('hotel-night/executor.webp'))
@@ -439,7 +577,9 @@ describe('Betrayals cinematic scenes', () => {
       container.querySelector('.betrayals-cine__verdict')!,
       'getBoundingClientRect'
     ).mockReturnValue(new DOMRect(80, 230, 180, 210))
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    const continueButton = screen.getByRole('button', { name: 'Continue' })
+    expect(continueButton).toHaveClass('betrayals-ceremony-action--primary')
+    fireEvent.click(continueButton)
     expect(container.querySelector('.betrayals-cine__handoff')).toHaveStyle('--exit-to-y: 400px')
     act(() => vi.advanceTimersByTime(1100))
     expect(onComplete).toHaveBeenCalledExactlyOnceWith('played')
@@ -494,6 +634,7 @@ describe('Betrayals cinematic scenes', () => {
       expect(sleeping.openingTitle).toBeUndefined()
       expect(recalled.openingTitle).toBe('What happened during the night…')
       expect(sleeping.nightRoom).toEqual(recalled.nightRoom)
+      expect(sleeping.weather).toBe(recalled.weather)
       return sleeping.nightRoom!
     })
     expect(new Set(rooms.map(({ sky }) => sky)).size).toBe(6)

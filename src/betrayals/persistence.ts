@@ -8,6 +8,20 @@ import {
   RULES_VERSION,
 } from './run.ts'
 import type { Run, Seat } from './run.ts'
+import {
+  CASTLE_ROLE_CATALOG,
+  COLUMBUS_GROUP_SIZE,
+  CLAIRVOYANT_MAX_USES,
+  INFLUENCE_ROLE_MAX_USES,
+  MAYOR_LAST_DAY,
+  MAYOR_MAX_USES,
+  castleRoleFor,
+  compatibleCastleRoleTrio,
+  isCastleRoleId,
+  isConcealedSecretBetrayer,
+  eligibleCastleRole,
+} from './castleRoles.ts'
+import type { CastleRoleId } from './castleRoles.ts'
 import { initializeSocialWallets } from './socialResources.ts'
 import { validSeasonCheckpoint, type SeasonRewards } from './seasonRewards.ts'
 import { CASTLE_PERIODS, CASTLE_SCENES } from './castleLifeBank.ts'
@@ -15,7 +29,7 @@ import type { CastleSceneId } from './castleLifeBank.ts'
 import { MORNING_MOVES, SAFETY_MOVES, SHIELD_MOVES, VOTE_MOVES } from './dayFlowState.ts'
 import { validBetrayalsEconomy } from './economy.ts'
 import { recruitmentFor, RECRUITMENT_END_DAY } from './recruitment.ts'
-import { MAX_BETRAYERS, MIN_BETRAYERS } from './seasonPhases.ts'
+import { MAX_BETRAYERS, MIN_BETRAYERS, NIGHT_SHIELD_COUNT } from './seasonPhases.ts'
 import {
   CASTLE_ROOMS,
   DEMEANORS,
@@ -34,7 +48,14 @@ import {
 const SAVE_PREFIX = 'big-eye:betrayals:season:'
 
 type StorageAdapter = Pick<Storage, 'getItem' | 'setItem'>
-type Restore = { status: 'ready'; run: Run } | { status: 'empty' | 'incompatible' | 'unavailable' }
+type Restore =
+  | { status: 'ready'; run: Run }
+  | { status: 'empty'; lastSeasonNumber?: number }
+  | { status: 'incompatible' | 'unavailable' }
+
+function validSeasonNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
+}
 
 function asObject(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -98,6 +119,7 @@ function validTableCount(value: unknown, ids: Set<string>): boolean {
     return false
   }
   const voters = new Set<string>()
+  let weighted = false
   for (const value of count.ballots) {
     const ballot = asObject(value)
     if (
@@ -111,12 +133,21 @@ function validTableCount(value: unknown, ids: Set<string>): boolean {
     ) {
       return false
     }
+    if (ballot.weight !== undefined) {
+      if (ballot.weight !== 2 || count.round !== 1 || weighted) return false
+      weighted = true
+    }
     voters.add(ballot.voterId)
   }
   return true
 }
 
-function validConclaveVotes(value: unknown, ids: Set<string>, betrayers: ReadonlySet<string>) {
+function validConclaveVotes(
+  value: unknown,
+  ids: Set<string>,
+  betrayers: ReadonlySet<string>,
+  alpha?: string
+) {
   if (!Array.isArray(value) || value.length > betrayers.size) return false
   const voters = new Set<string>()
   for (const ballot of value) {
@@ -128,7 +159,8 @@ function validConclaveVotes(value: unknown, ids: Set<string>, betrayers: Readonl
       voters.has(row.voterId) ||
       typeof row.targetId !== 'string' ||
       !ids.has(row.targetId) ||
-      betrayers.has(row.targetId)
+      betrayers.has(row.targetId) ||
+      (row.weight !== undefined && (row.weight !== 2 || row.voterId !== alpha))
     )
       return false
     voters.add(row.voterId)
@@ -140,7 +172,8 @@ function validConclaveVote(
   value: unknown,
   phase: unknown,
   ids: Set<string>,
-  betrayerIds: string[]
+  betrayerIds: string[],
+  alpha?: string
 ) {
   if (value === undefined) return true
   if (phase !== 'night' && phase !== 'night-resolved') return false
@@ -148,7 +181,7 @@ function validConclaveVote(
   const betrayers = new Set(betrayerIds)
   return Boolean(
     vote &&
-    validConclaveVotes(vote.nominations, ids, betrayers) &&
+    validConclaveVotes(vote.nominations, ids, betrayers, alpha) &&
     (phase === 'night'
       ? vote.runoff === undefined && (vote.nominations as unknown[]).length >= 2
       : vote.runoff === undefined || validConclaveVotes(vote.runoff, ids, betrayers))
@@ -221,6 +254,54 @@ function validIncomingResponses(value: unknown, day: number): boolean {
       return match && Number(match[1]) <= day && INCOMING_ANSWERS.some((valid) => answer === valid)
     })
   )
+}
+
+function validRoleDisclosures(
+  entries: unknown[],
+  ids: Set<string>,
+  day: number,
+  humanId: string,
+  roles: unknown
+): boolean {
+  const card = Array.isArray(roles)
+    ? roles.map(asObject).find((role) => role?.guestId === humanId)
+    : undefined
+  const direct = new Map<string, number>()
+  const informed = new Set<string>()
+  const relayed = new Set<string>()
+  for (const value of entries) {
+    const entry = asObject(value)
+    if (entry?.kind !== 'reveal-castle-role' && entry?.kind !== 'castle-role-rumor') continue
+    const { actorId, recipientId, disclosedRole } = entry
+    if (
+      !onOrBefore(entry.day, day) ||
+      typeof actorId !== 'string' ||
+      typeof recipientId !== 'string' ||
+      !validIds([actorId, recipientId], ids, 2, 2) ||
+      recipientId === humanId ||
+      !isCastleRoleId(disclosedRole) ||
+      card?.roleId !== disclosedRole ||
+      CASTLE_ROLE_CATALOG[disclosedRole].faction !== 'loyal' ||
+      entry.alliance !== undefined
+    )
+      return false
+    if (entry.kind === 'reveal-castle-role') {
+      if (actorId !== humanId || entry.suspectId !== undefined || direct.has(recipientId))
+        return false
+      direct.set(recipientId, entry.day)
+    } else {
+      if (
+        entry.suspectId !== humanId ||
+        direct.get(actorId) !== entry.day ||
+        relayed.has(actorId) ||
+        informed.has(recipientId)
+      )
+        return false
+      relayed.add(actorId)
+    }
+    informed.add(recipientId)
+  }
+  return true
 }
 
 function validShieldConversations(entries: unknown[], ids: Set<string>, day: number) {
@@ -760,12 +841,219 @@ function validCastleMoments(
   })
 }
 
+function validCastleRoleDay(value: unknown, currentDay: number): value is number {
+  return (
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= currentDay
+  )
+}
+
+function validCastleRoleUse(
+  use: unknown,
+  roleId: CastleRoleId,
+  guestId: string,
+  seats: Set<string>,
+  day: number
+): boolean {
+  const item = asObject(use)
+  if (!item || item.roleId !== roleId || !validCastleRoleDay(item.day, day)) return false
+  if (roleId === 'columbus')
+    return (
+      validIds(item.guestIds, seats, COLUMBUS_GROUP_SIZE, COLUMBUS_GROUP_SIZE) &&
+      !(item.guestIds as string[]).includes(guestId) &&
+      typeof item.hasBetrayer === 'boolean'
+    )
+  if (roleId === 'clairvoyant') return validIds(item.shieldIds, seats, 0, NIGHT_SHIELD_COUNT + 1)
+  if (roleId === 'fatigued') return item.challenge === 'immunity' || item.challenge === 'safety'
+  if (
+    roleId === 'mayor' ||
+    roleId === 'good-witch' ||
+    roleId === 'illusionist' ||
+    roleId === 'cursed' ||
+    roleId === 'secret-betrayer' ||
+    roleId === 'alpha-betrayer' ||
+    roleId === 'bad-witch' ||
+    roleId === 'change-of-heart'
+  )
+    return item.targetId === undefined
+  if (typeof item.targetId !== 'string' || !seats.has(item.targetId)) return false
+  if (roleId === 'medium')
+    return (
+      item.targetId !== guestId &&
+      (item.rememberedVote === undefined ||
+        (typeof item.rememberedVote === 'string' && seats.has(item.rememberedVote)))
+    )
+  if (roleId === 'dark-angel') return item.targetId !== guestId
+  if (roleId === 'politician')
+    return (
+      typeof item.voterId === 'string' &&
+      seats.has(item.voterId) &&
+      item.voterId !== guestId &&
+      item.voterId !== item.targetId
+    )
+  if (roleId === 'diva')
+    return (
+      item.targetId !== guestId &&
+      (item.fact === 'shield' ||
+        item.fact === 'quiet' ||
+        (item.fact === 'ballot' && typeof item.subjectId === 'string' && seats.has(item.subjectId)))
+    )
+  if (roleId === 'last-will')
+    return (
+      item.targetId !== guestId &&
+      (item.allegiance === 'loyal' || item.allegiance === 'betrayer') &&
+      (item.revealedRole === undefined || isCastleRoleId(item.revealedRole))
+    )
+  if (roleId === 'kamikaze') return item.targetId !== guestId && typeof item.blocked === 'boolean'
+  return (
+    roleId === 'doctor' ||
+    (roleId === 'extrasense' && item.targetId !== guestId && typeof item.hasRole === 'boolean')
+  )
+}
+
+function validCastleRoles(
+  value: unknown,
+  seats: Set<string>,
+  betrayers: ReadonlySet<string>,
+  day: number
+): boolean {
+  if (!Array.isArray(value)) return false
+  const roles: CastleRoleId[] = []
+  const guests = new Set<string>()
+  for (const entry of value) {
+    const card = asObject(entry)
+    if (
+      !card ||
+      !isCastleRoleId(card.roleId) ||
+      typeof card.guestId !== 'string' ||
+      !seats.has(card.guestId) ||
+      guests.has(card.guestId)
+    ) {
+      return false
+    }
+    if (card.status !== 'ready' && card.status !== 'used' && card.status !== 'retired') return false
+
+    const startingBetrayer = CASTLE_ROLE_CATALOG[card.roleId].faction === 'betrayer'
+    const usedDay = asObject(card.used)?.day
+    if (
+      (card.status === 'retired' && startingBetrayer) ||
+      betrayers.has(card.guestId) !== (startingBetrayer || card.status === 'retired') ||
+      (card.passedDay !== undefined && !validCastleRoleDay(card.passedDay, day)) ||
+      (card.status === 'ready' && card.used !== undefined) ||
+      (card.status === 'used' && card.used === undefined) ||
+      (card.roleId === 'cursed' && card.used !== undefined && card.status !== 'retired') ||
+      (card.roleId === 'change-of-heart' && card.used !== undefined && card.status !== 'retired') ||
+      (card.boundBetrayerId !== undefined &&
+        (card.roleId !== 'dark-angel' ||
+          typeof card.boundBetrayerId !== 'string' ||
+          !betrayers.has(card.boundBetrayerId))) ||
+      (card.clairvoyantUses !== undefined &&
+        (card.roleId !== 'clairvoyant' ||
+          typeof card.clairvoyantUses !== 'number' ||
+          !Number.isInteger(card.clairvoyantUses) ||
+          card.clairvoyantUses < 1 ||
+          card.clairvoyantUses > CLAIRVOYANT_MAX_USES)) ||
+      (card.selfWardUsed !== undefined &&
+        (card.roleId !== 'doctor' || card.selfWardUsed !== true)) ||
+      (card.mayorUses !== undefined &&
+        (card.roleId !== 'mayor' ||
+          typeof card.mayorUses !== 'number' ||
+          !Number.isInteger(card.mayorUses) ||
+          card.mayorUses < 1 ||
+          card.mayorUses > MAYOR_MAX_USES ||
+          !validCastleRoleDay(usedDay, Math.min(day, MAYOR_LAST_DAY)) ||
+          card.mayorUses > usedDay)) ||
+      (card.influenceUses !== undefined &&
+        ((card.roleId !== 'alpha-betrayer' && card.roleId !== 'politician') ||
+          typeof card.influenceUses !== 'number' ||
+          !Number.isInteger(card.influenceUses) ||
+          card.influenceUses < 1 ||
+          card.influenceUses > INFLUENCE_ROLE_MAX_USES ||
+          !validCastleRoleDay(usedDay, day) ||
+          card.influenceUses > usedDay)) ||
+      (card.used !== undefined &&
+        (!validCastleRoleUse(card.used, card.roleId, card.guestId, seats, day) ||
+          card.passedDay === usedDay))
+    ) {
+      return false
+    }
+    roles.push(card.roleId)
+    guests.add(card.guestId)
+  }
+  return compatibleCastleRoleTrio(roles)
+}
+
+function validNightCastleEffect(run: Run): boolean {
+  const night = run.private.pendingNight
+  if (!night || night.castleEffect === undefined) return true
+  const effect = asObject(night.castleEffect)
+  if (!effect || !run.options.castleRoles || night.recruitedId !== undefined) return false
+  const { targetId } = night
+  const living = (id: unknown) => run.seats.some((seat) => seat.id === id && !seat.exit)
+  const spent = (roleId: CastleRoleId) =>
+    run.private.castleRoles?.some(
+      (card) => card.roleId === roleId && card.status === 'used' && card.used?.day === run.day
+    )
+  if (effect.kind === 'good-witch')
+    return Boolean(
+      targetId === null && !night.blocked && !run.private.conclaveVote && spent('good-witch')
+    )
+  if (effect.kind === 'illusionist')
+    return Boolean(
+      living(targetId) &&
+      living(effect.originalTargetId) &&
+      effect.originalTargetId !== targetId &&
+      effect.originalTargetId !== run.immunityId &&
+      spent('illusionist')
+    )
+  return (
+    effect.kind === 'cursed' &&
+    night.blocked &&
+    typeof targetId === 'string' &&
+    Boolean(
+      castleRoleFor(run, targetId)?.roleId === 'cursed' &&
+      eligibleCastleRole(run, targetId, 'cursed')
+    )
+  )
+}
+
+function validSealedBallot(run: Run, ids: Set<string>) {
+  const night = run.private.pendingNight
+  if (!night || night.sealedBallot === undefined) return true
+  const ballot = asObject(night.sealedBallot)
+  if (!ballot || typeof ballot.voterId !== 'string' || typeof ballot.targetId !== 'string')
+    return false
+  const shortlist = ballot.shortlist
+  const original =
+    night.castleEffect?.kind === 'illusionist'
+      ? night.castleEffect.originalTargetId
+      : night.targetId
+  return (
+    run.phase === 'night-resolved' &&
+    !night.recruitedId &&
+    !run.private.conclaveVote &&
+    run.options.castleRoles === true &&
+    run.private.hiddenBetrayerIds?.includes(ballot.voterId) === true &&
+    castleRoleFor(run, ballot.voterId)?.roleId === 'secret-betrayer' &&
+    run.seats.some(({ id, exit }) => id === ballot.voterId && !exit) &&
+    validIds(shortlist, ids, 1, 4) &&
+    (shortlist as string[]).includes(ballot.targetId) &&
+    (shortlist as string[]).every(
+      (id) =>
+        id !== run.immunityId &&
+        !run.private.betrayers.includes(id) &&
+        run.seats.some((seat) => seat.id === id && !seat.exit)
+    ) &&
+    original === ballot.targetId
+  )
+}
+
 function isRun(value: unknown): value is Run {
   const item = asObject(value)
   if (!item || item.edition !== 'betrayals' || item.version !== RULES_VERSION) return false
   if (
     typeof item.id !== 'string' ||
     !item.id ||
+    (item.seasonNumber !== undefined && !validSeasonNumber(item.seasonNumber)) ||
     typeof item.revision !== 'number' ||
     !Number.isSafeInteger(item.revision) ||
     item.revision < 0 ||
@@ -791,6 +1079,7 @@ function isRun(value: unknown): value is Run {
   const shield = asObject(item.publicShield)
   const pendingTable = asObject(hidden?.pendingTable)
   const pendingNight = asObject(hidden?.pendingNight)
+  const departurePower = asObject(hidden?.departurePower)
   const lastShieldSave = asObject(hidden?.lastShieldSave)
   const lastTable = asObject(item.lastTable)
   const sway = asObject(item.tableSway)
@@ -814,17 +1103,38 @@ function isRun(value: unknown): value is Run {
         ['banishment', 'murder', 'final-vote'].includes(adBreak.kind as string))) &&
     options &&
     typeof options.publicMode === 'boolean' &&
+    (options.castleRoles === undefined || typeof options.castleRoles === 'boolean') &&
     ['off', 'casual', 'tv', 'adult'].some((preset) => preset === options.realityMode) &&
     hidden &&
-    validIds(hidden.betrayers, ids, MIN_BETRAYERS, MAX_BETRAYERS + RECRUITMENT_END_DAY - 1) &&
+    // A Cursed guest can add one more Betrayer over the season's recruitment allowance.
+    validIds(hidden.betrayers, ids, MIN_BETRAYERS, MAX_BETRAYERS + RECRUITMENT_END_DAY) &&
+    (options.castleRoles === true
+      ? validCastleRoles(hidden.castleRoles, ids, new Set(hidden.betrayers as string[]), item.day)
+      : hidden.castleRoles === undefined) &&
+    (hidden.departurePower === undefined ||
+      (options.castleRoles === true &&
+        departurePower &&
+        (departurePower.roleId === 'last-will' || departurePower.roleId === 'kamikaze') &&
+        departurePower.guestId === item.humanId &&
+        item.seats.some(({ id, exit }) => id === departurePower.guestId && !!exit) &&
+        validIds(departurePower.protectedIds, ids, 0, CAST_SIZE) &&
+        castleRoleFor(value as Run, item.humanId)?.roleId === departurePower.roleId)) &&
     (hidden.recruitmentSeed === undefined || Number.isSafeInteger(hidden.recruitmentSeed)) &&
     (hidden.humanRecruitmentOffered === undefined ||
       (hidden.humanRecruitmentOffered === true &&
         hidden.conclaveVote === undefined &&
         recruitmentFor(value as Run, item.humanId)?.kind === 'offer')) &&
-    validConclaveVote(hidden.conclaveVote, item.phase, ids, hidden.betrayers as string[]) &&
     (hidden.hiddenBetrayerIds === undefined ||
       validIds(hidden.hiddenBetrayerIds, new Set(hidden.betrayers as string[]), 0, 4)) &&
+    validConclaveVote(
+      hidden.conclaveVote,
+      item.phase,
+      ids,
+      (hidden.betrayers as string[]).filter((id) => !isConcealedSecretBetrayer(value as Run, id)),
+      (value as Run).private.castleRoles?.find(
+        ({ used }) => used?.roleId === 'alpha-betrayer' && used.day === item.day
+      )?.guestId
+    ) &&
     validIds(hidden.nightShieldIds, ids, 0, 2, false) &&
     (hidden.nightShieldAwardIds === undefined || validIds(hidden.nightShieldAwardIds, ids, 1, 2)) &&
     (hidden.lastShieldSave === undefined ||
@@ -836,6 +1146,7 @@ function isRun(value: unknown): value is Run {
         lastShieldSave.day >= 2 &&
         lastShieldSave.day <= item.day)) &&
     validShieldConversations(item.social, ids, item.day) &&
+    validRoleDisclosures(item.social, ids, item.day, item.humanId, hidden.castleRoles) &&
     (item.runoffIds === undefined || validIds(item.runoffIds, ids, 2, CAST_SIZE)) &&
     (item.tableRound === undefined || validTableRound(item.tableRound)) &&
     validTableCount(item.tableCount, ids) &&
@@ -908,7 +1219,9 @@ function isRun(value: unknown): value is Run {
             pendingNight.recruitedId !== pendingNight.targetId &&
             item.seats.some(({ id, exit }) => id === pendingNight.recruitedId && !exit))) &&
         (pendingNight.targetId === null ||
-          (typeof pendingNight.targetId === 'string' && ids.has(pendingNight.targetId)))
+          (typeof pendingNight.targetId === 'string' && ids.has(pendingNight.targetId))) &&
+        validNightCastleEffect(value as Run) &&
+        validSealedBallot(value as Run, ids)
       : hidden.pendingNight === undefined) &&
     (item.immunityId === undefined ||
       (typeof item.immunityId === 'string' && ids.has(item.immunityId))) &&
@@ -925,6 +1238,13 @@ function isRun(value: unknown): value is Run {
 
 export function saveRun(storage: StorageAdapter, profileId: string, run: Run): void {
   storage.setItem(SAVE_PREFIX + profileId, JSON.stringify(run))
+}
+
+export function abandonRun(storage: StorageAdapter, profileId: string, run: Run): void {
+  storage.setItem(
+    SAVE_PREFIX + profileId,
+    JSON.stringify({ edition: 'betrayals', abandonedSeasonNumber: run.seasonNumber ?? 1 })
+  )
 }
 
 function restoreSeasonRewards(run: Run): SeasonRewards | undefined {
@@ -946,6 +1266,7 @@ function restoreSeasonRewards(run: Run): SeasonRewards | undefined {
     day: restoreCheckpoint('day'),
     table: restoreCheckpoint('table'),
     finaleRevealed: run.phase === 'settled' && saved.finaleRevealed === true,
+    ...(run.phase === 'settled' && saved.rewindDeclined === true ? { rewindDeclined: true } : {}),
   }
 }
 
@@ -959,6 +1280,10 @@ export function restoreRun(storage: StorageAdapter, profileId: string): Restore 
   if (value === null) return { status: 'empty' }
   try {
     const candidate: unknown = JSON.parse(value)
+    const record = asObject(candidate)
+    if (record?.edition === 'betrayals' && validSeasonNumber(record.abandonedSeasonNumber)) {
+      return { status: 'empty', lastSeasonNumber: record.abandonedSeasonNumber }
+    }
     if (!isRun(candidate)) return { status: 'incompatible' }
     const seasonRewards = restoreSeasonRewards(candidate)
     return {

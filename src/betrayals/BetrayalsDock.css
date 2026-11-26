@@ -18,6 +18,12 @@
   display: none;
 }
 
+.betrayals-dock__utility .betrayals-inline-action[aria-pressed='true'] {
+  border-color: #e0b879;
+  background: #423021;
+  color: #fff0d4;
+}
+
 .betrayals-dock__vote-slot .round-table-feed__utility {
   min-height: 36px;
   padding-inline: 11px;
@@ -31,7 +37,7 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: center;
   gap: clamp(2px, 1vw, 7px);
-  padding: 4px clamp(4px, 2vw, 10px);
+  padding: 1px clamp(4px, 2vw, 10px);
   border-block: 1px solid transparent;
   border-radius: 18px 18px 8px 8px;
   background:
@@ -48,14 +54,11 @@
   box-sizing: border-box;
   appearance: none;
   -webkit-tap-highlight-color: transparent;
-  display: flex;
+  display: grid;
   min-width: 0;
-  min-height: 48px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 2px 1px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0 1px;
   color: #ded1c6;
   font: inherit;
   cursor: pointer;
@@ -67,8 +70,6 @@
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  font-size: 0.61rem;
-  line-height: 1;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -174,17 +175,12 @@
 }
 
 .betrayals-dock__play {
-  min-height: 50px;
   border: 0;
   border-radius: 14px 14px 6px 6px;
   background:
     linear-gradient(90deg, transparent, #f7d8a7, transparent) center bottom / 62% 1px no-repeat,
     radial-gradient(ellipse at 50% 50%, #a3764652, transparent 74%);
   color: #fff1d7;
-  text-shadow: 0 1px 2px #21121b;
-  font-size: 0.66rem;
-  font-weight: 720;
-  line-height: 1.1;
   transition:
     filter 160ms ease,
     transform 160ms ease;
@@ -208,10 +204,21 @@
   filter: drop-shadow(0 0 5px #edc0804d);
 }
 
-.betrayals-dock__label {
-  min-width: 0;
+.betrayals-dock__play[data-labeled] {
+  align-content: center;
+  gap: 1px;
+}
+
+.betrayals-dock__play[data-labeled] .betrayals-dock__play-glyph {
+  width: 22px;
+  height: 22px;
+}
+
+.betrayals-dock__play-label {
+  font:
+    650 0.625rem/1.05 system-ui,
+    sans-serif;
   text-align: center;
-  white-space: nowrap;
 }
 
 .betrayals-dock .betrayals-dock__side[aria-expanded='true'] .betrayals-dock__icon-frame svg,
@@ -244,10 +251,6 @@
   .betrayals-dock__shell {
     gap: 1px;
     padding-inline: 3px;
-  }
-
-  .betrayals-dock .betrayals-dock__side {
-    font-size: 0.55rem;
   }
 }
 

@@ -1,15 +1,19 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { declarePlayerAge } from '../safety/playerSafety'
 import * as durablePersistence from '../store/durablePersistence'
 import BetrayalsScreen from './BetrayalsScreen'
 import { BETRAYALS_AI_POOL } from './cast'
+import { castleRoleFor, type CastleRolePreview } from './castleRoles'
 import { openDayFlow } from './dayFlow'
 import { challengeGame } from './challengeRotation'
+import { challengeContestantIds, resolveChallenge } from './challenges'
 import { investigationFor } from './investigationRecords'
-import { getConclaveView } from './night'
+import { getConclaveView, resolveNightCastleRole } from './night'
 import { restoreRun, saveRun } from './persistence'
 import { commandToken, startRun } from './run'
 import { settleRun } from './settlement'
+import { recordSeasonCheckpoints } from './seasonRewards'
 import { applySocialMove } from './social'
 import { resolveTable } from './table'
 import { preparePaidNightShieldPurchase, recordBetrayalsEconomy } from './economy'
@@ -24,6 +28,7 @@ const commerce = vi.hoisted(() => ({
   vip: true,
   myPulse: true,
   realityMode: true,
+  dramaMode: true,
   noAds: true,
   premiumGames: false,
   paidLooks: true,
@@ -139,7 +144,105 @@ async function finishCinematic() {
   )
 }
 
+function startCastleRoleNight(role: CastleRolePreview) {
+  const run = startRun(
+    { id: 'human', name: 'Georgi' },
+    BETRAYALS_AI_POOL,
+    { publicMode: false, realityMode: 'off', castleRoles: true },
+    { id: 'castle-role-preview', roleSeed: 32, publicSeed: 12, previewCastleRole: role }
+  )
+  const night = { ...run, phase: 'night' as const, day: 2 }
+  saveRun(localStorage, 'edition-local', night)
+  return night
+}
+
 describe('Betrayals season review', () => {
+  it('opens the private gallery only after Nightfall and the Sealed Ballot cinematic', async () => {
+    const run = { ...startCastleRoleNight('secret-betrayer'), presentation: ['nightfall' as const] }
+    saveRun(localStorage, 'edition-local', run)
+    const ballot = getConclaveView(run, run.humanId)
+    if (!ballot?.sealed) throw new Error('Expected a private ballot')
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    render(<BetrayalsScreen />)
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'nightfall')
+    const castle = screen.getByRole('main', { hidden: true })
+    expect(castle).toHaveAttribute('data-conclave-cover', 'true')
+    expect(castle.querySelectorAll('[data-asleep]')).toHaveLength(run.seats.length)
+    await finishCinematic()
+    expect(screen.queryByRole('dialog', { name: 'The Conclave' })).not.toBeInTheDocument()
+    const scene = screen.getByRole('dialog', { name: 'The Sealed Ballot' })
+    expect(scene).toHaveAttribute('data-frame', 'latch')
+    expect(scene.querySelector('.conclave-film')).toHaveAttribute('data-group', '0')
+    expect(
+      within(scene).queryByRole('region', { name: 'Murder shortlist' })
+    ).not.toBeInTheDocument()
+    await clickAndSave(within(scene).getByRole('button', { name: 'Skip cinematic' }))
+    expect(screen.getByRole('dialog', { name: 'The Sealed Ballot' })).toBe(scene)
+    const gallery = within(scene).getByRole('region', { name: 'Murder shortlist' })
+    const names = run.seats
+      .filter(({ id }) => ballot.targetIds.includes(id))
+      .map(({ name }) => name)
+    expect(within(gallery).getAllByRole('button')).toHaveLength(names.length)
+    const vote = within(scene).getByRole('button', { name: 'Cast sealed vote' })
+    expect(vote).toBeDisabled()
+    const target = run.seats.find(({ id }) => id === ballot.targetIds[0])!
+    fireEvent.click(within(gallery).getByRole('button', { name: target.name }))
+    expect(vote).toBeEnabled()
+    await clickAndSave(vote)
+    const saved = restoreRun(localStorage, 'edition-local')
+    if (saved.status !== 'ready') throw new Error('Expected a saved sealed ballot')
+    expect(saved.run.private.pendingNight?.sealedBallot?.targetId).toBe(target.id)
+    expect(scene).toHaveAttribute('data-stage', 'verdict')
+    expect(within(scene).queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the private gallery available with reduced motion', () => {
+    startCastleRoleNight('secret-betrayer')
+    localStorage.setItem('betrayals.preferences.v1', JSON.stringify({ reducedMotion: true }))
+    render(<BetrayalsScreen />)
+    const scene = screen.getByRole('dialog', { name: 'The Sealed Ballot' })
+    expect(scene).toHaveAttribute('data-stage', 'ballot')
+    expect(within(scene).getByRole('region', { name: 'Murder shortlist' })).toBeVisible()
+    expect(within(scene).queryByRole('button', { name: 'Skip cinematic' })).not.toBeInTheDocument()
+  })
+
+  it('saves the next dawn when a full day is simulated in Castle QA', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'qa-next-dawn', roleSeed: 32, publicSeed: 12 }
+    )
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    await clickAndSave(screen.getByRole('button', { name: 'Open Castle QA' }))
+    const qa = within(await screen.findByRole('dialog', { name: 'Castle QA' }))
+    await clickAndSave(qa.getByRole('button', { name: 'Simulate full day' }))
+    expect(await qa.findByText(/Day 2/)).toBeVisible()
+    expect(qa.getByRole('status')).toHaveTextContent('Simulation saved.')
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status).toBe('ready')
+    if (saved.status === 'ready') expect(saved.run.phase).toBe('dawn')
+  })
+
+  it('lets the Bad Witch cast the sleep spell from the start of the Round Table', async () => {
+    const run = {
+      ...startCastleRoleNight('bad-witch'),
+      phase: 'round-table' as const,
+      tableSway: undefined,
+    }
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    const table = within(screen.getByRole('dialog', { name: 'Round Table' }))
+    await clickAndSave(table.getByRole('button', { name: 'Cast sleep spell' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved.status).toBe('ready')
+    if (saved.status === 'ready') {
+      expect(castleRoleFor(saved.run, run.humanId)?.used?.roleId).toBe('bad-witch')
+      expect(saved.run.private.pendingTable).toBeUndefined()
+    }
+  })
+
   it('blocks a required breakfast reply until the player declines in the Inbox', async () => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
@@ -176,6 +279,7 @@ describe('Betrayals season review', () => {
       vip: true,
       myPulse: true,
       realityMode: true,
+      dramaMode: true,
       noAds: true,
       paidLooks: true,
     })
@@ -192,6 +296,426 @@ describe('Betrayals season review', () => {
   })
 
   afterEach(() => vi.restoreAllMocks())
+
+  it.each([false, true])('gates the Drama Mode switch by ownership (%s)', async (entitled) => {
+    commerce.dramaMode = entitled
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const toggle = screen.queryByRole('switch', { name: 'Drama Mode' })
+    if (!entitled) {
+      expect(toggle).toBeNull()
+      return
+    }
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(toggle!)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Start season' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    expect(saved).toMatchObject({ status: 'ready', run: { options: { castleRoles: true } } })
+  })
+
+  it.each([false, true])(
+    'gates a private Castle Role reveal by entitlement (%s)',
+    async (entitled) => {
+      commerce.dramaMode = entitled
+      commerce.realityMode = false
+      const run = startCastleRoleNight('doctor')
+      saveRun(localStorage, 'edition-local', { ...run, phase: 'social' })
+      const guest = run.seats[1]
+      render(<BetrayalsScreen />)
+      fireEvent.click(screen.getByRole('button', { name: /^Social/ }))
+      const social = within(screen.getByRole('dialog', { name: 'Social' }))
+      fireEvent.click(social.getByRole('button', { name: new RegExp('^' + guest.name) }))
+      const card = social.queryByRole('button', { name: /Reveal role/ })
+      if (!entitled) {
+        expect(card).toBeNull()
+        return
+      }
+      expect(card).toBeVisible()
+      fireEvent.click(card!)
+      await clickAndSave(social.getByRole('button', { name: 'Tell guest' }))
+      expect(social.getByText(`You told ${guest.name} your Castle Role is Doctor.`)).toBeVisible()
+    }
+  )
+
+  it('saves and resumes the same season, then starts at Day 1 after abandonment', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'season-to-resume', roleSeed: 32, publicSeed: 12 }
+    )
+    const saved = { ...run, day: 2, phase: 'social' as const }
+    saveRun(localStorage, 'edition-local', saved)
+    saveRun(localStorage, 'profile-other', { ...run, id: 'other-season' })
+    const visit = render(<BetrayalsScreen />)
+
+    expect(screen.getByText('Season 1')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Leave the castle?' }))
+    expect(dialog.getByRole('button', { name: 'Save for later' })).toHaveFocus()
+    fireEvent.click(dialog.getByRole('button', { name: 'Stay in the castle' }))
+    expect(screen.queryByRole('dialog', { name: 'Leave the castle?' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Save for later' }))
+    expect(restoreRun(localStorage, 'edition-local')).toMatchObject({
+      status: 'ready',
+      run: { id: saved.id, day: 2 },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue season' }))
+    expect(screen.getByText('Season 1')).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Abandon the castle' }))
+    expect(screen.getByRole('button', { name: 'Start season' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Continue season' })).toBeNull()
+    expect(restoreRun(localStorage, 'profile-other')).toMatchObject({
+      status: 'ready',
+      run: { id: 'other-season' },
+    })
+
+    visit.unmount()
+    render(<BetrayalsScreen />)
+    await clickAndSave(screen.getByRole('button', { name: 'Start season' }))
+    expect(screen.getByText('Season 2')).toBeVisible()
+    const restarted = restoreRun(localStorage, 'edition-local')
+    expect(restarted).toMatchObject({
+      status: 'ready',
+      run: { seasonNumber: 2, day: 1, phase: 'role-reveal' },
+    })
+    expect(restarted.status === 'ready' && restarted.run.id).not.toBe(saved.id)
+  })
+
+  it('keeps the active season open if abandoning cannot be saved', async () => {
+    const run = startRun(
+      { id: 'human', name: 'Georgi' },
+      BETRAYALS_AI_POOL,
+      { publicMode: false, realityMode: 'off' },
+      { id: 'retry-abandon', roleSeed: 32, publicSeed: 12 }
+    )
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    vi.spyOn(durablePersistence, 'setDurableItem').mockReturnValueOnce(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Abandon the castle' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('could not end this season')
+    expect(restoreRun(localStorage, 'edition-local')).toMatchObject({
+      status: 'ready',
+      run: { id: run.id },
+    })
+    await clickAndSave(screen.getByRole('button', { name: 'Abandon the castle' }))
+    expect(screen.getByRole('button', { name: 'Start season' })).toBeVisible()
+  })
+
+  it.each(['rewind', 'set up privacy and rewind', 'leave'] as const)(
+    'opens the dawn decision and lets the player %s',
+    async (choice) => {
+      const run = startRun(
+        { id: 'human', name: 'Georgi' },
+        BETRAYALS_AI_POOL,
+        { publicMode: false, realityMode: 'off' },
+        { id: 'rewind-decision', roleSeed: 32, publicSeed: 12 }
+      )
+      const morning = recordSeasonCheckpoints(null, {
+        ...run,
+        day: 3,
+        seasonNumber: 2,
+        phase: 'dawn',
+      })
+      saveRun(localStorage, 'edition-local', {
+        ...morning,
+        phase: 'night-resolved',
+        private: {
+          ...run.private,
+          pendingNight: { targetId: run.humanId, blocked: false, filmPlayed: true },
+        },
+      })
+      render(<BetrayalsScreen />)
+      const dialog = within(screen.getByRole('dialog', { name: 'A second chance' }))
+      expect(dialog.getByRole('button', { name: 'Rewind to dawn' }).parentElement).toHaveClass(
+        'betrayals-leave__actions--stacked'
+      )
+      if (choice !== 'leave') {
+        if (choice === 'set up privacy and rewind') {
+          await clickAndSave(dialog.getByRole('button', { name: 'Rewind to dawn' }))
+          const setup = within(screen.getByRole('dialog', { name: 'Advertising privacy' }))
+          expect(recharge.request).not.toHaveBeenCalled()
+          fireEvent.change(setup.getByLabelText('Your age'), { target: { value: '28' } })
+          fireEvent.click(setup.getByRole('button', { name: 'Save age' }))
+          expect(setup.queryByLabelText('Your age')).not.toBeInTheDocument()
+          fireEvent.click(setup.getByRole('button', { name: 'Back to rewind' }))
+          expect(screen.getByRole('dialog', { name: 'A second chance' })).toBeVisible()
+        } else {
+          declarePlayerAge(28)
+        }
+        recharge.request.mockResolvedValueOnce(true)
+        await clickAndSave(dialog.getByRole('button', { name: 'Rewind to dawn' }))
+        expect(recharge.request).toHaveBeenCalledWith('betrayals_rewind')
+        expect(screen.queryByRole('dialog', { name: 'A second chance' })).toBeNull()
+        expect(restoreRun(localStorage, 'edition-local')).toMatchObject({
+          status: 'ready',
+          run: { id: run.id, day: 3, phase: 'dawn', seasonNumber: 2 },
+        })
+      } else {
+        await clickAndSave(dialog.getByRole('button', { name: 'Leave the castle' }))
+        expect(recharge.request).not.toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Start season' })).toBeVisible()
+        expect(restoreRun(localStorage, 'edition-local')).toEqual({
+          status: 'empty',
+          lastSeasonNumber: 2,
+        })
+      }
+    }
+  )
+
+  it('starts a Castle Roles preview with the requested human role', async () => {
+    render(<BetrayalsScreen />)
+    fireEvent.change(screen.getByRole('combobox', { name: 'Castle Roles playtest' }), {
+      target: { value: 'doctor' },
+    })
+    await clickAndSave(screen.getByRole('button', { name: 'Start season' }))
+    const broadcast = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(broadcast.getByText('You are a Loyal.')).toBeVisible()
+    expect(broadcast.getByText('Doctor · Ready')).toBeVisible()
+  })
+
+  it('uses Extrasense through the roster, retains its private result, and offers it next night', async () => {
+    const run = startCastleRoleNight('extrasense')
+    const target = run.seats[1]
+    const hasRole = Boolean(castleRoleFor(run, target.id))
+    const firstView = render(<BetrayalsScreen />)
+    const broadcast = within(screen.getByRole('region', { name: 'Faux TV' }))
+    const roster = within(screen.getByRole('list', { name: 'Contestant roster' }))
+    expect(broadcast.queryByRole('button')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Skip Extrasense and advance' })).toBeEnabled()
+    expect(roster.getByRole('button', { name: /^Georgi/ })).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(roster.getByRole('button', { name: new RegExp(`^${target.name}`) }))
+    await clickAndSave(screen.getByRole('button', { name: 'Check for a Castle Role' }))
+    const result = hasRole ? 'held a Castle Role' : 'held no Castle Role'
+    expect(broadcast.getByText(`Night 2. ${target.name} ${result}.`)).toBeVisible()
+    firstView.unmount()
+    const sameNight = render(<BetrayalsScreen />)
+    expect(screen.queryByRole('button', { name: 'Skip Extrasense and advance' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'View your Castle Role' }))
+    const card = within(screen.getByRole('dialog', { name: 'Your Castle Role' }))
+    expect(card.getByText('Extrasense · Used tonight')).toBeVisible()
+    expect(card.getByText(`Night 2. ${target.name} ${result}.`)).toBeVisible()
+    sameNight.unmount()
+
+    const saved = restoreRun(localStorage, 'edition-local')
+    if (saved.status !== 'ready') throw new Error('Expected the saved Night 2 result')
+    saveRun(localStorage, 'edition-local', { ...saved.run, day: 3 })
+    render(<BetrayalsScreen />)
+    expect(screen.getByRole('button', { name: 'Skip Extrasense and advance' })).toBeEnabled()
+  })
+
+  it('arms the Good Witch spell on the TV and casts it with Play', async () => {
+    startCastleRoleNight('good-witch')
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText('Good Witch')).toBeVisible()
+    const dock = within(screen.getByRole('navigation', { name: 'Season actions' }))
+    expect(dock.queryByRole('button', { name: 'Arm the spell' })).toBeNull()
+    const arm = tv.getByRole('button', { name: 'Arm the spell', pressed: false })
+    fireEvent.click(arm)
+    expect(arm).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(arm)
+    expect(dock.getByRole('button', { name: 'Skip power and advance' })).toBeEnabled()
+    fireEvent.click(arm)
+    await clickAndSave(dock.getByRole('button', { name: 'Cast sleep spell' }))
+    expect(tv.getByText('Night 2. You stopped the Conclave.')).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: 'The Conclave' })).toBeNull()
+    expect(dock.getByRole('button', { name: 'Open Dawn' })).toBeEnabled()
+  })
+
+  it('uses Play to skip the Illusionist while keeping the decoy available', async () => {
+    const run = startCastleRoleNight('illusionist')
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText('Illusionist')).toBeVisible()
+    const dock = within(screen.getByRole('navigation', { name: 'Season actions' }))
+    expect(dock.queryByRole('button', { name: 'Ready the decoy' })).toBeNull()
+    const decoy = tv.getByRole('button', { name: 'Ready the decoy' })
+    fireEvent.click(decoy)
+    expect(dock.getByRole('button', { name: 'Redirect the letter' })).toBeEnabled()
+    fireEvent.click(decoy)
+    await clickAndSave(dock.getByRole('button', { name: 'Skip power and advance' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    if (saved.status !== 'ready') throw new Error('Expected the saved Night result')
+    expect(castleRoleFor(saved.run, run.humanId)).toMatchObject({ status: 'ready', passedDay: 2 })
+  })
+
+  it('lets Columbus select exactly five portraits and shows the private result', async () => {
+    const run = startCastleRoleNight('columbus')
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    const cast = within(screen.getByRole('region', { name: 'Cast seats' }))
+    const group = run.seats.slice(1, 6)
+    const first = cast.getByRole('button', { name: new RegExp(`^${group[0].name}`) })
+    fireEvent.click(first)
+    expect(cast.getByText(group[0].name).closest('button')).toBe(first)
+    expect(screen.getByRole('button', { name: 'Check the Columbus group' })).toBeDisabled()
+    fireEvent.click(first)
+    expect(screen.getByRole('button', { name: 'Skip Columbus and advance' })).toBeEnabled()
+    for (const guest of group)
+      fireEvent.click(cast.getByRole('button', { name: new RegExp(`^${guest.name}`) }))
+    expect(tv.getByText(/5\/5 selected/)).toBeVisible()
+    await clickAndSave(screen.getByRole('button', { name: 'Check the Columbus group' }))
+    expect(tv.getByText(/Betrayer.*in your group/)).toBeVisible()
+    const saved = restoreRun(localStorage, 'edition-local')
+    if (saved.status !== 'ready') throw new Error('Expected a saved Columbus reading')
+    expect(castleRoleFor(saved.run, run.humanId)?.used).toMatchObject({
+      roleId: 'columbus',
+      guestIds: group.map(({ id }) => id),
+    })
+  })
+
+  it('shows Clairvoyant winners in hidden results and offers no Night activation', async () => {
+    const run = { ...startCastleRoleNight('clairvoyant'), phase: 'safety' as const }
+    const awarded = resolveChallenge(
+      run,
+      commandToken(run),
+      challengeContestantIds(run).map((contestantId, index) => ({
+        contestantId,
+        score: index,
+        potContribution: 0,
+      }))
+    )
+    saveRun(localStorage, 'edition-local', {
+      ...awarded,
+      presentation: ['safety-results'],
+    })
+    const first = render(<BetrayalsScreen />)
+    const results = within(screen.getByRole('dialog', { name: 'Safety Challenge results' }))
+    const winner = run.seats.at(-1)!
+    expect(results.getByRole('rowheader', { name: winner.name })).toBeVisible()
+    expect(results.getByText(/privately reveals the shield winners/)).toBeVisible()
+    first.unmount()
+    saveRun(localStorage, 'edition-local', { ...awarded, phase: 'night' })
+    render(<BetrayalsScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'View your Castle Role' }))
+    expect(screen.getByText(/Keep your power secret/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Castle Role' }))
+    expect(screen.queryByRole('button', { name: 'Ready the reading' })).toBeNull()
+  })
+
+  it.each(['uses', 'skips'] as const)(
+    '%s the Mayor power with Play at the Table',
+    async (choice) => {
+      const run = startRun(
+        { id: 'human', name: 'Georgi' },
+        BETRAYALS_AI_POOL,
+        { publicMode: false, realityMode: 'off', castleRoles: true },
+        { id: 'castle-role-mayor', roleSeed: 32, publicSeed: 12, previewCastleRole: 'mayor' }
+      )
+      saveRun(localStorage, 'edition-local', { ...run, phase: 'round-table', tableSway: null })
+      render(<BetrayalsScreen />)
+      const broadcast = within(screen.getByRole('region', { name: 'Faux TV' }))
+      expect(broadcast.getByText(/Select a guest for a double vote/)).toBeVisible()
+      expect(broadcast.queryByRole('button')).toBeNull()
+      const target = run.seats[1]
+      const portrait = screen.getByRole('button', { name: new RegExp(`^${target.name}`) })
+      fireEvent.click(portrait)
+      const doubleVote = screen.getByRole('button', { name: 'Lock double vote' })
+      if (choice === 'uses') {
+        await clickAndSave(doubleVote)
+      } else {
+        fireEvent.click(portrait)
+        await clickAndSave(
+          screen.getByRole('button', { name: 'Skip Mayor power and open regular ballot' })
+        )
+        expect(screen.getByRole('button', { name: 'Lock vote' })).toBeDisabled()
+        fireEvent.click(portrait)
+        await clickAndSave(screen.getByRole('button', { name: 'Lock vote' }))
+      }
+      const saved = restoreRun(localStorage, 'edition-local')
+      if (saved.status !== 'ready') throw new Error('Expected a saved first ballot')
+      const ballot = saved.run.tableCount?.ballots.find(({ voterId }) => voterId === run.humanId)
+      expect(ballot).toMatchObject({ targetId: target.id })
+      expect(ballot?.weight ?? 1).toBe(choice === 'uses' ? 2 : 1)
+    }
+  )
+
+  it('directs the Politician’s vote from the faux TV and the roster', async () => {
+    const run = {
+      ...startCastleRoleNight('politician'),
+      phase: 'round-table' as const,
+      tableSway: null,
+    }
+    saveRun(localStorage, 'edition-local', run)
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    const dock = within(screen.getByRole('navigation', { name: 'Season actions' }))
+    const [voter, target] = run.seats.slice(1)
+    fireEvent.click(tv.getByRole('button', { name: 'Direct a vote' }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${voter.name}`) }))
+    fireEvent.click(dock.getByRole('button', { name: 'Choose the voter' }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${target.name}`) }))
+    await clickAndSave(dock.getByRole('button', { name: 'Confirm voting instruction' }))
+    const saved = restoreRun(localStorage, 'edition-local')
+    if (saved.status !== 'ready') throw new Error('Expected a saved voting instruction')
+    expect(castleRoleFor(saved.run, run.humanId)?.used).toMatchObject({
+      roleId: 'politician',
+      voterId: voter.id,
+      targetId: target.id,
+    })
+  })
+
+  it.each(['pass', 'protect'] as const)(
+    'uses Play to %s at Night as the Doctor',
+    async (choice) => {
+      const run = startCastleRoleNight('doctor')
+      render(<BetrayalsScreen />)
+      const broadcast = within(screen.getByRole('region', { name: 'Faux TV' }))
+      expect(broadcast.queryByRole('button')).toBeNull()
+      const target = run.seats[1]
+      if (choice === 'protect') {
+        const portrait = screen.getByRole('button', { name: new RegExp('^' + target.name) })
+        fireEvent.click(portrait)
+        expect(screen.getByRole('button', { name: 'Confirm protection and advance' })).toBeEnabled()
+        fireEvent.click(portrait)
+        expect(screen.getByRole('button', { name: 'Skip protection and advance' })).toBeEnabled()
+        fireEvent.click(portrait)
+      }
+      await clickAndSave(
+        screen.getByRole('button', {
+          name:
+            choice === 'protect' ? 'Confirm protection and advance' : 'Skip protection and advance',
+        })
+      )
+      const saved = restoreRun(localStorage, 'edition-local')
+      expect(saved).toMatchObject({ status: 'ready', run: { phase: 'night-resolved' } })
+      if (saved.status !== 'ready') throw new Error('Expected the Night result')
+      const role = castleRoleFor(saved.run, run.humanId)
+      if (choice === 'protect')
+        expect(role?.used).toMatchObject({ targetId: target.id, day: run.day })
+      else expect(role?.passedDay).toBe(run.day)
+    }
+  )
+
+  it('puts a private invitation ahead of the spent Doctor card', () => {
+    const run = startCastleRoleNight('doctor')
+    const warded = resolveNightCastleRole(run, commandToken(run), run.humanId)
+    expect(castleRoleFor(warded, run.humanId)?.used?.roleId).toBe('doctor')
+    const departed = warded.private.betrayers.slice(1)
+    saveRun(localStorage, 'edition-local', {
+      ...warded,
+      seats: warded.seats.map((seat) =>
+        departed.includes(seat.id) ? { ...seat, exit: { cause: 'banished', day: 1 } } : seat
+      ),
+      private: { ...warded.private, humanRecruitmentOffered: true },
+    })
+
+    render(<BetrayalsScreen />)
+    const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
+    expect(tv.getByText('A sealed invitation')).toBeVisible()
+    expect(tv.getByText(/If you decline, you leave the castle/)).toBeVisible()
+    expect(tv.queryByText(/You warded/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Decline and leave' })).toBeEnabled()
+  })
 
   it('opens the paired Home Hub destinations from a profile', () => {
     const openDressingRoom = vi.fn()
@@ -430,6 +954,7 @@ describe('Betrayals season review', () => {
     fireEvent.click(wallet.getByRole('button', { name: 'Close wallet' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Home' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Save for later' }))
     expect(screen.getByRole('button', { name: 'Continue season' })).toBeVisible()
     expect(screen.getByRole('main')).not.toHaveTextContent(/Day\s+1\s*·\s*Social/)
     fireEvent.click(screen.getByRole('button', { name: 'Store' }))
@@ -1049,7 +1574,7 @@ describe('Betrayals season review', () => {
     expect(privateTalk.queryByRole('button', { name: /Propose Personal Pact/ })).toBeNull()
     fireEvent.click(privateTalk.getByRole('button', { name: 'Close social panel' }))
     fireEvent.click(screen.getByRole('button', { name: 'Enter Round Table' }))
-    await clickAndSave(screen.getByRole('button', { name: 'Hear the room and vote' }))
+    await clickAndSave(screen.getByRole('button', { name: 'Voting' }))
     expect(screen.queryByRole('dialog', { name: 'Round Table' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lock vote' })).toBeDisabled()
   })
@@ -1175,20 +1700,34 @@ describe('Betrayals season review', () => {
     render(<BetrayalsScreen />)
     const tv = within(screen.getByRole('region', { name: 'Faux TV' }))
     expect(tv.getByRole('heading', { name: 'Cocktails' })).toBeVisible()
-    fireEvent.click(tv.getByRole('button', { name: 'Review the vote' }))
+    fireEvent.click(tv.getByRole('button', { name: 'All Votes' }))
     const ledger = within(screen.getByRole('dialog', { name: 'All Round Table votes' }))
     expect(ledger.getByRole('list', { name: 'All ballots' })).toHaveTextContent(voter.name)
     expect(ledger.getByText(/They were a Loyal/)).toBeVisible()
     fireEvent.click(ledger.getByRole('button', { name: 'Back to Cocktails' }))
     await clickAndSave(screen.getByRole('button', { name: 'Continue to Night' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'nightfall')
+    expect(document.querySelectorAll('.betrayals-nightfall__windows')).toHaveLength(3)
+    await finishCinematic()
     expect(tv.getByText('Everyone is trying to sleep. However, evil never sleeps.')).toBeVisible()
     expect(screen.getAllByRole('button', { name: /Asleep/ }).length).toBeGreaterThan(0)
     await clickAndSave(screen.getByRole('button', { name: 'Go to sleep' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'conclave-shadow')
     await finishCinematic()
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+    const pending = restoreRun(localStorage, 'edition-local')
+    expect(pending.status).toBe('ready')
+    if (pending.status !== 'ready') throw new Error('Expected the night result to be saved')
+    const victimId = pending.run.private.pendingNight?.targetId
+    const victimSeat = document.querySelector(`[data-seat-id="${victimId}"]`)
+    expect(victimSeat).toHaveAttribute('data-asleep', 'true')
+    expect(victimSeat?.querySelector('[data-seal="night"]')).toBeNull()
     await finishCinematic()
+    expect(victimSeat).not.toHaveAttribute('data-asleep')
+    expect(victimSeat?.querySelector('[data-seal="night"]')).toBeInTheDocument()
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'castle-wakes')
+    await finishCinematic()
     expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeVisible()
   })
 
@@ -1216,7 +1755,7 @@ describe('Betrayals season review', () => {
       within(screen.getByRole('dialog', { name: 'Round Table ballot reveal' })).getByRole(
         'button',
         {
-          name: 'View all votes',
+          name: 'All Votes',
         }
       )
     )
@@ -1224,7 +1763,7 @@ describe('Betrayals season review', () => {
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
     expect(
       within(screen.getByRole('region', { name: 'Faux TV' })).getByRole('button', {
-        name: 'View all votes',
+        name: 'All Votes',
       })
     ).toBeVisible()
 
@@ -1241,7 +1780,7 @@ describe('Betrayals season review', () => {
     expect(feed.getByRole('status')).toHaveTextContent('The count is complete.')
     expect(
       within(screen.getByRole('region', { name: 'Faux TV' })).getByRole('button', {
-        name: 'View all votes',
+        name: 'All Votes',
       })
     ).toBeVisible()
     expect(screen.getByRole('button', { name: 'Reveal result' })).toBeEnabled()
@@ -1286,6 +1825,8 @@ describe('Betrayals season review', () => {
     await clickAndSave(screen.getByRole('button', { name: 'Reveal result' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'departure')
     await finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'nightfall')
+    await finishCinematic()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(tv.getByText(banished.name + ' was banished. A Loyal.')).toBeVisible()
     const seats = cast.getAllByRole('button')
@@ -1304,6 +1845,8 @@ describe('Betrayals season review', () => {
     expect(seats[position]).not.toHaveAttribute('data-asleep')
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'death-letter')
+    await finishCinematic()
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'castle-wakes')
     await finishCinematic()
     expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'awakening')
     expect(screen.getByRole('dialog')).toHaveAttribute('data-reduced', 'true')
@@ -1330,7 +1873,9 @@ describe('Betrayals season review', () => {
       const night = {
         ...run,
         phase: 'night' as const,
-        presentation: ['conclave-arrival' as const],
+        presentation: animated
+          ? (['nightfall', 'conclave-arrival'] as const).slice()
+          : ['conclave-arrival' as const],
         private: {
           ...run.private,
           betrayers: run.seats.slice(0, 4).map(({ id }) => id),
@@ -1348,6 +1893,12 @@ describe('Betrayals season review', () => {
       render(<BetrayalsScreen />)
 
       if (animated) {
+        expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'nightfall')
+        expect(screen.getByRole('main', { hidden: true })).toHaveAttribute(
+          'data-conclave-cover',
+          'true'
+        )
+        await finishCinematic()
         const room = screen.getByRole('dialog', { name: 'The Conclave' })
         const conclave = within(room)
         const film = room.querySelector('.conclave-film')
@@ -1399,6 +1950,7 @@ describe('Betrayals season review', () => {
     render(<BetrayalsScreen />)
 
     const conclave = within(screen.getByRole('dialog', { name: 'The Conclave' }))
+    expect(conclave.getByRole('heading', { name: 'A Quiet Knock' })).toBeVisible()
     const gallery = within(conclave.getByRole('list', { name: 'Eligible contestants' }))
     expect(gallery.getAllByRole('button')).toHaveLength(21)
     expect(gallery.queryByRole('button', { name: immune.name })).not.toBeInTheDocument()
@@ -1549,7 +2101,7 @@ describe('Betrayals season review', () => {
     ])
   })
 
-  it('goes straight to Dawn and privately tells you when your Night Shield stopped the elimination', async () => {
+  it('plays the morning transition and privately tells you when your Night Shield worked', async () => {
     const run = startRun(
       { id: 'human', name: 'Georgi' },
       BETRAYALS_AI_POOL,
@@ -1570,6 +2122,8 @@ describe('Betrayals season review', () => {
     render(<BetrayalsScreen />)
 
     await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'castle-wakes')
+    await finishCinematic()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Breakfast' })).toBeVisible()
     expect(screen.getByText('Your Night Shield stopped the Conclave’s attempt.')).toBeVisible()
@@ -1643,6 +2197,8 @@ describe('Betrayals season review', () => {
             act(() => vi.advanceTimersByTime(duration))
           }
           await clickAndSave(screen.getByRole('button', { name: 'Continue' }))
+          expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'castle-wakes')
+          await finishCinematic()
         }
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
         expect(
@@ -1678,6 +2234,8 @@ describe('Betrayals season review', () => {
       render(<BetrayalsScreen />)
 
       await clickAndSave(screen.getByRole('button', { name: 'Open Dawn' }))
+      expect(screen.getByRole('dialog')).toHaveAttribute('data-scene', 'castle-wakes')
+      await finishCinematic()
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Georgi, Eliminated at Night' })).toBeVisible()
     } finally {

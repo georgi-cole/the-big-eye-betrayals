@@ -141,6 +141,17 @@
   stroke-linecap: round;
 }
 
+.betrayals-broadcast__controls .round-table-feed__utility {
+  min-height: 100%;
+  padding: 0 0.28rem;
+  font: inherit;
+}
+
+.betrayals-broadcast__controls .round-table-feed__utility svg {
+  width: 11px;
+  height: 11px;
+}
+
 .round-table-ballot {
   position: fixed;
   inset: 0;
@@ -265,8 +276,15 @@
   gap: 8px 15px;
 }
 
-.round-table-ballot__frame--review > button {
+.round-table-ballot__vote-count {
   margin-bottom: max(12px, env(safe-area-inset-bottom));
+  color: #f2d1a9;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.round-table-ballot__frame--review .round-table-ballot__header {
+  align-items: center;
 }
 
 .round-table-ballot__frame--review {

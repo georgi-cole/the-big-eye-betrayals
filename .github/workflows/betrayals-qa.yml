@@ -1,0 +1,51 @@
+name: Deploy private Betrayals QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: betrayals-qa
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: betrayals-qa
+    steps:
+      - name: Verify private QA deployment is configured
+        env:
+          ACCESS_CONFIGURED: ${{ vars.CLOUDFLARE_QA_ACCESS_CONFIGURED }}
+          QA_PROJECT: ${{ vars.CLOUDFLARE_QA_PAGES_PROJECT }}
+          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [[ "$ACCESS_CONFIGURED" != true || -z "$QA_PROJECT" || -z "$ACCOUNT_ID" || -z "$API_TOKEN" ]]; then
+            echo "::error::Configure the dedicated QA Pages project and Cloudflare Access before deploying."
+            exit 1
+          fi
+          if [[ ! "$QA_PROJECT" =~ ^[a-z0-9-]+-qa$ || "$QA_PROJECT" == bbmobilenew-qa ]]; then
+            echo "::error::Use a dedicated Betrayals QA Pages project ending in -qa."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:pr
+      - run: npm run generate:after-eye
+      - run: npx vite build --mode betrayals-qa
+      - name: Deploy QA to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy dist-betrayals-qa --project-name=${{ vars.CLOUDFLARE_QA_PAGES_PROJECT }} --branch=main

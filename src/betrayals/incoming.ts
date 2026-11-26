@@ -6,6 +6,7 @@ import { castleSocialMoment, closeCastleMoment, playCastleChoice } from './castl
 import { CASTLE_CHOICES } from './castleLifeBank.ts'
 import type { CastleChoice } from './castleLifeBank.ts'
 import {
+  canAskPlayerForNightShield,
   gaveNightShieldToday,
   nightShieldWindowOpen,
   reactionToShieldClaim,
@@ -265,7 +266,13 @@ function shieldInteractions(run: Run): IncomingInteraction[] {
   const requester = run.phase === 'shield-deals' && guests.get(requestId ?? '')
   const requestKey = `${run.day}:shield-request`
   const reply = run.incomingResponses?.[requestKey]
-  if (requester && !requester.exit && (reply || run.private.nightShieldIds.includes(run.humanId))) {
+  if (
+    requester &&
+    !requester.exit &&
+    (reply ||
+      (run.private.nightShieldIds.includes(run.humanId) &&
+        canAskPlayerForNightShield(run, requester.id)))
+  ) {
     return [
       ...messages,
       {
@@ -525,11 +532,16 @@ export function respondToIncomingInteraction(
     if (answer === 'listen') return run
     const next =
       answer === 'engage'
-        ? applySocialMove(run, token, {
-            actorId: run.humanId,
-            recipientId: encounter.speaker.id,
-            kind: 'shield-gift',
-          })
+        ? applySocialMove(
+            run,
+            token,
+            {
+              actorId: run.humanId,
+              recipientId: encounter.speaker.id,
+              kind: 'shield-gift',
+            },
+            true
+          )
         : run
     if (answer === 'engage' && next === run) return run
     return {

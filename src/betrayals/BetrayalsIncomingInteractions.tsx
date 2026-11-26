@@ -5,9 +5,12 @@ import {
 } from '../components/IncomingInteractionsInbox/IncomingInboxChrome'
 import type { IncomingInteractionIconName } from '../components/IncomingInteractionsInbox/IncomingInteractionIcon'
 import PlayerAvatar from '../components/PlayerAvatar/PlayerAvatar'
+import StoreProductIcon from '../components/StoreProductModal/StoreProductIcon'
 import { BetrayalsResourceCosts } from './BetrayalsResourceCosts'
 import type { IncomingAction, IncomingInteraction } from './incoming'
+import { isPremiumCastleChoice } from './premiumAccess'
 import type { IncomingAnswer } from './run'
+import '../components/SocialPanelV2/ActionCard.css'
 import './betrayals-incoming.css'
 import './ceremonyActions.css'
 
@@ -15,6 +18,8 @@ type Props = {
   interactions: readonly IncomingInteraction[]
   onRespond: (id: string, answer: IncomingAction) => void
   onClose: () => void
+  hasRealityMode?: boolean
+  hasMyPulse?: boolean
   readIds?: ReadonlySet<string>
   onRead?: (id: string) => void
   onDiscussVote?: (speakerId: string) => void
@@ -90,6 +95,14 @@ function hasOpenFollowUp({ response, shieldFollowUp }: IncomingInteraction) {
   return response !== 'dismiss' && (shieldFollowUp?.canRequest || shieldFollowUp?.canAskPlans)
 }
 
+function InboxVipEye({ feature }: { feature: 'Reality Mode' | 'My Pulse' }) {
+  return (
+    <span className="ac-card__premium-badge" aria-hidden="true" title={`Unlock ${feature}`}>
+      <StoreProductIcon name="vip" />
+    </span>
+  )
+}
+
 function outcome({ response, kind, speaker, target, castleMoment }: IncomingInteraction) {
   if (castleMoment?.response) {
     return {
@@ -133,6 +146,8 @@ function InboxMessage({
   onRespond,
   onDiscussVote,
   onOpenIntel,
+  hasRealityMode,
+  hasMyPulse,
 }: {
   interaction: IncomingInteraction
   read: boolean
@@ -140,6 +155,8 @@ function InboxMessage({
   onRespond: Props['onRespond']
   onDiscussVote?: Props['onDiscussVote']
   onOpenIntel?: Props['onOpenIntel']
+  hasRealityMode: boolean
+  hasMyPulse: boolean
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const { id, kind, speaker, response, text, shieldFollowUp } = interaction
@@ -161,9 +178,11 @@ function InboxMessage({
         <button
           type="button"
           className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
+          aria-description={hasMyPulse ? undefined : 'My Pulse feature'}
           onClick={() => onOpenIntel(moment.reportGuestId!)}
         >
           Open in Intel
+          {!hasMyPulse && <InboxVipEye feature="My Pulse" />}
         </button>
       )}
     </div>
@@ -241,9 +260,11 @@ function InboxMessage({
             <button
               type="button"
               className="betrayals-ceremony-action--secondary betrayals-inbox__intel"
+              aria-description={hasMyPulse ? undefined : 'My Pulse feature'}
               onClick={() => onOpenIntel(moment.callbackGuestId!)}
             >
               Follow up in Intel
+              {!hasMyPulse && <InboxVipEye feature="My Pulse" />}
             </button>
           )}
       </div>
@@ -286,19 +307,24 @@ function InboxMessage({
             </button>
           )}
           {!response &&
-            moment?.options.map(({ action, label, cost, reason }) => (
-              <button
-                key={action}
-                type="button"
-                className="inbox-action inbox-action--neutral"
-                disabled={!!reason}
-                title={reason}
-                onClick={() => onRespond(id, action)}
-              >
-                {label}
-                <BetrayalsResourceCosts cost={cost} />
-              </button>
-            ))}
+            moment?.options.map(({ action, label, cost, reason }) => {
+              const locked = !hasRealityMode && isPremiumCastleChoice(action)
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className="inbox-action inbox-action--neutral betrayals-inbox__reply"
+                  aria-description={locked ? 'Reality Mode feature' : undefined}
+                  disabled={!!reason}
+                  title={reason}
+                  onClick={() => onRespond(id, action)}
+                >
+                  <span>{label}</span>
+                  <BetrayalsResourceCosts cost={cost} />
+                  {locked && <InboxVipEye feature="Reality Mode" />}
+                </button>
+              )
+            })}
           {!response &&
             (moment ? (['dismiss'] as const) : (['engage', 'listen', 'dismiss'] as const)).map(
               (answer) =>
@@ -337,6 +363,8 @@ export function BetrayalsIncomingInteractions({
   onRead,
   onDiscussVote,
   onOpenIntel,
+  hasRealityMode = false,
+  hasMyPulse = false,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [localReadIds, setLocalReadIds] = useState<ReadonlySet<string>>(() => new Set())
@@ -381,6 +409,8 @@ export function BetrayalsIncomingInteractions({
       onRespond={respond}
       onDiscussVote={onDiscussVote}
       onOpenIntel={onOpenIntel}
+      hasRealityMode={hasRealityMode}
+      hasMyPulse={hasMyPulse}
     />
   )
 

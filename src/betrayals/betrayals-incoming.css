@@ -89,16 +89,26 @@
   white-space: nowrap;
 }
 
-.betrayals-incoming-dialog .betrayals-resource-costs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.12em 0.42em;
-  margin-block-start: 0.14rem;
+.betrayals-incoming-dialog .betrayals-inbox__reply {
+  flex-flow: row wrap;
+  gap: 0.18rem 0.32rem;
 }
 
-.betrayals-incoming-dialog .betrayals-resource-costs span {
+.betrayals-inbox__reply > span:not(.ac-card__premium-badge) {
+  max-inline-size: 100%;
+}
+
+.betrayals-inbox__reply .betrayals-resource-costs {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: center;
+  gap: 0.12em 0.42em;
+}
+
+.betrayals-inbox__reply .betrayals-resource-costs > span {
   white-space: nowrap;
+  word-spacing: -0.12em;
 }
 
 .betrayals-inbox__card-head {
@@ -120,4 +130,16 @@
   padding: 0.12rem 0.45rem;
   font-size: 0.67rem;
   white-space: nowrap;
+}
+
+.betrayals-incoming-dialog :is(.inbox-action, .betrayals-inbox__intel)[aria-description] {
+  position: relative;
+}
+
+.betrayals-incoming-dialog .ac-card__premium-badge {
+  top: -0.52rem;
+  right: 0.04rem;
+  width: 1.24rem;
+  height: 1.24rem;
+  pointer-events: none;
 }

@@ -5,6 +5,10 @@ import process from 'node:process'
 const outputDirectory = path.resolve(process.argv[2] ?? 'dist')
 const inspectedExtensions = new Set(['.html', '.js', '.mjs'])
 const forbiddenPatterns = [
+  {
+    label: 'Betrayals QA menu or simulated checkout',
+    pattern: /Open Castle QA|Simulate to season result|QA Eyeros top-up/,
+  },
   { label: 'release performance fixture', pattern: /window\.__releasePerf\b/ },
   // Match the legacy browser global itself, not legitimate persisted keys such as
   // player__storeExtraVote used to attribute an additional ballot.

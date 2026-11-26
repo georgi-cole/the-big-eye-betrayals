@@ -43,3 +43,22 @@ export const phaseGroupLabel: Record<Phase, string> = {
   'end-vote': 'Finale',
   settled: 'Finale',
 }
+
+export const phaseSubphaseLabel: Record<Phase, string> = {
+  'role-reveal': 'The Oath',
+  dawn: 'First Light',
+  social: 'Castle Whispers',
+  immunity: 'Immunity Trial',
+  'after-immunity': 'Lunch',
+  safety: 'Shield Trial',
+  'shield-deals': 'Shield Deals',
+  'round-table': 'Round Table',
+  'table-reveal': 'The Verdict',
+  cocktail: 'After the Vote',
+  night: 'Lights Out',
+  'night-resolved': 'The Long Hush',
+  'final-challenge': 'Last Trial',
+  'final-banishment': 'Last Banishment',
+  'end-vote': 'One More?',
+  settled: 'The Reckoning',
+}

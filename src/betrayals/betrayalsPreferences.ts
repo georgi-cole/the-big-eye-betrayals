@@ -18,6 +18,7 @@ type Preferences = {
   reducedMotion: boolean
   lookId: BetrayalsLookId | null
   seasonPublicMode?: boolean
+  seasonDramaMode?: boolean
   seasonRealityMode?: RealityPreset
 }
 
@@ -73,6 +74,7 @@ function readPreferences(): Preferences {
       lookId: saved.lookId && isBetrayalsLook(saved.lookId) ? saved.lookId : null,
       seasonPublicMode:
         typeof saved.seasonPublicMode === 'boolean' ? saved.seasonPublicMode : undefined,
+      seasonDramaMode: saved.seasonDramaMode === true,
       seasonRealityMode: isSeasonRealityMode(saved.seasonRealityMode)
         ? saved.seasonRealityMode
         : undefined,
@@ -89,6 +91,7 @@ export function useBetrayalsUtilities(phase?: Phase, suspended = false, lastSeas
   const { musicOn, musicVolume, soundOn, soundVolume } = preferences
   const seasonOptions: RunOptions = {
     publicMode: preferences.seasonPublicMode ?? lastSeason?.publicMode ?? false,
+    castleRoles: preferences.seasonDramaMode === true,
     realityMode:
       preferences.seasonRealityMode ??
       (isSeasonRealityMode(lastSeason?.realityMode) ? lastSeason.realityMode : 'off'),

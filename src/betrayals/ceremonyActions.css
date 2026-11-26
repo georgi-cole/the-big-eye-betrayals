@@ -5,7 +5,10 @@
   border-radius: 0.36rem;
   background:
     url('/assets/betrayals/entrance-primary-plaque.png') center / 100% 100% no-repeat,
-    radial-gradient(ellipse, #c59b62 28%, transparent 64%);
+    linear-gradient(170deg, #e9c88c, #d6aa6d 43%, #b78750) center / calc(100% - 1.35rem)
+      calc(100% - 1rem) no-repeat,
+    linear-gradient(170deg, #e8c893, #7d532c) center / calc(100% - 1.2rem) calc(100% - 0.85rem)
+      no-repeat;
   color: #25170f;
   font:
     700 1.11rem Georgia,
@@ -40,4 +43,41 @@
 .betrayals-ceremony-action--secondary:is(:hover, :focus-visible) {
   color: #fff0d9;
   filter: brightness(1.16) drop-shadow(0 0 0.5rem #efb36144);
+}
+
+button.betrayals-ceremony-action--compact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 34px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 5px;
+  background: url('/assets/betrayals/entrance-secondary-plaque.png') center / 100% 100% no-repeat;
+  color: #ffdfb3;
+  font:
+    700 0.78rem/1.12 Georgia,
+    serif;
+  text-align: center;
+  cursor: pointer;
+}
+
+button.betrayals-ceremony-action--compact[aria-pressed='true'] {
+  background-image: url('/assets/betrayals/entrance-primary-plaque.png');
+  color: #28180d;
+}
+
+button.betrayals-ceremony-action--compact:is(:hover, :focus-visible):enabled {
+  filter: brightness(1.15);
+}
+
+button.betrayals-ceremony-action--compact:focus-visible {
+  outline: 2px solid #ffe0a4;
+  outline-offset: 2px;
+}
+
+button.betrayals-ceremony-action--compact:disabled {
+  opacity: 0.55;
+  cursor: default;
 }

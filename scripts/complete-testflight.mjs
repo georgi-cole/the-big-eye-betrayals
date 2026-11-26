@@ -7,14 +7,25 @@ import {
 } from './lib/testflight-readiness.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const policy = JSON.parse(
-  await readFile(new URL('./testflight-readiness-policy.json', import.meta.url), 'utf8')
+const args = process.argv.slice(2)
+const betrayals = args.includes('--betrayals')
+const checkOnly = args.includes('--check-policy')
+if (args.some((arg) => arg !== '--betrayals' && arg !== '--check-policy'))
+  throw new Error('Use --betrayals for Betrayals and --check-policy to validate without uploading.')
+const policyName = betrayals
+  ? 'betrayals-testflight-readiness-policy.json'
+  : 'testflight-readiness-policy.json'
+const policy = JSON.parse(await readFile(new URL(policyName, import.meta.url), 'utf8'))
+if (
+  betrayals &&
+  (policy.appId !== '6839538320' ||
+    policy.internalGroupId !== 'd7a334e3-0eba-4c19-aeee-5609861042df')
 )
+  throw new Error('The Betrayals policy must target the Betrayals app and internal QA group.')
 await verifyEncryptionInputs(root, policy)
-if (process.argv.length === 3 && process.argv[2] === '--check-policy') {
+if (checkOnly) {
   console.log('TestFlight encryption inputs match the user-approved baseline.')
 } else {
-  if (process.argv.length !== 2) throw new Error('Use no arguments or --check-policy.')
   const api = createAppleClient({
     issuerId: process.env.ASC_API_ISSUER_ID,
     keyId: process.env.ASC_API_KEY_ID,
@@ -25,7 +36,7 @@ if (process.argv.length === 3 && process.argv[2] === '--check-policy') {
     policy,
     buildNumber: process.env.IOS_BUILD_NUMBER,
   })
-  const summary = `## TestFlight ready\n- Build: ${result.buildNumber}\n- Status: ${result.internalBuildState}\n- Group: The Big Eye Internal\n- Reused the completed encryption answer from approved build ${policy.approvedBuildId}.\n`
+  const summary = `## TestFlight ready\n- Build: ${result.buildNumber}\n- Status: ${result.internalBuildState}\n- Group: ${betrayals ? 'Betrayals QA' : 'The Big Eye Internal'}\n- Reused the completed encryption answer from approved build ${policy.approvedBuildId}.\n`
   console.log(summary)
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, summary)
 }

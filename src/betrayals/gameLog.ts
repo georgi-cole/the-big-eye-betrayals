@@ -1,4 +1,5 @@
 import type { Run, SocialEntry } from './run.ts'
+import { CASTLE_ROLE_CATALOG, castleRoleFor } from './castleRoles.ts'
 
 export type GameLogEntry = {
   day: number
@@ -104,6 +105,31 @@ export function recordGameActivity(previous: Run | null, next: Run): Run {
     entries.push({ day: next.day, kind, text })
   }
   if (next.day > previous.day) add('The castle opened for a new day.')
+  let kamikazeVictim: string | undefined
+  for (const card of next.private.castleRoles ?? []) {
+    const used = card.used
+    if (!used || used === castleRoleFor(previous, card.guestId)?.used) continue
+    if (used.roleId === 'last-will') {
+      const role = used.revealedRole
+        ? ` with the ${CASTLE_ROLE_CATALOG[used.revealedRole].title} role`
+        : ''
+      add(
+        `Last Will revealed ${guestName(next, used.targetId)} as ${used.allegiance === 'betrayer' ? 'a Betrayer' : 'a Loyal'}${role}.`
+      )
+    }
+    if (used.roleId === 'medium') add(`${guestName(next, used.targetId)} returned to the castle.`)
+    if (used.roleId === 'bad-witch') add('The Round Table fell asleep. The ballot was cancelled.')
+    if (used.roleId === 'kamikaze') {
+      const target = guestName(next, used.targetId)
+      if (!used.blocked) kamikazeVictim = used.targetId
+      add(
+        used.blocked
+          ? `${target} was protected from the Kamikaze.`
+          : `${target} was taken out by the Kamikaze.`,
+        'departure'
+      )
+    }
+  }
   const shieldSave = next.private.lastShieldSave
   if (next.day > previous.day && shieldSave?.day === next.day && shieldSave.id === next.humanId) {
     add('Your Night Shield stopped the Conclave’s attempt.')
@@ -139,7 +165,7 @@ export function recordGameActivity(previous: Run | null, next: Run): Run {
   }
   entries.push(
     ...next.seats.flatMap((seat, index) =>
-      seat.exit && !previous.seats[index]?.exit ? departure(seat) : []
+      seat.exit && seat.id !== kamikazeVictim && !previous.seats[index]?.exit ? departure(seat) : []
     )
   )
   entries.push(...personalActivity(next, next.social.slice(previous.social.length)))

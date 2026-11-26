@@ -11,13 +11,15 @@ import { chooseTarget, resolutionPerspective } from './strategy.ts'
 import { closeCastleMoment } from './castleLife.ts'
 import { hasRequiredIncoming } from './incoming.ts'
 import { settleUnansweredVoteOffers } from './votePlans.ts'
+import { prepareDayCastleRoles } from './castleRoleEvents.ts'
 
 export function advanceDayBeat(run: Run): Run {
+  if (run.presentation?.length || run.private.departurePower || hasRequiredIncoming(run)) return run
+  const prepared = prepareDayCastleRoles(run)
   if (run.phase === 'dawn' && !run.dayFlow?.castleDay)
-    return openInvestigationDay(advancePreparation(run, commandToken(run)))
+    return openInvestigationDay(advancePreparation(prepared, commandToken(prepared)))
   if (run.phase !== 'social' && run.phase !== 'dawn') return run
-  if (run.presentation?.length || hasRequiredIncoming(run)) return run
-  let active = closeCastleMoment(run)
+  let active = closeCastleMoment(prepared)
   const preset = run.options.realityMode
   const afternoon = run.phase === 'social' && run.dayFlow?.castleDay
   const rng = mulberry32(run.publicSeed ^ (run.day * 917) ^ (afternoon ? 40343 : 0))

@@ -1,0 +1,13 @@
+.betrayals-castle-role {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.betrayals-castle-role strong {
+  color: #f5d7ad;
+  font-weight: 650;
+}
+
+.betrayals-castle-role p {
+  margin: 0;
+}
