@@ -185,6 +185,37 @@ it('maps anonymous Safety outcomes back to the right guests and honors game plac
   expect(restored.status === 'ready' && restored.run.challengeHistory).toEqual([game.key])
 })
 
+it('shows a regular Loyal their own shield win and keeps the other private winner hidden', () => {
+  const fieldRun = field(12, 'safety')
+  const run = {
+    ...fieldRun,
+    private: {
+      ...fieldRun.private,
+      betrayers: fieldRun.private.betrayers.filter((id) => id !== fieldRun.humanId),
+    },
+  }
+  const game = availableGames(run).get('cardClash')!
+  const players = challengePlayers(run, game)
+  const human = players.find(({ isHuman }) => isHuman)!
+  const opponent = players.find(({ isHuman }) => !isHuman)!
+  const ranked = [human, opponent, ...players.filter((p) => p !== human && p !== opponent)]
+  const result = resolveChallenge(
+    run,
+    commandToken(run),
+    scoreField(run, game, {
+      score: 2000,
+      completion: { authoritativeRankedIds: ranked.map(({ id }) => id) },
+    }),
+    game.key
+  )
+  expect(result.private.nightShieldIds).toEqual([human.contestantId, opponent.contestantId])
+  expect(viewFor(result, run.humanId).knownNightShieldIds).toEqual([human.contestantId])
+  expect(safetyResultsFor(result, run.humanId).slice(0, 2)).toMatchObject([
+    { own: true, name: 'Georgi', shield: true },
+    { own: false, name: null, shield: undefined },
+  ])
+})
+
 it('uses real contestants and publishes named standings for a public Safety fallback', () => {
   const run = field(12, 'safety')
   const games = [...availableGames(run).values()]

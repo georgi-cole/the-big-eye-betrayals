@@ -78,7 +78,7 @@
    an already-full viewport. Let the arena flex into the actual remaining space
    instead, and compact the HUD/roster enough that the full wall stays visible. */
 @media (max-width: 540px), (max-height: 900px) {
-  .minigame-host .htw-root {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-root {
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -89,7 +89,7 @@
     overflow: hidden;
   }
 
-  .minigame-host .htw-hud {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud {
     flex: 0 0 auto;
     width: min(100%, 28rem);
     max-width: 28rem;
@@ -97,48 +97,48 @@
     padding: 0.32rem 0.72rem;
   }
 
-  .minigame-host .htw-hud-stat {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud-stat {
     gap: 0;
   }
 
-  .minigame-host .htw-hud-stat .htw-hourglass {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud-stat .htw-hourglass {
     margin: -8px auto -10px;
     transform: scale(0.7);
     transform-origin: center;
   }
 
-  .minigame-host .htw-hud-label {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud-label {
     font-size: 0.58rem;
     line-height: 1.1;
   }
 
-  .minigame-host .htw-hud-value {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud-value {
     font-size: 1rem;
     line-height: 1.1;
   }
 
-  .minigame-host .htw-participants {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-participants {
     flex: 0 0 auto;
     gap: 0.2rem 0.42rem;
     max-width: 100%;
   }
 
-  .minigame-host .htw-participant {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-participant {
     gap: 1px;
   }
 
-  .minigame-host .htw-participant-avatar {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-participant-avatar {
     width: 30px;
     height: 30px;
   }
 
-  .minigame-host .htw-participant-name {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-participant-name {
     max-width: 46px;
     font-size: 0.58rem;
     line-height: 1.1;
   }
 
-  .minigame-host .htw-narrative {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-narrative {
     flex: 0 0 auto;
     min-height: 0;
     max-width: 100%;
@@ -147,7 +147,7 @@
     line-height: 1.28;
   }
 
-  .minigame-host .htw-wall--expanded {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-wall--expanded {
     flex: 1 1 0;
     width: 100%;
     height: auto;
@@ -156,17 +156,17 @@
     border-radius: 0.9rem 0.75rem 0.45rem 0.45rem;
   }
 
-  .minigame-host .htw-wall__pressure {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-wall__pressure {
     top: 0.72rem;
     width: min(84%, 22rem);
     padding: 0.4rem 0.55rem 0.48rem;
   }
 
-  .minigame-host .htw-wall__grip-field {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-wall__grip-field {
     inset: 5.6rem 0 4.7rem;
   }
 
-  .minigame-host .htw-wall__hold-zone {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-wall__hold-zone {
     bottom: 0.65rem;
     width: min(84%, 19rem);
     padding: 0.62rem 0.8rem;
@@ -206,21 +206,21 @@
 }
 
 @media (max-height: 720px) {
-  .minigame-host .htw-root {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-root {
     gap: 0.24rem;
     padding-top: 0.3rem;
   }
 
-  .minigame-host .htw-hud {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-hud {
     padding-block: 0.2rem;
   }
 
-  .minigame-host .htw-participant-avatar {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-participant-avatar {
     width: 26px;
     height: 26px;
   }
 
-  .minigame-host .htw-narrative {
+  :is(.minigame-host, .betrayals-challenge-game) .htw-narrative {
     padding-block: 0.28rem;
     font-size: 0.7rem;
   }

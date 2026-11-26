@@ -88,7 +88,7 @@ describe('Betrayals incoming inbox', () => {
     expect(onRespond).not.toHaveBeenCalled()
   })
 
-  it('shows numeric costs with matching resource symbols and opens Intel from the reply row', () => {
+  it('shows numeric costs with matching resource symbols and places Intel by the message heading or outcome', () => {
     const onOpenIntel = vi.fn()
     const moment: IncomingInteraction = {
       id: 'castle',
@@ -106,7 +106,8 @@ describe('Betrayals incoming inbox', () => {
             action: 'ask-about',
             label: 'Ask who was there',
             cost: { energy: 1, influence: 2, info: 0 },
-            reason: 'Requires 2 Influence.',
+            reason: undefined,
+            shortfall: 'influence',
           },
         ],
         callback: undefined,
@@ -117,17 +118,30 @@ describe('Betrayals incoming inbox', () => {
       },
     }
     const props = { onClose: vi.fn(), onRespond: vi.fn(), onOpenIntel }
+    const pending = {
+      ...moment,
+      castleMoment: { ...moment.castleMoment!, callbackGuestId: 'sable' },
+    }
     const { rerender } = render(
-      <BetrayalsIncomingInteractions interactions={[moment]} {...props} />
+      <BetrayalsIncomingInteractions interactions={[pending]} {...props} />
     )
-    const reply = within(screen.getByRole('button', { name: /^Ask who was there/ }))
+    const pendingIntel = screen.getByRole('button', { name: /^Open Intel$/ })
+    expect(pendingIntel.closest('.betrayals-inbox__card-heading')).toHaveTextContent('Sable')
+    expect(screen.queryByRole('button', { name: 'Pass' })).not.toBeInTheDocument()
+    fireEvent.click(pendingIntel)
+    expect(onOpenIntel).toHaveBeenLastCalledWith('sable')
+    const replyButton = screen.getByRole('button', { name: /^Ask who was there/ })
+    const reply = within(replyButton)
     expect(reply.getByRole('img', { name: '1 Energy' })).toHaveTextContent('⚡ 1')
     expect(reply.getByRole('img', { name: '2 Influence' })).toHaveTextContent('🗣️ 2')
-    expect(reply.queryByText('Requires 2 Influence.')).toBeNull()
+    expect(reply.queryByText(/Requires/)).not.toBeInTheDocument()
+    fireEvent.click(replyButton)
+    const shortage = within(screen.getByRole('dialog', { name: 'Not enough Influence' }))
+    expect(shortage.getByText('This reply costs 2 Influence.')).toBeVisible()
+    expect(shortage.queryByRole('button', { name: /Watch ad/ })).not.toBeInTheDocument()
+    expect(props.onRespond).not.toHaveBeenCalled()
+    fireEvent.click(shortage.getByRole('button', { name: 'Back to Inbox' }))
     expect(reply.getByTitle('Unlock Reality Mode')).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('button', { name: 'Pass' })).queryByTitle('Unlock Reality Mode')
-    ).not.toBeInTheDocument()
     rerender(<BetrayalsIncomingInteractions interactions={[moment]} hasRealityMode {...props} />)
     expect(screen.queryByTitle('Unlock Reality Mode')).not.toBeInTheDocument()
     rerender(
@@ -141,6 +155,7 @@ describe('Betrayals incoming inbox', () => {
               options: [],
               response: 'observed',
               reportGuestId: 'opal',
+              callbackGuestId: 'sable',
             },
           },
         ]}
@@ -148,10 +163,15 @@ describe('Betrayals incoming inbox', () => {
       />
     )
     fireEvent.click(screen.getByText('History · 1'))
+    expect(screen.queryByText(/Resolved/)).not.toBeInTheDocument()
     const intel = screen.getByRole('button', { name: 'Open in Intel' })
     expect(within(intel).getByTitle('Unlock My Pulse')).toBeInTheDocument()
     expect(intel.parentElement?.parentElement).toHaveTextContent('Your sighting is in Intel.')
     fireEvent.click(intel)
     expect(onOpenIntel).toHaveBeenCalledWith('opal')
+    const followUp = screen.getByRole('button', { name: 'Continue in Intel' })
+    expect(followUp.closest('.inbox-item__feedback')).toBe(intel.closest('.inbox-item__feedback'))
+    fireEvent.click(followUp)
+    expect(onOpenIntel).toHaveBeenLastCalledWith('sable')
   })
 })

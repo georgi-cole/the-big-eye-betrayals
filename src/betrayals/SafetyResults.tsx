@@ -71,7 +71,9 @@ export function SafetyResults({
                 <th scope="row">{row.name ?? <span aria-label="Hidden">✦✦✦</span>}</th>
                 <td>{row.forfeited ? '—' : row.place}</td>
                 <td>{row.forfeited ? 'Forfeit' : formatScore(row.score)}</td>
-                <td>{row.shield ? 'Won' : '—'}</td>
+                <td aria-label={row.shield === undefined ? 'Shield result hidden' : undefined}>
+                  {row.shield ? 'Won' : '—'}
+                </td>
               </tr>
             ))}
           </tbody>

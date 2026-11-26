@@ -601,6 +601,39 @@
   overscroll-behavior: contain;
 }
 
+.betrayals-challenge-game:has(> .htw-root) {
+  container: betrayals-wall / size;
+  overflow: hidden;
+}
+
+.betrayals-challenge-game:has(> .htw-root) .htw-spectating {
+  flex: 0 0 auto;
+  order: 4;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.betrayals-challenge-game:has(> .htw-root) .htw-spectating p {
+  margin: 0;
+}
+
+@container betrayals-wall (max-height: 560px) {
+  .betrayals-challenge-game .htw-participants {
+    box-sizing: border-box;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 0.25rem 0.3rem;
+    overscroll-behavior-inline: contain;
+    touch-action: pan-x;
+  }
+
+  .betrayals-challenge-game .htw-participant {
+    flex: 0 0 auto;
+  }
+}
+
 .betrayals-challenge-portal > .qtr-canvas {
   position: absolute;
   min-height: 0;

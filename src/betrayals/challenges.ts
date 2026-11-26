@@ -217,7 +217,7 @@ export function safetyResultsFor(run: Run, actorId: string | null) {
       score,
       place: index + 1,
       forfeited: Boolean(forfeited),
-      shield,
+      shield: revealName ? shield : undefined,
       ...(shield && privatelyKnown.has(contestantId) && { clairvoyant: true }),
     }
   })

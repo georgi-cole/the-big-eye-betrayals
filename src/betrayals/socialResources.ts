@@ -17,6 +17,7 @@ export const CASTLE_EXPLORATION_INFO = 25
 export const EAVESDROP_INFO = 100
 export const GROUP_CHAT_INFLUENCE_PER_GUEST = 2
 export const SOCIAL_RECHARGE_ENERGY = calibration.rewardedRechargeEnergy
+export const INBOX_RECHARGE_ENERGY = 5
 
 const shieldConversationCost = { energy: 1, influence: 0, info: 0 }
 const actionEconomy: Record<
@@ -232,12 +233,13 @@ export function canRechargeSocialEnergy(run: Run): boolean {
 }
 
 /** Called after a completed ad, for the same season and in-game day as the offer. */
-export function rechargeSocialEnergy(run: Run): Run {
+export function rechargeSocialEnergy(run: Run, source: 'social' | 'inbox' = 'social'): Run {
   if (!canRechargeSocialEnergy(run)) return run
+  const energy = source === 'inbox' ? INBOX_RECHARGE_ENERGY : SOCIAL_RECHARGE_ENERGY
   return {
     ...run,
     revision: run.revision + 1,
-    socialWallets: recordSocialWallet(run, run.humanId, { energy: SOCIAL_RECHARGE_ENERGY }),
+    socialWallets: recordSocialWallet(run, run.humanId, { energy }),
   }
 }
 

@@ -9,7 +9,7 @@ import {
   SECRET_BETRAYER_CAST,
 } from './castleRoles'
 import { MIN_BETRAYERS, phaseLabel } from './seasonPhases'
-import { SOCIAL_RECHARGE_ENERGY } from './socialResources'
+import { INBOX_RECHARGE_ENERGY, SOCIAL_RECHARGE_ENERGY } from './socialResources'
 import './betrayalsRules.css'
 
 type HandbookChapter = {
@@ -114,13 +114,15 @@ const chapters: readonly HandbookChapter[] = [
         <p>
           The Public Shield protects its holder at the Round Table. Night Shields protect against
           the Conclave. The game shows which protection you hold. A guest who gives you a Night
-          Shield won't ask you for one that evening.
+          Shield won't ask you for one that evening. In a private Shield Trial, you see your own
+          result. Shield wins revealed by your role may also appear.
         </p>
         <p>
           Social cards show what each move costs. Each morning restores some Energy. Check in for
           Influence, or hear a suspicion and explore the castle for Info. You can still vote when
-          your reserves are empty. At zero Energy, an available optional ad can grant{' '}
-          {SOCIAL_RECHARGE_ENERGY} Energy once per real day.
+          your reserves are empty. At zero Energy, you can watch one available ad per real day. It
+          restores {SOCIAL_RECHARGE_ENERGY} Energy in Social or {INBOX_RECHARGE_ENERGY} Energy in
+          Incoming when you tap a reply you cannot afford.
         </p>
         <p>
           With Reality Mode, choose a guest in Social to observe them, ask around, or set a lookout.
