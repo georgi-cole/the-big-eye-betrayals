@@ -76,6 +76,7 @@ jobs:
 
       - name: Build and sync the isolated QA web bundle
         env:
+          BETRAYALS_NATIVE_BUILD: 'true'
           VITE_ADMOB_MODE: 'off'
         run: |
           npm run generate:audio

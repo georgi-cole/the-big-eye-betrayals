@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { excludeBetrayalsUnusedAssets } from './scripts/lib/betrayals-unused-assets.mjs'
 import { excludeMobileCinematicAssets } from './scripts/lib/mobile-cinematic-assets.mjs'
 import { excludeMobileBetrayalsSoundtrack } from './scripts/lib/mobile-betrayals-soundtrack.mjs'
 import { betrayalsMinigameCss } from './scripts/lib/betrayals-minigame-css'
@@ -19,6 +20,11 @@ const { version: appVersion } = JSON.parse(
 //   npm run build:capacitor   →  "./"             (passed via --base ./ CLI flag,
 //                                                   required for Capacitor/WKWebView)
 const mobileModes = new Set(['capacitor', 'ios', 'android'])
+const isBetrayalsBuild = (mode: string) =>
+  mode === 'betrayals-qa' || process.env.VITE_BETRAYALS_EDITION === 'true'
+const isNativeBuild = (mode: string) =>
+  mobileModes.has(mode) ||
+  (mode === 'betrayals-qa' && process.env.BETRAYALS_NATIVE_BUILD === 'true')
 const normalizeWatchPath = (path: string) => {
   const normalized = path.replaceAll('\\', '/')
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized
@@ -37,7 +43,7 @@ export default defineConfig(({ mode }) => ({
   base:
     mode === 'betrayals-qa'
       ? '/'
-      : mobileModes.has(mode)
+      : isNativeBuild(mode)
         ? './'
         : process.env.VITE_BASE_PATH || '/the-big-eye-betrayals/',
   ...(mode === 'betrayals-qa' && {
@@ -46,10 +52,10 @@ export default defineConfig(({ mode }) => ({
     preview: { host: '127.0.0.1', port: 4392, strictPort: true },
   }),
   define: {
-    ...(mode === 'betrayals-qa' && { 'import.meta.env.VITE_BETRAYALS_EDITION': '"true"' }),
+    ...(isBetrayalsBuild(mode) && { 'import.meta.env.VITE_BETRAYALS_EDITION': '"true"' }),
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
     'import.meta.env.VITE_CINEMATIC_PACK_EXTERNAL': JSON.stringify(
-      mobileModes.has(mode) ? 'true' : 'false'
+      isNativeBuild(mode) && !isBetrayalsBuild(mode) ? 'true' : 'false'
     ),
   },
   assetsInclude: ['**/*.wp2'],
@@ -67,15 +73,30 @@ export default defineConfig(({ mode }) => ({
         })
       },
       async writeBundle(options) {
-        if (!mobileModes.has(mode)) return
-        const result = await excludeMobileCinematicAssets(
-          process.cwd(),
-          resolve(options.dir ?? 'dist'),
-          cinematicPack
-        )
+        const root = process.cwd()
+        const output = resolve(options.dir ?? 'dist')
+        if (isBetrayalsBuild(mode)) {
+          const unused = await excludeBetrayalsUnusedAssets(root, output)
+          console.log(
+            `Betrayals media: excluded ${unused.excludedPaths.length} unused files (${unused.excludedBytes} bytes).`
+          )
+          if (isNativeBuild(mode)) {
+            const soundtrack = await excludeMobileBetrayalsSoundtrack(
+              root,
+              output,
+              unused.excludedPaths
+            )
+            console.log(
+              `Betrayals media: excluded ${soundtrack.excludedFiles} streamed tracks (${soundtrack.excludedBytes} bytes); verified ${soundtrack.retainedFiles} bundled public files.`
+            )
+          }
+          return
+        }
+        if (!isNativeBuild(mode)) return
+        const result = await excludeMobileCinematicAssets(root, output, cinematicPack)
         const soundtrack = await excludeMobileBetrayalsSoundtrack(
-          process.cwd(),
-          resolve(options.dir ?? 'dist'),
+          root,
+          output,
           cinematicPack.files.map((file) => file.path)
         )
         console.log(

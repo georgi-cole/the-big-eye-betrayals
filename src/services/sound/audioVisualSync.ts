@@ -15,7 +15,7 @@ export function installAudioVisualSync(): void {
   if (installed || typeof document === 'undefined') return
   installed = true
 
-  preloadPublicVotingAudioDuration()
+  if (import.meta.env.VITE_BETRAYALS_EDITION !== 'true') preloadPublicVotingAudioDuration()
 
   const originalPlay = SoundManager.play.bind(SoundManager)
   SoundManager.play = async (key, options) => {
