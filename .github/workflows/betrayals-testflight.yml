@@ -32,7 +32,7 @@ jobs:
   upload:
     name: Sign and upload internal QA
     needs: quality
-    runs-on: xcode-27-arm64
+    runs-on: xcode-27
     timeout-minutes: 55
     env:
       IOS_BUILD_NUMBER: ${{ github.run_id }}.${{ github.run_attempt }}
