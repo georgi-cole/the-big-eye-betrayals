@@ -63,11 +63,15 @@
 }
 
 .betrayals-utility-dialog {
-  width: min(29rem, calc(100% - 1.5rem));
-  max-height: calc(100% - 1.5rem);
-  max-height: calc(100dvh - 1.5rem);
+  position: fixed;
+  inset: var(--app-safe-area-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  width: min(29rem, calc(100% - 1.5rem - var(--safe-left) - var(--safe-right)));
+  max-height: calc(100% - 1.5rem - var(--app-safe-area-top) - var(--safe-bottom));
+  max-height: calc(100dvh - 1.5rem - var(--app-safe-area-top) - var(--safe-bottom));
   padding: 0;
+  margin: auto;
   overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   border: 1px solid #9b7c53;
   border-radius: 0.6rem;

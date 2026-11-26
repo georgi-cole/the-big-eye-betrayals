@@ -217,7 +217,7 @@ export function BetrayalsHome({
               <p>The Big Eye</p>
             </div>
             <h1>Betrayals</h1>
-            {IS_BETRAYALS_QA_BUILD && <p>QA build</p>}
+            {IS_BETRAYALS_QA_BUILD && <p className="betrayals-home__qa-label">QA build</p>}
           </div>
           <form className="betrayals-home__controls" onSubmit={selectPrimaryAction}>
             {!profiles && !continuing && (

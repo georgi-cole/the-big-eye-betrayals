@@ -1,10 +1,12 @@
 .betrayals-layout.betrayals-home {
   display: grid;
-  grid-template-rows: auto minmax(10rem, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(min-content, 1fr) auto;
+  width: 100%;
+  min-height: 100vh;
   min-height: 100dvh;
-  padding: max(1rem, env(safe-area-inset-top)) max(0.9rem, env(safe-area-inset-right))
-    calc(clamp(1.1rem, 3.7svh, 2.4rem) + env(safe-area-inset-bottom))
-    max(0.9rem, env(safe-area-inset-left));
+  padding: max(0.7rem, var(--app-safe-area-top)) max(0.9rem, var(--safe-right))
+    max(0.65rem, calc(var(--safe-bottom) + 0.25rem)) max(0.9rem, var(--safe-left));
   background: #0d0b11;
 }
 
@@ -21,7 +23,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, #0d0b11a1, transparent 22% 46%, #0e0b12a0 69%, #0d0b11f5 92%),
+    linear-gradient(180deg, #0d0b11a1, transparent 22% 46%, #0e0b126e 69%, #0d0b11a3 100%),
     linear-gradient(90deg, #09080e50, transparent 22% 78%, #09080e50);
   content: '';
 }
@@ -30,6 +32,7 @@
   position: absolute;
   top: 38%;
   left: 50%;
+  width: max(100%, calc(100vh * 0.5628));
   width: max(100%, calc(100cqh * 0.5628));
   aspect-ratio: 941 / 1672;
   transform: translate(-50%, -38%);
@@ -122,10 +125,10 @@
 }
 
 .betrayals-home__compass {
-  position: absolute;
+  position: relative;
   z-index: 2;
-  inset-block-start: max(0.7rem, env(safe-area-inset-top));
-  inset-inline-start: max(0.7rem, env(safe-area-inset-left));
+  grid-row: 1;
+  place-self: start;
   inline-size: clamp(3.2rem, 12.5vw, 3.85rem);
   aspect-ratio: 192 / 250;
   padding: 0;
@@ -177,9 +180,9 @@
 
 .betrayals-home__entrance {
   display: grid;
-  grid-row: 3;
+  grid-row: 2;
   justify-items: center;
-  gap: clamp(0.8rem, 2.3svh, 1.6rem);
+  gap: clamp(0.65rem, 2.3vh, 1.6rem);
 }
 
 .betrayals-home__identity {
@@ -208,8 +211,12 @@
 .betrayals-home__identity h1 {
   margin: 0.32rem 0 0;
   color: #f8ebda;
-  font-size: clamp(3.3rem, 15.4vw, 5.05rem);
+  font-size: clamp(2.75rem, min(15.4vw, 11vh), 5.05rem);
   line-height: 0.94;
+}
+
+.betrayals-home__qa-label {
+  margin: 0.6rem 0 0;
 }
 
 .betrayals-home__controls {
@@ -289,12 +296,6 @@
   color: #fff0d5;
   text-decoration: underline;
   text-underline-offset: 0.25em;
-}
-
-@media (max-height: 650px) {
-  .betrayals-layout.betrayals-home {
-    grid-template-rows: auto minmax(5.5rem, 1fr) auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

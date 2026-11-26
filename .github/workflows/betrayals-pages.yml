@@ -9,6 +9,12 @@ on:
       - 'scripts/lib/betrayals-pages-incident.mjs'
       - 'scripts/check-betrayals-rules.mjs'
       - 'tests/betrayals-pages-incident.test.mjs'
+      - 'playwright.betrayals.config.ts'
+      - 'e2e/playwright/betrayals-*.spec.ts'
+      - 'index.html'
+      - 'src/index.css'
+      - 'src/components/layout/**'
+      - 'src/hooks/useGameMode.ts'
       - 'src/betrayals/**'
       - 'public/assets/betrayals/**'
 
@@ -47,7 +53,7 @@ jobs:
         env:
           VITE_BETRAYALS_EDITION: 'true'
           VITE_BASE_PATH: /the-big-eye-betrayals/
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npx playwright test --config playwright.betrayals.config.ts
       - name: Mark the build for public verification
         run: printf '%s\n' "$GITHUB_SHA" > dist/deployed-commit.txt

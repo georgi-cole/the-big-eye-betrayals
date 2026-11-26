@@ -1,3 +1,11 @@
+:is(html, body):has(
+  .betrayals-layout--game,
+  .betrayals-layout--challenge,
+  .betrayals-profile-shell
+) {
+  overflow: hidden;
+}
+
 .betrayals-layout {
   --betrayals-ink: #f1e6dc;
   --betrayals-tile: #15181e;
@@ -8,10 +16,11 @@
   position: relative;
   isolation: isolate;
   width: min(100%, 460px);
+  min-height: 100vh;
   min-height: 100dvh;
   margin-inline: auto;
-  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
-    calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  padding: max(8px, var(--app-safe-area-top)) max(10px, var(--safe-right))
+    calc(10px + var(--safe-bottom)) max(10px, var(--safe-left));
   font-family: system-ui, sans-serif;
   color: var(--betrayals-ink);
   color-scheme: dark;
@@ -81,11 +90,24 @@
 
 .betrayals-layout--game {
   display: grid;
-  grid-template-rows: auto minmax(104px, 0.39fr) auto minmax(255px, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  block-size: 100vh;
   block-size: 100dvh;
   min-block-size: 0;
   gap: clamp(5px, 0.9dvh, 9px);
-  overflow: auto;
+  overflow: hidden;
+}
+
+.betrayals-board {
+  display: grid;
+  grid-template-rows: auto minmax(104px, 0.39fr) auto minmax(255px, 1fr);
+  gap: inherit;
+  margin-inline: -3px;
+  padding-inline: 3px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y pinch-zoom;
 }
 
 .betrayals-layout--game .betrayals-broadcast {
@@ -477,7 +499,7 @@
 .betrayals-save-issue {
   position: absolute;
   z-index: 3;
-  inset: auto 18px calc(71px + env(safe-area-inset-bottom));
+  inset: auto 18px calc(71px + var(--safe-bottom));
   margin: 0;
   padding: 5px 8px;
   border: 1px solid #94634b;
@@ -550,6 +572,7 @@
 .betrayals-layout--challenge {
   display: flex;
   flex-direction: column;
+  height: 100vh;
   height: 100dvh;
 }
 
