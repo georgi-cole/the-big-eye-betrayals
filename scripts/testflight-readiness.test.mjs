@@ -90,10 +90,10 @@ function fixture({
   }
 }
 
-test('current encryption inputs match the user-completed Apple baseline', async () => {
+test('current encryption inputs match the approved Betrayals baseline', async () => {
   const root = fileURLToPath(new URL('../', import.meta.url))
   const reviewed = JSON.parse(
-    await readFile(new URL('./testflight-readiness-policy.json', import.meta.url), 'utf8')
+    await readFile(new URL('./betrayals-testflight-readiness-policy.json', import.meta.url), 'utf8')
   )
   await verifyEncryptionInputs(root, reviewed)
   await assert.rejects(

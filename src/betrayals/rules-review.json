@@ -1,8 +1,8 @@
 {
   "src/betrayals/BetrayalsRules.tsx": "f30abf39f44039a2f24123453fd3a8f47cc2439c444389cddee1bf939198bb2e",
   "src/betrayals/BetrayalsCastleRole.tsx": "00a3587babd070c8c4b2b44ba8b7c0f67fbb9f83b5c69dca7054b48cb6767897",
-  "src/betrayals/BetrayalsHome.tsx": "66a7a012a945d47b5c21e618e0e6b7a5f47a306ab929a799c310fcfe099839e3",
-  "src/betrayals/BetrayalsScreen.tsx": "2acd81e72a9dc26652a90f4a38df00220410230b1840e4cf09e3127cdae2a6c5",
+  "src/betrayals/BetrayalsHome.tsx": "b3bbb54a18ef5e8e41088f3ac5c9e4ca5809a8507b11293eb6dd887ae150f898",
+  "src/betrayals/BetrayalsScreen.tsx": "e4392f0f6640d7595c92e72a6da915cddab6bf5d57f823678eeaf27a8a55b4b6",
   "src/betrayals/allianceRecords.ts": "651c426fa2dc1bbc2eb1a1fc035c2233fcba8f180c48efeb11e33c154e3ff33f",
   "src/betrayals/castleLife.ts": "74a3e0629d414cf5201511ec632b9d9cb6d723f780ef54fe87b40712ef707ed8",
   "src/betrayals/castleLifeBank.ts": "3e840f0b2b58f4a372f3d746b67559bcb9220a9cd1472cc31f9d3f8796958962",

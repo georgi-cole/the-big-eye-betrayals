@@ -12,14 +12,13 @@
     place-content: center;
     align-items: center;
     gap: clamp(1.5rem, 5vw, 4rem);
-    padding: max(1.5rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right))
-      max(1.5rem, env(safe-area-inset-bottom)) max(2rem, env(safe-area-inset-left));
+    padding: max(1.5rem, var(--app-safe-area-top)) max(2rem, var(--safe-right))
+      max(1.5rem, var(--safe-bottom)) max(2rem, var(--safe-left));
     color: #f7f8ff;
     text-align: left;
     background:
       radial-gradient(circle at 20% 20%, rgb(101 72 255 / 28%), transparent 34%),
-      radial-gradient(circle at 80% 75%, rgb(255 53 143 / 18%), transparent 32%),
-      #090d18;
+      radial-gradient(circle at 80% 75%, rgb(255 53 143 / 18%), transparent 32%), #090d18;
   }
 
   .portrait-orientation-guard__phone {
@@ -65,9 +64,14 @@
 }
 
 @keyframes portrait-guard-rotate {
-  to { transform: rotate(0deg); }
+  to {
+    transform: rotate(0deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .portrait-orientation-guard__phone { animation: none; transform: none; }
+  .portrait-orientation-guard__phone {
+    animation: none;
+    transform: none;
+  }
 }

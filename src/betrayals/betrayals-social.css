@@ -3,6 +3,7 @@
   --social-metal: #685646;
   --social-surface: linear-gradient(150deg, #29221d, #171718 72%);
   width: 100%;
+  height: 100vh;
   height: 100dvh;
   max-width: none;
   max-height: none;
@@ -46,7 +47,7 @@
   justify-content: flex-start;
   gap: 0.48rem;
   padding-top: max(0.48rem, var(--app-safe-area-top, 0px));
-  padding-inline: max(0.74rem, env(safe-area-inset-left)) max(0.74rem, env(safe-area-inset-right));
+  padding-inline: max(0.74rem, var(--safe-left)) max(0.74rem, var(--safe-right));
 }
 
 .betrayals-social-dialog .sp2-header__resources {
@@ -89,7 +90,7 @@
   width: min(100%, 68rem);
   min-height: 0;
   margin-inline: auto;
-  padding-inline: max(0.56rem, env(safe-area-inset-left)) max(0.56rem, env(safe-area-inset-right));
+  padding-inline: max(0.56rem, var(--safe-left)) max(0.56rem, var(--safe-right));
   overflow: hidden auto;
   overscroll-behavior: contain;
   background: linear-gradient(180deg, #14141866, #0e1013b3);
@@ -309,7 +310,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.45rem 0.85rem;
-  padding: 0.65rem max(0.85rem, env(safe-area-inset-left));
+  padding: 0.65rem max(0.85rem, var(--safe-right)) 0.65rem max(0.85rem, var(--safe-left));
   border-block-end: 1px solid #604b36;
   background: #261d15;
   color: #f5e3be;

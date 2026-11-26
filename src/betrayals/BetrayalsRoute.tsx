@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { Outlet, useNavigate } from 'react-router'
+import { useRouteScrollReset } from '../components/layout/useRouteScrollReset'
 import { useAppSelector } from '../store/hooks'
 import { selectCurrentProfile } from '../store/profilesSlice'
 import { store } from '../store/store'
@@ -8,8 +10,11 @@ import { getBetrayalsPortrait, isBetrayalsLook } from './betrayalsAppearance'
 import './betrayalsProfile.css'
 
 export function BetrayalsProfileShell() {
+  const scrollContainer = useRef<HTMLDivElement>(null)
+  useRouteScrollReset(scrollContainer)
+
   return (
-    <div className="betrayals-profile-shell">
+    <div ref={scrollContainer} className="betrayals-profile-shell">
       <Outlet />
     </div>
   )
@@ -17,6 +22,7 @@ export function BetrayalsProfileShell() {
 
 export default function BetrayalsRoute() {
   const navigate = useNavigate()
+  useRouteScrollReset()
   const profile = useAppSelector(selectCurrentProfile)
   const selection = profile?.appearanceSelection
   const portrait =

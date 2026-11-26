@@ -1,0 +1,24 @@
+{
+  "appId": "6839538320",
+  "approvedBuildId": "baa2e07b-9513-4569-8adf-0a5ae1d3139c",
+  "internalGroupId": "d7a334e3-0eba-4c19-aeee-5609861042df",
+  "reviewedFiles": {
+    "capacitor.config.ts": "527fdd89130019f8a703714f54d8f1de750e279aad26964dd442e915a156c811",
+    "ios/App/CapApp-SPM/Package.swift": "657402b256780acd48065fd119aef21904bfb0f63f9ac80824989fb77d7c8388",
+    "node_modules/@capacitor-community/sqlite/Package.swift": "a54174c20bcad806d016f1a9829956d84bd337a93255ce212f869d8613207c75"
+  },
+  "reviewedPackages": {
+    "@capacitor-community/sqlite": {
+      "version": "8.1.1",
+      "integrity": "sha512-wsqscMOMveDeIvB9WHLm38jkUV2317LmuWvvbhvmOB1REdr8GH6weFZpAiKmLimbpP2CQ2eVs8nmRcrTqbd9ng=="
+    },
+    "jeep-sqlite": {
+      "version": "2.8.0",
+      "integrity": "sha512-FWNUP6OAmrUHwiW7H1xH5YUQ8tN2O4l4psT1sLd7DQtHd5PfrA1nvNdeKPNj+wQBtu7elJa8WoUibTytNTaaCg=="
+    },
+    "sql.js": {
+      "version": "1.14.2",
+      "integrity": "sha512-3ZGPovObMFrdw79zrUHbfdE/DLIsy8jdNdssmMSQuRAymedU6q84asPt0kgiqrdMYlPegDItiIMfmIXzZnYFcw=="
+    }
+  }
+}

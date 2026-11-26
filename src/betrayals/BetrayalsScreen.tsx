@@ -38,6 +38,8 @@ import { castleGlance } from './castleLife'
 import { CASTLE_CHOICES } from './castleLifeBank'
 import { waitingShieldWitnesses } from './investigationRecords'
 import { usePresentationReducedMotion } from '../services/presentation/usePresentationReducedMotion'
+import PortraitOrientationGuard from '../components/layout/PortraitOrientationGuard'
+import useGameMode from '../hooks/useGameMode'
 import { preloadImage } from '../utils/preload'
 import { BETRAYALS_SOCIAL_RECHARGE_PLACEMENT } from '../services/ads/adsService'
 import { getAdAvailabilityMessage } from '../services/ads/adAvailability'
@@ -330,6 +332,8 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
   const motion = utilities.preferences.reducedMotion ? 'reduced' : undefined
   const portrait = profiles ? player?.portrait : getBetrayalsPortrait(utilities.preferences.lookId)
   const needsLook = Boolean(profiles && !portrait)
+  const showHome = !run || homeOpen || needsLook
+  useGameMode(!showHome)
   const soundtrackScene = resolveBetrayalsSoundtrackScene(run, homeOpen, run?.presentation?.[0])
   useBetrayalsSoundtrack(soundtrackScene)
 
@@ -722,7 +726,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
     if (omitNightFilm) dismissNightFilm()
   }, [omitNightFilm, firstCue])
 
-  if (!run || homeOpen || needsLook) {
+  if (showHome) {
     const saved =
       player?.portrait && !run && !getDurableItem(legacyClaim)
         ? restoreRun(saveStorage, saveId)
@@ -1211,23 +1215,26 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
 
   if (playing && canPlay && game) {
     return (
-      <BetrayalsChallengeStage
-        key={run.id + ':' + run.revision}
-        title={stageTitle}
-        game={game}
-        premiumGames={commerce.premiumGames}
-        motion={motion}
-        onForfeit={() => finishChallenge()}
-      >
-        <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
-          <ChallengeGame
-            run={run}
-            game={game}
-            premiumGames={commerce.premiumGames}
-            onFinish={finishChallenge}
-          />
-        </Suspense>
-      </BetrayalsChallengeStage>
+      <>
+        <BetrayalsChallengeStage
+          key={run.id + ':' + run.revision}
+          title={stageTitle}
+          game={game}
+          premiumGames={commerce.premiumGames}
+          motion={motion}
+          onForfeit={() => finishChallenge()}
+        >
+          <Suspense fallback={<p role="status">Loading {challengeName}…</p>}>
+            <ChallengeGame
+              run={run}
+              game={game}
+              premiumGames={commerce.premiumGames}
+              onFinish={finishChallenge}
+            />
+          </Suspense>
+        </BetrayalsChallengeStage>
+        <PortraitOrientationGuard />
+      </>
     )
   }
 
@@ -2030,172 +2037,174 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
             alt=""
           />
         </div>
-        <header className="betrayals-header">
-          <div className="betrayals-brand-row">
-            <div className="betrayals-wordmark">
-              <span className="betrayals-eye" aria-hidden="true" />
-              <div className="betrayals-wordmark__copy">
-                <span className="betrayals-wordmark__signature">Betrayals</span>
-                <sup className="betrayals-wordmark__season">Season {run.seasonNumber ?? 1}</sup>
+        <div className="betrayals-board">
+          <header className="betrayals-header">
+            <div className="betrayals-brand-row">
+              <div className="betrayals-wordmark">
+                <span className="betrayals-eye" aria-hidden="true" />
+                <div className="betrayals-wordmark__copy">
+                  <span className="betrayals-wordmark__signature">Betrayals</span>
+                  <sup className="betrayals-wordmark__season">Season {run.seasonNumber ?? 1}</sup>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="betrayals-phase-strip">
-            <div className="betrayals-phase-strip__copy" aria-live="polite">
-              <span className="betrayals-phase-strip__group">{stageGroup}</span>
-              <span className="betrayals-phase-strip__subphase">{subphase}</span>
-            </div>
-            <div
-              className="betrayals-phase-strip__tools"
-              role="group"
-              aria-label="Season shortcuts"
-            >
-              {roleCard && stage !== 'role-reveal' && (
+            <div className="betrayals-phase-strip">
+              <div className="betrayals-phase-strip__copy" aria-live="polite">
+                <span className="betrayals-phase-strip__group">{stageGroup}</span>
+                <span className="betrayals-phase-strip__subphase">{subphase}</span>
+              </div>
+              <div
+                className="betrayals-phase-strip__tools"
+                role="group"
+                aria-label="Season shortcuts"
+              >
+                {roleCard && stage !== 'role-reveal' && (
+                  <button
+                    className="betrayals-phase-strip__log"
+                    type="button"
+                    aria-label="View your Castle Role"
+                    aria-haspopup="dialog"
+                    aria-expanded={castleRoleOpen}
+                    title="Your Castle Role"
+                    onClick={() => setCastleRoleOpen(true)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="3" width="14" height="18" rx="2" />
+                      <path d="m12 7 3.5 5-3.5 5-3.5-5z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   className="betrayals-phase-strip__log"
                   type="button"
-                  aria-label="View your Castle Role"
+                  aria-label="Open My Pulse"
                   aria-haspopup="dialog"
-                  aria-expanded={castleRoleOpen}
-                  title="Your Castle Role"
-                  onClick={() => setCastleRoleOpen(true)}
+                  aria-expanded={Boolean(pulse)}
+                  title="My Pulse"
+                  onClick={() => investigation.openPulse()}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="5" y="3" width="14" height="18" rx="2" />
-                    <path d="m12 7 3.5 5-3.5 5-3.5-5z" />
+                    <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
+                    <path d="M12 3v3l1.5-1 1.5 1V3" />
                   </svg>
                 </button>
-              )}
-              <button
-                className="betrayals-phase-strip__log"
-                type="button"
-                aria-label="Open My Pulse"
-                aria-haspopup="dialog"
-                aria-expanded={Boolean(pulse)}
-                title="My Pulse"
-                onClick={() => investigation.openPulse()}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M7 3h12v16H7a2 2 0 0 0 0 4h12M7 3a2 2 0 0 0-2 2v16M9 8h6m-6 4h6" />
-                  <path d="M12 3v3l1.5-1 1.5 1V3" />
-                </svg>
-              </button>
-              <button
-                className="betrayals-phase-strip__store"
-                type="button"
-                aria-label="Open Store"
-                aria-haspopup="dialog"
-                title="Store"
-                onClick={() => openStore('home')}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M5 8h14l-1 13H6L5 8Z" />
-                  <path d="M9 8V6a3 3 0 0 1 6 0v2" />
-                  <path d="M9 12v1m6-1v1" />
-                </svg>
-              </button>
-              {(import.meta.env.DEV || import.meta.env.MODE === 'betrayals-qa') && (
                 <button
-                  className="betrayals-phase-strip__log betrayals-phase-strip__qa"
+                  className="betrayals-phase-strip__store"
                   type="button"
+                  aria-label="Open Store"
                   aria-haspopup="dialog"
-                  aria-label="Open Castle QA"
-                  onClick={() => setQaOpen(true)}
+                  title="Store"
+                  onClick={() => openStore('home')}
                 >
-                  QA
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 8h14l-1 13H6L5 8Z" />
+                    <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+                    <path d="M9 12v1m6-1v1" />
+                  </svg>
                 </button>
-              )}
+                {(import.meta.env.DEV || import.meta.env.MODE === 'betrayals-qa') && (
+                  <button
+                    className="betrayals-phase-strip__log betrayals-phase-strip__qa"
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-label="Open Castle QA"
+                    onClick={() => setQaOpen(true)}
+                  >
+                    QA
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <BetrayalsBroadcast
-          title={
-            conclave?.sealed ? 'The Sealed Ballot' : conclaveChoice ? 'The Conclave' : stageTitle
-          }
-          message={message}
-          detail={detail}
-          interactive={Boolean(
-            tableFeed || nightPower || dayPower || tablePower || conclave?.alphaAvailable
-          )}
-          controlsRef={
-            !cue && (counting || stage === 'cocktail') ? setVoteActionsTarget : undefined
-          }
-          cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
-          mode={broadcastMode}
-          art={artBase + scene + '.jpg'}
-          opener={
-            openWeather && (
-              <DawnWeather
-                key={[run.id, run.day, stage].join(':')}
-                weather={castleWeather(run, run.day + Number(stage === 'night-resolved'))}
-                reducedMotion={!playNightFilm}
-                onFinish={shownCue === 'sunrise' ? finishCue : undefined}
-              />
-            )
-          }
-        />
-
-        <div className="betrayals-status" role="group" aria-label="Season status">
-          <span className="betrayals-status__day">
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="10" r="3" />
-              <path d="M10 2v2m0 12v2M2 10h2m12 0h2M4.4 4.4l1.4 1.4m8.4 8.4 1.4 1.4m0-11.2-1.4 1.4m-8.4 8.4-1.4 1.4" />
-            </svg>
-            Day <strong>{String(run.day).padStart(2, '0')}</strong>
-          </span>
-          <span className="betrayals-status__cast">
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="7" r="2.5" />
-              <path d="M5 16v-1a5 5 0 0 1 10 0v1M5 6a2 2 0 0 0 0 4m10-4a2 2 0 0 1 0 4M3.5 12a3 3 0 0 0-2 3m15-3a3 3 0 0 1 2 3" />
-            </svg>
-            <span>
-              <strong>{activeCast.length}</strong>/{view.seats.length} left
-            </span>
-          </span>
-          <span className="betrayals-status__pot">
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M5 6h10l3 4-8 7-8-7zm0 0 2.5 4L10 17m5-11-2.5 4-2.5 7M2 10h16M10 2v1" />
-            </svg>
-            <strong>{run.pot.toLocaleString()}</strong> pot
-          </span>
-        </div>
-
-        <section ref={rosterSection} className="betrayals-cast" aria-label="Cast seats">
-          <Roster
-            view={view}
-            selectedId={selected}
-            selectedIds={columbusChoice ? columbusIds : undefined}
-            humanId={run.humanId}
-            sleeping={
-              (stage === 'night' && (!conclaveChoice || conclave?.sealed || Boolean(cue))) ||
-              stage === 'night-resolved' ||
-              shownCue === 'awakening'
+          <BetrayalsBroadcast
+            title={
+              conclave?.sealed ? 'The Sealed Ballot' : conclaveChoice ? 'The Conclave' : stageTitle
             }
-            selectableIds={
-              columbusChoice && columbusIds.length === COLUMBUS_GROUP_SIZE
-                ? columbusIds
-                : targets.length
-                  ? targets
-                  : undefined
+            message={message}
+            detail={detail}
+            interactive={Boolean(
+              tableFeed || nightPower || dayPower || tablePower || conclave?.alphaAvailable
+            )}
+            controlsRef={
+              !cue && (counting || stage === 'cocktail') ? setVoteActionsTarget : undefined
             }
-            runoffIds={votePhase ? run.runoffIds : undefined}
-            announcedNightId={announcedNightId}
-            compactExitId={compactExit ? cinematic.subject?.id : undefined}
-            mourning={mourning}
-            onSelect={(id) => {
-              if (columbusChoice) {
-                const ids = columbusIds.includes(id)
-                  ? columbusIds.filter((guestId) => guestId !== id)
-                  : [...columbusIds, id]
-                setColumbusPick({ key: columbusKey, ids })
-              } else setSelected((nightRole || mayorChoice) && selected === id ? undefined : id)
-            }}
+            cueKey={run.id + ':' + run.day + ':' + stage + ':' + beat}
+            mode={broadcastMode}
+            art={artBase + scene + '.jpg'}
+            opener={
+              openWeather && (
+                <DawnWeather
+                  key={[run.id, run.day, stage].join(':')}
+                  weather={castleWeather(run, run.day + Number(stage === 'night-resolved'))}
+                  reducedMotion={!playNightFilm}
+                  onFinish={shownCue === 'sunrise' ? finishCue : undefined}
+                />
+              )
+            }
           />
-          {!participating && stage !== 'settled' && (
-            <div className="betrayals-cast__caption">Spectator</div>
-          )}
-        </section>
+
+          <div className="betrayals-status" role="group" aria-label="Season status">
+            <span className="betrayals-status__day">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <circle cx="10" cy="10" r="3" />
+                <path d="M10 2v2m0 12v2M2 10h2m12 0h2M4.4 4.4l1.4 1.4m8.4 8.4 1.4 1.4m0-11.2-1.4 1.4m-8.4 8.4-1.4 1.4" />
+              </svg>
+              Day <strong>{String(run.day).padStart(2, '0')}</strong>
+            </span>
+            <span className="betrayals-status__cast">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <circle cx="10" cy="7" r="2.5" />
+                <path d="M5 16v-1a5 5 0 0 1 10 0v1M5 6a2 2 0 0 0 0 4m10-4a2 2 0 0 1 0 4M3.5 12a3 3 0 0 0-2 3m15-3a3 3 0 0 1 2 3" />
+              </svg>
+              <span>
+                <strong>{activeCast.length}</strong>/{view.seats.length} left
+              </span>
+            </span>
+            <span className="betrayals-status__pot">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M5 6h10l3 4-8 7-8-7zm0 0 2.5 4L10 17m5-11-2.5 4-2.5 7M2 10h16M10 2v1" />
+              </svg>
+              <strong>{run.pot.toLocaleString()}</strong> pot
+            </span>
+          </div>
+
+          <section ref={rosterSection} className="betrayals-cast" aria-label="Cast seats">
+            <Roster
+              view={view}
+              selectedId={selected}
+              selectedIds={columbusChoice ? columbusIds : undefined}
+              humanId={run.humanId}
+              sleeping={
+                (stage === 'night' && (!conclaveChoice || conclave?.sealed || Boolean(cue))) ||
+                stage === 'night-resolved' ||
+                shownCue === 'awakening'
+              }
+              selectableIds={
+                columbusChoice && columbusIds.length === COLUMBUS_GROUP_SIZE
+                  ? columbusIds
+                  : targets.length
+                    ? targets
+                    : undefined
+              }
+              runoffIds={votePhase ? run.runoffIds : undefined}
+              announcedNightId={announcedNightId}
+              compactExitId={compactExit ? cinematic.subject?.id : undefined}
+              mourning={mourning}
+              onSelect={(id) => {
+                if (columbusChoice) {
+                  const ids = columbusIds.includes(id)
+                    ? columbusIds.filter((guestId) => guestId !== id)
+                    : [...columbusIds, id]
+                  setColumbusPick({ key: columbusKey, ids })
+                } else setSelected((nightRole || mayorChoice) && selected === id ? undefined : id)
+              }}
+            />
+            {!participating && stage !== 'settled' && (
+              <div className="betrayals-cast__caption">Spectator</div>
+            )}
+          </section>
+        </div>
 
         {saveIssue && (
           <p className="betrayals-save-issue" role="status">
@@ -2548,6 +2557,7 @@ export default function BetrayalsScreen({ profiles }: { profiles?: BetrayalsProf
           <CastleQaDialog run={run} onClose={() => setQaOpen(false)} onSimulate={simulateQa} />
         </Suspense>
       )}
+      <PortraitOrientationGuard />
     </>
   )
 }

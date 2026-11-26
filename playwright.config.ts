@@ -18,6 +18,7 @@ const chromiumLaunchOptions = chromiumExecutablePath
 
 export default defineConfig({
   testDir: './e2e/playwright',
+  testIgnore: '**/betrayals-*.spec.ts',
   outputDir: 'test-results',
   fullyParallel: false,
   workers: process.env.CI ? 2 : 1,

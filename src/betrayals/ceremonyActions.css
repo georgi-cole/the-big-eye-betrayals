@@ -3,12 +3,9 @@
   padding-inline: 2rem;
   border: 0;
   border-radius: 0.36rem;
-  background:
-    url('/assets/betrayals/entrance-primary-plaque.png') center / 100% 100% no-repeat,
-    linear-gradient(170deg, #e9c88c, #d6aa6d 43%, #b78750) center / calc(100% - 1.35rem)
-      calc(100% - 1rem) no-repeat,
-    linear-gradient(170deg, #e8c893, #7d532c) center / calc(100% - 1.2rem) calc(100% - 0.85rem)
-      no-repeat;
+  -webkit-appearance: none;
+  appearance: none;
+  background: url('/assets/betrayals/entrance-primary-plaque.png') center / 100% 100% no-repeat;
   color: #25170f;
   font:
     700 1.11rem Georgia,

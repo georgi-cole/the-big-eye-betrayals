@@ -43,12 +43,13 @@
 }
 
 .betrayals-shop-page {
+  min-height: 100vh;
   min-height: 100dvh;
   background:
     radial-gradient(ellipse at 50% -12%, #70283a58, transparent 48%),
     linear-gradient(165deg, #1b0c15, #0d0a10 70%);
   color: #f8ecdc;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  padding: max(20px, var(--app-safe-area-top)) 16px max(24px, var(--safe-bottom));
 }
 
 .betrayals-shop-page > header {

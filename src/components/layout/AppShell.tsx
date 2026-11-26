@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import NavBar from './NavBar'
 import { useAppSelector } from '../../store/hooks'
@@ -7,6 +7,7 @@ import { selectSettings } from '../../store/settingsSlice'
 import { selectRemoteBroadcast, selectRemoteConfig } from '../../remoteConfig/remoteConfigSlice'
 import useGameMode from '../../hooks/useGameMode'
 import { buildViewportMetaContent } from './viewportMeta'
+import { useRouteScrollReset } from './useRouteScrollReset'
 import PortraitOrientationGuard from './PortraitOrientationGuard'
 import SaveRecoveryNotice from '../SaveRecoveryNotice/SaveRecoveryNotice'
 import PhonePreviewSystemChrome from './PhonePreviewSystemChrome'
@@ -80,20 +81,7 @@ export default function AppShell() {
   // measured cutout and gesture insets still protect interactive content.
   useGameMode(location.pathname === '/game', allowsLandscape)
 
-  // React Router keeps this persistent scroll container mounted between
-  // screens. Reset it before the next screen paints so a long form (notably
-  // Profile Picker) cannot leave Profile or the fixed gameplay surface panned.
-  useLayoutEffect(() => {
-    const main = mainRef.current
-    if (main) {
-      main.scrollTop = 0
-      main.scrollLeft = 0
-    }
-    document.documentElement.scrollTop = 0
-    document.documentElement.scrollLeft = 0
-    document.body.scrollTop = 0
-    document.body.scrollLeft = 0
-  }, [location.key])
+  useRouteScrollReset(mainRef)
 
   // Apply theme preset and accessibility classes to document.body
   useEffect(() => {

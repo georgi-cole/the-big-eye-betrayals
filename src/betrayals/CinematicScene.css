@@ -14,7 +14,7 @@
   background: #080a10;
   color-scheme: dark;
   --cine-gold: #eec397;
-  --cine-controls: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  --cine-controls: max(1rem, calc(var(--safe-bottom) + 0.5rem));
   animation: betrayals-cine-in 500ms ease both;
 }
 
@@ -46,7 +46,8 @@
   max-height: none;
   box-sizing: border-box;
   margin: 0;
-  padding: max(4rem, calc(env(safe-area-inset-top) + 3rem)) 1rem 0;
+  padding: max(4rem, calc(var(--app-safe-area-top) + 3rem)) max(1rem, var(--safe-right)) 0
+    max(1rem, var(--safe-left));
   border: 0;
   color: #f5e5d1;
   background: transparent;

@@ -1,11 +1,20 @@
 .betrayals-profile-shell {
   box-sizing: border-box;
+  height: 100vh;
   height: 100dvh;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline: var(--safe-left) var(--safe-right);
+  touch-action: pan-y pinch-zoom;
   color-scheme: dark;
   background: radial-gradient(ellipse at 50% 0%, #322522 0, #110d13 66%);
   --color-accent: #dfb888;
   --color-accent-2: #b77f5e;
+}
+
+.betrayals-profile-shell :is(.profile-picker, .player-account) {
+  padding-block: max(16px, var(--app-safe-area-top)) max(16px, var(--safe-bottom));
 }
 
 .betrayals-profile-shell .dressing-room,
